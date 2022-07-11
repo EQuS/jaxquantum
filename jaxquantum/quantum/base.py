@@ -16,7 +16,7 @@ config.update("jax_enable_x64", True)
 
 # Convert between QuTiP and JAX
 # ===============================================================
-def qt2jax(qt_obj, dtype=jnp.complex128) -> jnp.ndarray:
+def qt2jax(qt_obj, dtype=jnp.complex128):
     """QuTiP state -> JAX array.
 
     Args:
