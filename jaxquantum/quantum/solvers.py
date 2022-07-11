@@ -11,6 +11,14 @@ from jaxquantum.quantum.base import dag
 
 
 def spre(op: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
+    """Superoperator generator.
+
+    Args:
+        op: operator to be turned into a superoperator
+
+    Returns:
+        superoperator function
+    """
     op_dag = jnp.conj(op).T
     return lambda rho: 0.5 * (
         2 * op @ rho @ op_dag - rho @ op_dag @ op - op_dag @ op @ rho
@@ -28,11 +36,23 @@ def mesolve(
     p: jnp.ndarray,
     t_list: jnp.ndarray,
     c_ops: Optional[List[jnp.ndarray]] = None,
-    H0: Optional[jnp.ndarray] = None,  # if H0 is not None, it will override Ht
+    H0: Optional[jnp.ndarray] = None,
     Ht: Optional[Callable[[float], jnp.ndarray]] = None,
-    use_density_matrix=False,  # if c_ops is nonempty, use_density_matrix will be overriden to True
+    use_density_matrix=False,
 ):
-    """ """
+    """Quantum Master Equation solver.
+
+    Args:
+        p: initial state
+        t_list: time list
+        c_ops: list of collapse operators
+        H0: time independent Hamiltonian. If H0 is not None, it will override Ht.
+        Ht: time dependent Hamiltonian.
+        use_density_matrix: if True, use density matrix instead of state vector
+
+    Returns:
+        list of states
+    """
 
     # These checks slow down the function substantially.. so removing them for now.
     # use_density_matrix = use_density_matrix or c_ops is not None
@@ -49,7 +69,7 @@ def mesolve(
         if H0 is not None:
             H = H0_val  # use H0 if given
         else:
-            H = Ht(t)  # else use Ht (this will fail if Ht is not provided)
+            H = Ht(t)  # type: ignore
 
         rho_dot = -1j * (H @ rho)
 
@@ -64,6 +84,16 @@ def mesolve(
 
 
 def calc_expect(op: jnp.ndarray, states: jnp.ndarray) -> jnp.ndarray:
+    """Calculate expectation value of an operator given a list of states.
+
+    Args:
+        op: operator
+        states: list of states
+
+    Returns:
+        list of expectation values
+    """
+
     @jit
     def calc_expect_single(state: jnp.ndarray):
         return (dag(state) @ op @ state)[0][0]
