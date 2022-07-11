@@ -3,9 +3,11 @@
 from functools import partial
 from typing import Callable, List, Optional
 
-from jax import jit
+from jax import jit, vmap
 from jax.experimental.ode import odeint
 import jax.numpy as jnp
+
+from jaxquantum.quantum.base import dag
 
 
 def spre(op: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
@@ -59,3 +61,11 @@ def mesolve(
         return rho_dot
 
     return odeint(f, p, t_list, H0, c_ops)
+
+
+def calc_expect(op: jnp.ndarray, states: jnp.ndarray) -> jnp.ndarray:
+    @jit
+    def calc_expect_single(state: jnp.ndarray):
+        return (dag(state) @ op @ state)[0][0]
+
+    return vmap(calc_expect_single)(states)
