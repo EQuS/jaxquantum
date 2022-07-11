@@ -47,9 +47,9 @@ def mesolve(
         c_ops_val: List[jnp.ndarray],
     ):
         if H0 is not None:
-            H = H0_val
+            H = H0_val  # use H0 if given
         else:
-            H = Ht(t)
+            H = Ht(t)  # else use Ht (this will fail if Ht is not provided)
 
         rho_dot = -1j * (H @ rho)
 
