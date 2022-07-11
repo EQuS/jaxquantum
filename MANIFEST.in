@@ -1,0 +1,2 @@
+include jaxquantum/VERSION.txt 
+include README.md
