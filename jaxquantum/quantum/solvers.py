@@ -8,6 +8,7 @@ from jax.experimental.ode import odeint
 import jax.numpy as jnp
 
 from jaxquantum.quantum.base import dag
+from jaxquantum.utils.utils import is_1d
 
 
 def spre(op: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
@@ -95,7 +96,14 @@ def calc_expect(op: jnp.ndarray, states: jnp.ndarray) -> jnp.ndarray:
     """
 
     @jit
-    def calc_expect_single(state: jnp.ndarray):
+    def calc_expect_ket_single(state: jnp.ndarray):
         return (dag(state) @ op @ state)[0][0]
 
-    return vmap(calc_expect_single)(states)
+    @jit
+    def calc_expect_dm_single(state: jnp.ndarray):
+        return jnp.trace(op @ state)
+
+    if is_1d(states[0]):
+        return vmap(calc_expect_ket_single)(states)
+    else:
+        return vmap(calc_expect_dm_single)(states)
