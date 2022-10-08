@@ -94,13 +94,11 @@ def sigmap() -> jnp.ndarray:
 
 
 def destroy(N) -> jnp.ndarray:
-    # TODO: replace with JAX implementation
-    return qt2jax(qt.destroy(int(N)))
+    return jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=1)
 
 
 def create(N) -> jnp.ndarray:
-    op = destroy(N)
-    return dag(op)
+    return jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=-1)
 
 
 def num(N) -> jnp.ndarray:
@@ -156,7 +154,10 @@ def expm(*args, **kwargs) -> jnp.ndarray:
 
 
 def tensor(*args, **kwargs) -> jnp.ndarray:
-    return jnp.kron(*args, **kwargs)
+    ans = args[0]
+    for arg in args[1:]:
+        ans = jnp.kron(ans, arg)
+    return ans
 
 
 def tr(*args, **kwargs) -> jnp.ndarray:
