@@ -57,7 +57,16 @@ Please use `pip install -e '.[dev]'` if you are a `zsh` user.
 
 Installing the package in the usual non-editable mode would require a developer to upgrade their pip installation (i.e. run `pip install --upgrade .`) every time they update the package source code.
 
-#### Building documentation locally
+#### Viewing documentation locally
+
+Set yourself up to use the `[dev]` dependencies. Then, from the command line run:
+```bash
+mkdocs serve
+```
+
+Then, go to: [http://127.0.0.1:8000/](http://127.0.0.1:8000/) to view the documentation.
+
+#### Updating and deploying documentation for Devs
 
 Set yourself up to use the `[dev]` dependencies. Then, from the command line run:
 ```bash
@@ -74,5 +83,5 @@ mkdocs gh-deploy
 **Core Devs:** [Shantanu Jha](https://github.com/Phionx)
 
 
-This project was created by the Engineering Quantum Systems group at MIT.
+This package was developed while conducting research in the Engineering Quantum Systems Group at MIT with invaluable advice from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/).
 
