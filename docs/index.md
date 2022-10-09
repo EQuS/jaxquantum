@@ -5,9 +5,6 @@
     <img src="https://img.shields.io/static/v1?style=for-the-badge&label=maintainer&message=EQuS&color=inactive"/>
 </p>
 
-
-<!-- **Documentation**: [https://github.mit.edu/pages/EQuS/python_package_template/](https://github.mit.edu/pages/EQuS/python_package_template/)  -->
-
 ## Motivation
 
 `jaxquantum` is intended to replace QuTiP by leveraging JAX to accelerate quantum simulation tooling, such as master equatino solving. 
@@ -37,7 +34,7 @@ This should execute silently if installation was successful.
 To build `jaxquantum` from source, pip install using:
 
 ```bash
-git clone git@github.mit.edu:EQuS/EQuS_template_repo.git jaxquantum
+git clone git@github.com:EQuS/jaxquantum.git jaxquantum
 cd jaxquantum
 pip install --upgrade .
 ```
@@ -48,7 +45,7 @@ If you also want to download the dependencies needed to run optional tutorials, 
 
 If you intend to contribute to this project, please install `jaxquantum` in editable mode as follows:
 ```bash
-git clone git@github.mit.edu:EQuS/EQuS_template_repo.git jaxquantum
+git clone git@github.com:EQuS/jaxquantum.git jaxquantum
 cd jaxquantum
 pip install -e .[dev]
 ```
