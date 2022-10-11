@@ -80,5 +80,5 @@ mkdocs gh-deploy
 **Core Devs:** [Shantanu Jha](https://github.com/Phionx)
 
 
-This package was developed while conducting research in the Engineering Quantum Systems Group at MIT with invaluable advice from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/).
+This package was developed while conducting research in the Engineering Quantum Systems Group at MIT with invaluable advice from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/). 
 
