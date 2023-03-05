@@ -56,7 +56,7 @@ Installing the package in the usual non-editable mode would require a developer 
 
 ## Documentation
 
-Documentation should be viewable here: [https://github.mit.edu/pages/EQuS/jaxquantum/](https://github.mit.edu/pages/EQuS/jaxquantum/) 
+Documentation should be viewable here: [https://github.com/pages/EQuS/jaxquantum/](https://github.com/pages/EQuS/jaxquantum/) 
 
 #### View locally
 

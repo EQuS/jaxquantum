@@ -13,11 +13,26 @@ QFUNC = "qfunc"
 
 
 def plot_qp(state, pts, dims=None, ax=None, contour=True, qp_type=WIGNER):
+    """Plot quasi-probability distribution.
+
+    TODO: decouple this from qutip.
+
+    Args:
+        state: statevector
+        pts: points to evaluate quasi-probability distribution on
+        dim: dimensions of state
+        ax: matplotlib axis to plot on
+        contour: make the plot use contouring
+        qp_type: type of quasi probability distribution ("wigner", "qfunc")
+
+    Returns:
+        axis on which the plot was plotted.
+    """
     pts = np.array(pts)
     state = jax2qt(state, dims=dims)
     if ax is None:
-        fig, ax = plt.subplots(1, figsize=(4, 3), dpi=200)
-    fig = ax.get_figure()
+        _, ax = plt.subplots(1, figsize=(4, 3), dpi=200)
+    # fig = ax.get_figure()
 
     if qp_type == WIGNER:
         vmin = -1
