@@ -54,26 +54,27 @@ Please use `pip install -e '.[dev]'` if you are a `zsh` user.
 
 Installing the package in the usual non-editable mode would require a developer to upgrade their pip installation (i.e. run `pip install --upgrade .`) every time they update the package source code.
 
-#### Viewing documentation locally
+## Documentation
 
-Set yourself up to use the `[dev]` dependencies. Then, from the command line run:
-```bash
-mkdocs serve
+Documentation should be viewable here: [https://github.com/pages/EQuS/jaxquantum/](https://github.com/pages/EQuS/jaxquantum/) 
+
+#### View locally
+
+
+To view documentation locally, please open `docs/build/html/index.html` in your browser.
+
+
+#### Build documentation 
+
+To rebuild documentation, please start in the root folder and run:
+
+```sh
+cd docs
+make clean
+make html
 ```
 
-Then, go to: [http://127.0.0.1:8000/](http://127.0.0.1:8000/) to view the documentation.
-
-#### Updating and deploying documentation for Devs
-
-Set yourself up to use the `[dev]` dependencies. Then, from the command line run:
-```bash
-mkdocs build
-```
-
-Then, when you're ready to deploy, run:
-```bash
-mkdocs gh-deploy
-```
+*You may also have to delete the `docs/source/_autosummary` directory before running the above commands.*
 
 ## Acknowledgements
 

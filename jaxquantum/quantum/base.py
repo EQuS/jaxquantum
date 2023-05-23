@@ -4,6 +4,7 @@ Common jax <-> qutip-inspired functions
 
 from jax.config import config
 from jax.nn import one_hot
+
 import jax.numpy as jnp
 import jax.scipy as jsp
 import numpy as np
@@ -52,7 +53,15 @@ def jax2qt(jax_obj, dims=None):
 # ===============================================================
 
 
-def unit(rho, use_density_matrix=False):
+def unit(rho: jnp.ndarray, use_density_matrix=False):
+    """Normalize density matrix.
+
+    Args:
+        rho: density matrix
+
+    Returns:
+        normalized density matrix
+    """
     if use_density_matrix:
         evals, _ = jnp.linalg.eigh(rho @ jnp.conj(rho).T)
         rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)))
@@ -61,66 +70,172 @@ def unit(rho, use_density_matrix=False):
 
 
 def dag(op: jnp.ndarray) -> jnp.ndarray:
+    """Conjugate transpose.
+
+    Args:
+        op: operator
+
+    Returns:
+        conjugate transpose of op
+    """
     return jnp.conj(op).T
 
 
 def ket2dm(ket: jnp.ndarray) -> jnp.ndarray:
+    """Turns ket into density matrix.
+
+    Args:
+        ket: ket
+
+    Returns:
+        Density matrix
+    """
     ket = ket.reshape(ket.shape[0], 1)
     return ket @ dag(ket)
 
 
 def basis(N, k):
+    """Creates a |k> (i.e. fock state) ket in a specified Hilbert Space.
+
+    Args:
+        N: Hilbert space dimension
+        k: fock number
+
+    Returns:
+        Fock State |k>
+    """
     return one_hot(k, N).reshape(N, 1)
 
 
 def sigmax() -> jnp.ndarray:
+    """σx
+
+    Returns:
+        σx Pauli Operator
+    """
     return jnp.array([[0.0, 1.0], [1.0, 0.0]])
 
 
 def sigmay() -> jnp.ndarray:
+    """σy
+
+    Returns:
+        σy Pauli Operator
+    """
     return jnp.array([[0.0, -1.0j], [1.0j, 0.0]])
 
 
 def sigmaz() -> jnp.ndarray:
+    """σz
+
+    Returns:
+        σz Pauli Operator
+    """
     return jnp.array([[1.0, 0.0], [0.0, -1.0]])
 
 
 def sigmam() -> jnp.ndarray:
+    """σ-
+
+    Returns:
+        σ- Pauli Operator
+    """
     return jnp.array([[0.0, 0.0], [1.0, 0.0]])
 
 
 def sigmap() -> jnp.ndarray:
+    """σ+
+
+    Returns:
+        σ+ Pauli Operator
+    """
     return jnp.array([[0.0, 1.0], [0.0, 0.0]])
 
 
 def destroy(N) -> jnp.ndarray:
+    """annihilation operator
+
+    Args:
+        N: Hilbert space size
+
+    Returns:
+        annilation operator in Hilber Space of size N
+    """
     return jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=1)
 
 
 def create(N) -> jnp.ndarray:
+    """creation operator
+
+    Args:
+        N: Hilbert space size
+
+    Returns:
+        creation operator in Hilber Space of size N
+    """
     return jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=-1)
 
 
 def num(N) -> jnp.ndarray:
+    """Number operator
+
+    Args:
+        N: Hilbert Space size
+
+    Returns:
+        number operator in Hilber Space of size N
+    """
     return jnp.diag(jnp.arange(N))
 
 
-def coherent(N, a) -> jnp.ndarray:
+def coherent(N, α) -> jnp.ndarray:
+    """Coherent state.
+
+    Args:
+        N: Hilbert Space Size
+        α: coherent state amplitude
+
+    Return:
+        coherent state |α⟩
+    """
     # TODO: replace with JAX implementation
-    return qt2jax(qt.coherent(int(N), complex(a)))
+    return qt2jax(qt.coherent(int(N), complex(α)))
 
 
 def identity(*args, **kwargs) -> jnp.ndarray:
+    """Identity matrix.
+
+    Returns:
+        Identity matrix.
+    """
     return jnp.eye(*args, **kwargs)
 
 
-def displace(N, alpha) -> jnp.ndarray:
+def displace(N, α) -> jnp.ndarray:
+    """Displace operator
+
+    Args:
+        N: Hilbert Space Size
+        α: displacement
+
+    Returns:
+        Displace operator D(α)
+    """
     # TODO: replace with JAX implementation
-    return qt2jax(qt.displace(int(N), float(alpha)))
+    return qt2jax(qt.displace(int(N), float(α)))
 
 
 def ptrace(rho, indx, dims):
-    """
+    """Partial Trace.
+
+    Args:
+        rho: density matrix
+        indx: index to trace out
+        dims: list of dimensions of the tensored hilbert spaces
+
+    Returns:
+        partial traced out density matrix
+
     TODO: Fix weird tracing errors that arise with reshape
     """
     if is_1d(rho):
@@ -150,10 +265,24 @@ def ptrace(rho, indx, dims):
 
 
 def expm(*args, **kwargs) -> jnp.ndarray:
+    """Matrix exponential wrapper.
+
+    Returns:
+        matrix exponential
+    """
     return jsp.linalg.expm(*args, **kwargs)
 
 
 def tensor(*args, **kwargs) -> jnp.ndarray:
+    """Tensor product.
+
+    Args:
+        *args: tensors to take the product of
+
+    Returns:
+        Tensor product of given tensors
+
+    """
     ans = args[0]
     for arg in args[1:]:
         ans = jnp.kron(ans, arg)
@@ -161,4 +290,9 @@ def tensor(*args, **kwargs) -> jnp.ndarray:
 
 
 def tr(*args, **kwargs) -> jnp.ndarray:
+    """Full trace.
+
+    Returns:
+        Full trace.
+    """
     return jnp.trace(*args, **kwargs)

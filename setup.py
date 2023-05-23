@@ -5,7 +5,7 @@ import os
 
 from setuptools import setup, find_namespace_packages
 
-DIST_NAME = "jaxquantum"  # some people prefer using example-package instead as the distribution name
+DIST_NAME = "jaxquantum"
 PACKAGE_NAME = "jaxquantum"
 
 REQUIREMENTS = [
@@ -21,12 +21,11 @@ EXTRA_REQUIREMENTS = {
         "mypy",
         "pylint",
         "black",
-        "mkdocs",
-        "mkdocs-material",
-        "mkdocs-gen-files",
-        "mkdocs-literate-nav",
-        "mkdocs-section-index",
-        "mkdocstrings-python",
+        "sphinx",
+        "sphinx-book-theme",
+        "sphinxcontrib-napoleon",
+        "Jinja2<3.1",  # https://github.com/readthedocs/readthedocs.org/issues/9038
+        "myst-nb",
     ],
 }
 
@@ -49,7 +48,7 @@ setup(
     long_description=README,
     long_description_content_type="text/markdown",
     url="https://github.com/EQuS/jaxquantum",
-    author="Shantanu Jha",
+    author="Shantanu Jha, Shoumik Chowdhury, Max Hays",
     author_email="shantanu.rajesh.jha@gmail.com",
     license="Apache License 2.0",
     packages=find_namespace_packages(exclude=["tutorials*"]),
