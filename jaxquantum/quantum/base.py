@@ -188,18 +188,18 @@ def num(N) -> jnp.ndarray:
     return jnp.diag(jnp.arange(N))
 
 
-def coherent(N, α) -> jnp.ndarray:
+def coherent(N, alpha) -> jnp.ndarray:
     """Coherent state.
 
     Args:
         N: Hilbert Space Size
-        α: coherent state amplitude
+        alpha: coherent state amplitude
 
     Return:
-        coherent state |α⟩
+        coherent state |alpha>
     """
     # TODO: replace with JAX implementation
-    return qt2jax(qt.coherent(int(N), complex(α)))
+    return qt2jax(qt.coherent(int(N), complex(alpha)))
 
 
 def identity(*args, **kwargs) -> jnp.ndarray:

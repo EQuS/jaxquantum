@@ -67,7 +67,7 @@ html_theme_options = {
     "use_repository_button": True,
 }
 
-html_title = "graph-based pulse design"
+html_title = "autodifferentiable and accelerated quantum dynamics simulation"
 
 html_logo = "_static/assets/logo.png"
 

@@ -7,13 +7,13 @@
 
 ## Motivation
 
-`jaxquantum` is intended to replace QuTiP by leveraging JAX to accelerate quantum simulation tooling, such as master equatino solving. 
+`jaxquantum` leverages JAX to enable the auto differentiable and accelerated simulation of quantum dynamical systems, through tooling such as master equation solving. 
 
 ## Installation
 
 *Conda users, please make sure to `conda install pip` before running any pip installation if you want to install `jaxquantum` into your conda environment.*
 
-`jaxquantum` may soon be published on PyPI. Once it is, simply run the following code to install the package:
+`jaxquantum` is published on PyPI. So, to install the latest version from PyPI, simply run the following code to install the package:
 
 ```bash
 pip install jaxquantum
@@ -72,6 +72,12 @@ To rebuild documentation, please start in the root folder and run:
 cd docs
 make clean
 make html
+```
+
+For windows users, you may have to do:
+```sh
+.\make.bat clean
+.\make.bat html
 ```
 
 *You may also have to delete the `docs/source/_autosummary` directory before running the above commands.*
