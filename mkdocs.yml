@@ -1,0 +1,60 @@
+site_name: jaxquantum
+site_url: "https://github.com/EQuS/jaxquantum"
+use_directory_urls: false
+repo_url: https://github.com/EQuS/jaxquantum
+repo_name: jaxquantum
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default 
+      primary: amber
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: amber
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+copyright: "&copy Copyright 2022, jaxquantum developers."
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/EQuS/jaxquantum
+plugins:
+  - search
+  - gen-files:
+      scripts:
+      - docs/gen_ref_pages.py
+  - literate-nav:
+      nav_file: summary.md
+  - section-index
+  - mkdocstrings:
+      watch:
+      - docs
+      - jaxquantum
+
+nav:
+  - About: index.md
+  - Code Reference: reference/

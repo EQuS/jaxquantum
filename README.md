@@ -47,10 +47,10 @@ If you intend to contribute to this project, please install `jaxquantum` in edit
 ```bash
 git clone git@github.com:EQuS/jaxquantum.git jaxquantum
 cd jaxquantum
-pip install -e .[dev]
+pip install -e .[dev, docs]
 ```
 
-Please use `pip install -e '.[dev]'` if you are a `zsh` user.
+Please use `pip install -e '.[dev, docs]'` if you are a `zsh` user.
 
 Installing the package in the usual non-editable mode would require a developer to upgrade their pip installation (i.e. run `pip install --upgrade .`) every time they update the package source code.
 
@@ -58,33 +58,28 @@ Installing the package in the usual non-editable mode would require a developer 
 
 Documentation should be viewable here: [https://github.com/pages/EQuS/jaxquantum/](https://github.com/pages/EQuS/jaxquantum/) 
 
-#### View locally
+### Build and view locally
 
+To view documentation locally, plesae make sure the install the requirements under the `docs` extra, as specified above. Then, run the following:
 
-To view documentation locally, please open `docs/build/html/index.html` in your browser.
-
-
-#### Build documentation 
-
-To rebuild documentation, please start in the root folder and run:
-
-```sh
-cd docs
-make clean
-make html
+```
+mkdocs serve
 ```
 
-For windows users, you may have to do:
-```sh
-.\make.bat clean
-.\make.bat html
-```
+The documentation should now be at the url provided by the above command. 
 
-*You may also have to delete the `docs/source/_autosummary` directory before running the above commands.*
+### Updating Docs
+
+The documentation should be updated automatically when any changes are made to the `main` branch. However, updates can also be forced by running:
+
+```
+mkdocs gh-deploy --force
+```
+This will build your documentation and deploy it to a branch gh-pages in your repository.
 
 ## Acknowledgements
 
-**Core Devs:** [Shantanu Jha](https://github.com/Phionx)
+**Core Devs:** [Shantanu Jha](https://github.com/Phionx), [Shoumik Chowdhury](https://github.com/shoumikdc)
 
 
 This package was developed while conducting research in the Engineering Quantum Systems Group at MIT with invaluable advice from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/). 
