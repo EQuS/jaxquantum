@@ -7,7 +7,7 @@ from typing import Dict
 
 from jax import lax, jit
 from jax import device_put
-from jax.config import config
+from jax import config
 from jax._src.scipy.special import gammaln
 import jax.numpy as jnp
 import numpy as np

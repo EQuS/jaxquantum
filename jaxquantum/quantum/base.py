@@ -2,7 +2,7 @@
 Common jax <-> qutip-inspired functions
 """
 
-from jax.config import config
+from jax import config
 from jax.nn import one_hot
 
 import jax.numpy as jnp
