@@ -24,7 +24,12 @@ EXTRA_REQUIREMENTS = {
         "black"
     ],
     "docs": [
-        "mkdocs-material"
+        "mkdocs",
+        "mkdocs-material",
+        "mkdocs-literate-nav",
+        "mkdocs-section-index",
+        "mkdocs-gen-files",
+        "mkdocstrings-python",
     ]
 }
 

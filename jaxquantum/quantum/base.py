@@ -78,7 +78,8 @@ def dag(op: jnp.ndarray) -> jnp.ndarray:
     Returns:
         conjugate transpose of op
     """
-    return jnp.conj(op).T
+    # return jnp.conj(op).T
+    return jnp.moveaxis(jnp.conj(op), -1, -2) # transposes last two axes, good for batching
 
 
 def ket2dm(ket: jnp.ndarray) -> jnp.ndarray:
