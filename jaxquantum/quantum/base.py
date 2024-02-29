@@ -2,7 +2,7 @@
 Common jax <-> qutip-inspired functions
 """
 
-from jax import config
+from jax import config, Array
 from jax.nn import one_hot
 
 import jax.numpy as jnp
@@ -69,6 +69,17 @@ def unit(rho: jnp.ndarray, use_density_matrix=False):
     return rho / jnp.linalg.norm(rho)
 
 
+def ket(vec: Array) -> Array:
+    """Turns a vector array into a ket.
+
+    Args:
+        vec: vector
+
+    Returns:
+        ket
+    """
+    return vec.reshape(vec.shape[0], 1)
+
 def dag(op: jnp.ndarray) -> jnp.ndarray:
     """Conjugate transpose.
 
@@ -78,6 +89,7 @@ def dag(op: jnp.ndarray) -> jnp.ndarray:
     Returns:
         conjugate transpose of op
     """
+    op = op.reshape(op.shape[0],-1) # adds dimension to 1D array if needed
     return jnp.conj(op).T
 
 def batch_dag(op: jnp.ndarray) -> jnp.ndarray:
