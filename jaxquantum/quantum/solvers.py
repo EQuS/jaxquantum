@@ -36,7 +36,7 @@ def spre(op: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
     )
 
 
-def spre_old(op: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
+def spre_iso(op: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
     """Superoperator generator.
 
     Args:
@@ -125,7 +125,7 @@ def mesolve(
     jit,
     static_argnums=(4,),
 )
-def mesolve_old(
+def mesolve_iso(
     ρ0: jnp.ndarray,
     t_list: jnp.ndarray,
     c_ops: Optional[List[jnp.ndarray]] = jnp.array([]),
@@ -256,7 +256,7 @@ def sesolve(
     jit,
     static_argnums=(3,),
 )
-def sesolve_old(
+def sesolve_iso(
     ψ: jnp.ndarray,
     t_list: jnp.ndarray,
     H0: Optional[jnp.ndarray] = None,
