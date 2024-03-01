@@ -218,6 +218,8 @@ def num(N) -> jnp.ndarray:
 def coherent(N, α) -> jnp.ndarray:
     """Coherent state.
 
+    TODO: add trimming!
+
     Args:
         N: Hilbert Space Size.
         α: coherent state amplitude.
