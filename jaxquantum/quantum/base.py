@@ -8,7 +8,7 @@ from jax.nn import one_hot
 import jax.numpy as jnp
 import jax.scipy as jsp
 import numpy as np
-import qutip as qt
+from qutip import Qobj
 
 from jaxquantum.utils.utils import is_1d
 
@@ -42,11 +42,11 @@ def jax2qt(jax_obj, dims=None):
     Returns:
         QuTiP state.
     """
-    if isinstance(jax_obj, qt.Qobj) or jax_obj is None:
+    if isinstance(jax_obj, Qobj) or jax_obj is None:
         return jax_obj
     if dims is not None:
         dims = np.array(dims).astype(int).tolist()
-    return qt.Qobj(np.array(jax_obj), dims=dims)
+    return Qobj(np.array(jax_obj), dims=dims)
 
 
 # QuTiP alternatives in JAX (some are a WIP)
@@ -80,6 +80,7 @@ def ket(vec: Array) -> Array:
     """
     return vec.reshape(vec.shape[0], 1)
 
+
 def dag(op: jnp.ndarray) -> jnp.ndarray:
     """Conjugate transpose.
 
@@ -89,8 +90,9 @@ def dag(op: jnp.ndarray) -> jnp.ndarray:
     Returns:
         conjugate transpose of op
     """
-    op = op.reshape(op.shape[0],-1) # adds dimension to 1D array if needed
+    op = op.reshape(op.shape[0], -1)  # adds dimension to 1D array if needed
     return jnp.conj(op).T
+
 
 def batch_dag(op: jnp.ndarray) -> jnp.ndarray:
     """Conjugate transpose.
@@ -101,7 +103,9 @@ def batch_dag(op: jnp.ndarray) -> jnp.ndarray:
     Returns:
         conjugate of op, and transposes last two axes
     """
-    return jnp.moveaxis(jnp.conj(op), -1, -2) # transposes last two axes, good for batching
+    return jnp.moveaxis(
+        jnp.conj(op), -1, -2
+    )  # transposes last two axes, good for batching
 
 
 def ket2dm(ket: jnp.ndarray) -> jnp.ndarray:
@@ -211,18 +215,17 @@ def num(N) -> jnp.ndarray:
     return jnp.diag(jnp.arange(N))
 
 
-def coherent(N, alpha) -> jnp.ndarray:
+def coherent(N, α) -> jnp.ndarray:
     """Coherent state.
 
     Args:
-        N: Hilbert Space Size
-        alpha: coherent state amplitude
+        N: Hilbert Space Size.
+        α: coherent state amplitude.
 
     Return:
-        coherent state |alpha>
+        Coherent state |α⟩.
     """
-    # TODO: replace with JAX implementation
-    return qt2jax(qt.coherent(int(N), complex(alpha)))
+    return displace(N, α) @ basis(N, 0)
 
 
 def identity(*args, **kwargs) -> jnp.ndarray:
@@ -235,17 +238,17 @@ def identity(*args, **kwargs) -> jnp.ndarray:
 
 
 def displace(N, α) -> jnp.ndarray:
-    """Displace operator
+    """Displacement operator
 
     Args:
         N: Hilbert Space Size
-        α: displacement
+        α: Phase space displacement
 
     Returns:
         Displace operator D(α)
     """
-    # TODO: replace with JAX implementation
-    return qt2jax(qt.displace(int(N), float(α)))
+    a = destroy(N)
+    return expm(α * dag(a) - jnp.conj(α) * a)
 
 
 def ptrace(rho, indx, dims):
