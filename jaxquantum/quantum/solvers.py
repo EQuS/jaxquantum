@@ -75,9 +75,9 @@ def mesolve(
         list of states
     """
 
-    ρ0 = ρ0 + 0.0j
-    c_ops = c_ops + 0.0j
-    H0 = None if H0 is None else H0 + 0.0j
+    ρ0 = jnp.asarray(ρ0) + 0.0j
+    c_ops = jnp.asarray(c_ops) + 0.0j
+    H0 = jnp.asarray(H0) + 0.0j if H0 is not None else H0
 
     def f(
         t: float,
@@ -145,9 +145,9 @@ def mesolve_old(
         list of states
     """
 
-    ρ0 = complex_to_real_iso_matrix(ρ0 + 0.0j)
-    c_ops = vmap(complex_to_real_iso_matrix)(c_ops + 0.0j)
-    H0 = None if H0 is None else complex_to_real_iso_matrix(H0 + 0.0j)
+    ρ0 = complex_to_real_iso_matrix(jnp.asarray(ρ0) + 0.0j)
+    c_ops = vmap(complex_to_real_iso_matrix)(jnp.asarray(c_ops) + 0.0j)
+    H0 = None if H0 is None else complex_to_real_iso_matrix(jnp.asarray(H0) + 0.0j)
 
     def f(
         t: float,
@@ -212,8 +212,8 @@ def sesolve(
     Returns:
         list of states
     """
-    ψ = ψ + 0.0j
-    H0 = None if H0 is None else H0 + 0.0j
+    ψ = jnp.asarray(ψ) + 0.0j
+    H0 = None if H0 is None else jnp.asarray(H0) + 0.0j
 
     def f(
         t: float,
@@ -273,8 +273,8 @@ def sesolve_old(
     Returns:
         list of states
     """
-    ψ = complex_to_real_iso_vector(ψ + 0.0j)
-    H0 = None if H0 is None else complex_to_real_iso_matrix(H0 + 0.0j)
+    ψ = complex_to_real_iso_vector(jnp.asarray(ψ) + 0.0j)
+    H0 = None if H0 is None else complex_to_real_iso_matrix(jnp.asarray(H0) + 0.0j)
 
     def f(
         t: float,
