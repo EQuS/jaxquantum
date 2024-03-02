@@ -8,7 +8,7 @@ from jax import jit, vmap
 from jax.experimental.ode import odeint
 import jax.numpy as jnp
 
-from jaxquantum.quantum.base import dag
+from jaxquantum.core.operations import dag
 from jaxquantum.utils.utils import (
     is_1d,
     real_to_complex_iso_matrix,
