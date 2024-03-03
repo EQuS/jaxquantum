@@ -19,13 +19,14 @@ from jaxquantum.utils.utils import (
 )
 
 from jaxquantum.core.qarray import Qarray
+from jaxquantum.core.conversions import jnps2jqts, jqts2jnps
 
 
 
 # ----
 
 @jit
-def calc_expect(op: Qarray, states: jnp.ndarray) -> jnp.ndarray:
+def calc_expect(op: Qarray, states: List[Qarray]) -> jnp.ndarray:
     """Calculate expectation value of an operator given a list of states.
 
     Args:
@@ -37,6 +38,7 @@ def calc_expect(op: Qarray, states: jnp.ndarray) -> jnp.ndarray:
     """
 
     op = op.data
+    states = jqts2jnps(states)
 
     def calc_expect_ket_single(state: jnp.ndarray):
         return (jnp.conj(state).T @ op @ state)[0][0]
@@ -90,7 +92,7 @@ def mesolve(
     Returns:
         list of states
     """
-
+    dims = ρ0.dims
     ρ0 = jnp.asarray(ρ0.data) + 0.0j
     c_ops = c_ops or []
     c_ops = jnp.asarray([c_op.data for c_op in c_ops]) + 0.0j
@@ -135,7 +137,7 @@ def mesolve(
         max_steps=16**5,
     )
 
-    return sol.ys
+    return jnps2jqts(sol.ys, dims=dims)
 
 @partial(
     jit,
@@ -158,6 +160,9 @@ def sesolve(
     Returns:
         list of states
     """
+
+    dims = ψ.dims
+
     ψ = jnp.asarray(ψ.data) + 0.0j
     H0 = jnp.asarray(H0.data) + 0.0j if H0 is not None else None
 
@@ -195,7 +200,7 @@ def sesolve(
         args=[H0],
     )
 
-    return sol.ys
+    return jnps2jqts(sol.ys, dims=dims)
 
 # ----
 
@@ -241,6 +246,8 @@ def mesolve_iso(
         list of states
     """
     
+    dims = ρ0.dims
+
     ρ0 = jnp.asarray(ρ0.data) + 0.0j
     c_ops = c_ops or []
     c_ops = jnp.asarray([c_op.data for c_op in c_ops]) + 0.0j
@@ -289,7 +296,7 @@ def mesolve_iso(
         max_steps=16**5,
     )
 
-    return vmap(real_to_complex_iso_matrix)(sol.ys)
+    return jnps2jqts(vmap(real_to_complex_iso_matrix)(sol.ys), dims=dims)
 
 @partial(
     jit,
@@ -312,6 +319,7 @@ def sesolve_iso(
     Returns:
         list of states
     """
+    dims = ψ.dims
 
     ψ = jnp.asarray(ψ.data) + 0.0j
     H0 = jnp.asarray(H0.data) + 0.0j if H0 is not None else None
@@ -354,7 +362,7 @@ def sesolve_iso(
         args=[H0],
     )
 
-    return vmap(real_to_complex_iso_vector)(sol.ys)
+    return jnps2jqts(vmap(real_to_complex_iso_vector)(sol.ys), dims=dims)
 
 # ----
 
