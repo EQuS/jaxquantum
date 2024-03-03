@@ -6,3 +6,4 @@ from .conversions import *
 from .visualization import *
 from .solvers import *
 from .qarray import *
+from .settings import SETTINGS

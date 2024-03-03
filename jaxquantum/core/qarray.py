@@ -11,6 +11,8 @@ from numbers import Number
 import jax.numpy as jnp
 import jax.scipy as jsp
 
+from jaxquantum.core.settings import SETTINGS
+
 config.update("jax_enable_x64", True)
 
 DIMS_TYPE = List[List[int]]
@@ -130,6 +132,15 @@ def _ensure_equal_type(method):
         return NotImplemented
     return out
 
+def tidy_up(data, atol):
+    data_re = jnp.real(data)
+    data_im = jnp.imag(data)
+    data_re_mask = jnp.abs(data_re) > atol
+    data_im_mask = jnp.abs(data_im) > atol
+    data_new = data_re * data_re_mask + 1j * data_im * data_im_mask
+    return data_new
+
+
 @struct.dataclass # this allows us to send in and return Qarray from jitted functions
 class Qarray:
     _data: Array
@@ -151,6 +162,13 @@ class Qarray:
         qdims = Qdims(dims)
 
         dims = deepcopy(dims)
+
+        # TODO: Constantly tidying up on Qarray creation might be a bit overkill.
+        # It increases the compilation time, but only very slightly 
+        # increased the runtime of the jit compiled function.
+        # We could instead use this tidy_up where we think we need it.
+        data = tidy_up(data, SETTINGS["auto_tidyup_atol"])
+
         return cls(data, qdims)
 
 
