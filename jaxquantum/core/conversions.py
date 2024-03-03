@@ -1,14 +1,15 @@
 """
-Common jax <-> qutip-inspired functions
+Converting between different object types.
 """
 
-from jax import config
+from jax import config, Array
 from qutip import Qobj
+from typing import Optional
 import jax.numpy as jnp
 import numpy as np
 
 
-from jaxquantum.core.qarray import Qarray
+from jaxquantum.core.qarray import Qarray, DIMS_TYPE
 
 
 config.update("jax_enable_x64", True)
@@ -44,3 +45,14 @@ def jqt2qt(jqt_obj):
         return jqt_obj
     
     return Qobj(np.array(jqt_obj.data), dims=jqt_obj.dims)
+
+def jnp2jqt(arr: Array, dims: Optional[DIMS_TYPE] = None):
+    """JAX array -> QuTiP state.
+
+    Args:
+        jnp_obj: JAX array.
+
+    Returns:
+        QuTiP state.
+    """
+    return Qarray.create(arr, dims=dims)

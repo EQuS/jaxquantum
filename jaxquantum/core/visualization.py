@@ -6,7 +6,7 @@ import qutip as qt
 import numpy as np
 import matplotlib.pyplot as plt
 
-from jaxquantum.core.qutip import jqt2qt
+from jaxquantum.core.conversions import jqt2qt
 
 WIGNER = "wigner"
 QFUNC = "qfunc"

@@ -5,7 +5,6 @@ from typing import Callable, List, Optional
 
 from diffrax import diffeqsolve, Dopri5, ODETerm, SaveAt, PIDController
 from jax import jit, vmap
-from jax.experimental.ode import odeint
 import jax.numpy as jnp
 
 from jaxquantum.utils.utils import (
@@ -19,12 +18,14 @@ from jaxquantum.utils.utils import (
     conj_transpose_iso_matrix,
 )
 
+from jaxquantum.core.qarray import Qarray
+
 
 
 # ----
 
 @jit
-def calc_expect(op: jnp.ndarray, states: jnp.ndarray) -> jnp.ndarray:
+def calc_expect(op: Qarray, states: jnp.ndarray) -> jnp.ndarray:
     """Calculate expectation value of an operator given a list of states.
 
     Args:
@@ -35,8 +36,10 @@ def calc_expect(op: jnp.ndarray, states: jnp.ndarray) -> jnp.ndarray:
         list of expectation values
     """
 
+    op = op.data
+
     def calc_expect_ket_single(state: jnp.ndarray):
-        return (dag(state) @ op @ state)[0][0]
+        return (jnp.conj(state).T @ op @ state)[0][0]
 
     def calc_expect_dm_single(state: jnp.ndarray):
         return jnp.trace(op @ state)
@@ -69,11 +72,11 @@ def spre(op: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
     static_argnums=(4,),
 )
 def mesolve(
-    ρ0: jnp.ndarray,
+    ρ0: Qarray,
     t_list: jnp.ndarray,
-    c_ops: Optional[List[jnp.ndarray]] = jnp.array([]),
-    H0: Optional[jnp.ndarray] = None,
-    Ht: Optional[Callable[[float], jnp.ndarray]] = None,
+    c_ops: Optional[List[Qarray]] = None,
+    H0: Optional[Qarray] = None,
+    Ht: Optional[Callable[[float], Qarray]] = None,
 ):
     """Quantum Master Equation solver.
 
@@ -88,9 +91,10 @@ def mesolve(
         list of states
     """
 
-    ρ0 = jnp.asarray(ρ0) + 0.0j
-    c_ops = jnp.asarray(c_ops) + 0.0j
-    H0 = jnp.asarray(H0) + 0.0j if H0 is not None else H0
+    ρ0 = jnp.asarray(ρ0.data) + 0.0j
+    c_ops = c_ops or []
+    c_ops = jnp.asarray([c_op.data for c_op in c_ops]) + 0.0j
+    H0 = jnp.asarray(H0.data) + 0.0j if H0 is not None else None
 
     def f(
         t: float,
@@ -103,7 +107,7 @@ def mesolve(
         if H0_val is not None:
             H = H0_val  # use H0 if given
         else:
-            H = Ht(t)  # type: ignore
+            H = Ht(t).data  # type: ignore
             H = H + 0.0j
 
         rho_dot = -1j * (H @ rho - rho @ H)
@@ -138,10 +142,10 @@ def mesolve(
     static_argnums=(3,),
 )
 def sesolve(
-    ψ: jnp.ndarray,
+    ψ: Qarray,
     t_list: jnp.ndarray,
-    H0: Optional[jnp.ndarray] = None,
-    Ht: Optional[Callable[[float], jnp.ndarray]] = None,
+    H0: Optional[Qarray] = None,
+    Ht: Optional[Callable[[float], Qarray]] = None,
 ):
     """Schrödinger Equation solver.
 
@@ -154,8 +158,8 @@ def sesolve(
     Returns:
         list of states
     """
-    ψ = jnp.asarray(ψ) + 0.0j
-    H0 = None if H0 is None else jnp.asarray(H0) + 0.0j
+    ψ = jnp.asarray(ψ.data) + 0.0j
+    H0 = jnp.asarray(H0.data) + 0.0j if H0 is not None else None
 
     def f(
         t: float,
@@ -167,7 +171,7 @@ def sesolve(
         if H0_val is not None:
             H = H0_val  # use H0 if given
         else:
-            H = Ht(t)  # type: ignore
+            H = Ht(t).data  # type: ignore
         # print("H", H.shape)
         # print("psit", ψₜ.shape)
         ψₜ_dot = -1j * (H @ ψₜ)
@@ -218,11 +222,11 @@ def spre_iso(op: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
     static_argnums=(4,),
 )
 def mesolve_iso(
-    ρ0: jnp.ndarray,
+    ρ0: Qarray,
     t_list: jnp.ndarray,
-    c_ops: Optional[List[jnp.ndarray]] = jnp.array([]),
-    H0: Optional[jnp.ndarray] = None,
-    Ht: Optional[Callable[[float], jnp.ndarray]] = None,
+    c_ops: Optional[List[Qarray]] = None,
+    H0: Optional[Qarray] = None,
+    Ht: Optional[Callable[[float], Qarray]] = None,
 ):
     """Quantum Master Equation solver.
 
@@ -236,6 +240,11 @@ def mesolve_iso(
     Returns:
         list of states
     """
+    
+    ρ0 = jnp.asarray(ρ0.data) + 0.0j
+    c_ops = c_ops or []
+    c_ops = jnp.asarray([c_op.data for c_op in c_ops]) + 0.0j
+    H0 = jnp.asarray(H0.data) + 0.0j if H0 is not None else None
 
     ρ0 = complex_to_real_iso_matrix(jnp.asarray(ρ0) + 0.0j)
     c_ops = vmap(complex_to_real_iso_matrix)(jnp.asarray(c_ops) + 0.0j)
@@ -252,7 +261,7 @@ def mesolve_iso(
         if H0_val is not None:
             H = H0_val  # use H0 if given
         else:
-            H = Ht(t)  # type: ignore
+            H = Ht(t).data  # type: ignore
             H = complex_to_real_iso_matrix(H + 0.0j)
 
         rho_dot = -1 * imag_times_iso_matrix(H @ rho - rho @ H)
@@ -287,10 +296,10 @@ def mesolve_iso(
     static_argnums=(3,),
 )
 def sesolve_iso(
-    ψ: jnp.ndarray,
+    ψ: Qarray,
     t_list: jnp.ndarray,
-    H0: Optional[jnp.ndarray] = None,
-    Ht: Optional[Callable[[float], jnp.ndarray]] = None,
+    H0: Optional[Qarray] = None,
+    Ht: Optional[Callable[[float], Qarray]] = None,
 ):
     """Schrödinger Equation solver.
 
@@ -303,6 +312,10 @@ def sesolve_iso(
     Returns:
         list of states
     """
+
+    ψ = jnp.asarray(ψ.data) + 0.0j
+    H0 = jnp.asarray(H0.data) + 0.0j if H0 is not None else None
+    
     ψ = complex_to_real_iso_vector(jnp.asarray(ψ) + 0.0j)
     H0 = None if H0 is None else complex_to_real_iso_matrix(jnp.asarray(H0) + 0.0j)
 
@@ -316,7 +329,7 @@ def sesolve_iso(
         if H0_val is not None:
             H = H0_val  # use H0 if given
         else:
-            H = Ht(t)  # type: ignore
+            H = Ht(t).data  # type: ignore
             H = complex_to_real_iso_matrix(H)
         # print("H", H.shape)
         # print("psit", ψₜ.shape)

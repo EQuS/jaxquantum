@@ -123,10 +123,8 @@ def _ensure_equal_type(method):
                 )
                 raise ValueError(msg)
             return method(self, other)
-        if other == 0:
-            return method(self, other)
-        if (self.data.shape[0] == self.data.shape[1]) and isinstance(other, Number):
-            scalar = complex(other)
+        if (self.data.shape[0] == self.data.shape[1]):
+            scalar = other + 0.0j
             other = Qarray.create(jnp.eye(self.data.shape[0], dtype=self.data.dtype) * scalar, dims=self.dims)
             return method(self, other)
         return NotImplemented
@@ -176,7 +174,7 @@ class Qarray:
         if isinstance(other, Qarray):
             return self.__matmul__(other)
         
-        multiplier = complex(other)
+        multiplier = other + 0.0j
         return Qarray.create(
             self.data * multiplier,
             dims=self._qdims.dims,
@@ -193,8 +191,6 @@ class Qarray:
     
     @_ensure_equal_type
     def __add__(self, other):
-        if other == 0:
-            return self.copy()
         return Qarray.create(self.data + other.data, dims=self.dims)
     
     def __radd__(self, other):
