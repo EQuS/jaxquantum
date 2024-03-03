@@ -1,6 +1,6 @@
 """ Relevant linear algebra operations. """
 
-from jax import config
+from jax import config, Array
 
 import jax.numpy as jnp
 
@@ -10,7 +10,7 @@ config.update("jax_enable_x64", True)
 
 # Linear Algebra Operations -----------------------------------------------------
 
-def batch_dag(op: jnp.ndarray) -> jnp.ndarray:
+def batch_dag_data(op: Array) -> Array:
     """Conjugate transpose.
 
     Args:

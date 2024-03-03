@@ -11,7 +11,7 @@ config.update("jax_enable_x64", True)
 
 
 
-def sigmax() -> jnp.ndarray:
+def sigmax() -> Qarray:
     """σx
 
     Returns:
@@ -20,7 +20,7 @@ def sigmax() -> jnp.ndarray:
     return Qarray.create(jnp.array([[0.0, 1.0], [1.0, 0.0]]))
 
 
-def sigmay() -> jnp.ndarray:
+def sigmay() -> Qarray:
     """σy
 
     Returns:
@@ -29,7 +29,7 @@ def sigmay() -> jnp.ndarray:
     return Qarray.create(jnp.array([[0.0, -1.0j], [1.0j, 0.0]]))
 
 
-def sigmaz() -> jnp.ndarray:
+def sigmaz() -> Qarray:
     """σz
 
     Returns:
@@ -38,7 +38,15 @@ def sigmaz() -> jnp.ndarray:
     return Qarray.create(jnp.array([[1.0, 0.0], [0.0, -1.0]]))
 
 
-def sigmam() -> jnp.ndarray:
+def hadamard() -> Qarray:
+    """H
+
+    Returns:
+        H: Hadamard gate
+    """
+    return Qarray.create(jnp.array([[1, 1], [1, -1]]) / jnp.sqrt(2))
+
+def sigmam() -> Qarray:
     """σ-
 
     Returns:
@@ -47,7 +55,7 @@ def sigmam() -> jnp.ndarray:
     return Qarray.create(jnp.array([[0.0, 0.0], [1.0, 0.0]]))
 
 
-def sigmap() -> jnp.ndarray:
+def sigmap() -> Qarray:
     """σ+
 
     Returns:
@@ -56,7 +64,7 @@ def sigmap() -> jnp.ndarray:
     return Qarray.create(jnp.array([[0.0, 1.0], [0.0, 0.0]]))
 
 
-def destroy(N) -> jnp.ndarray:
+def destroy(N) -> Qarray:
     """annihilation operator
 
     Args:
@@ -68,7 +76,7 @@ def destroy(N) -> jnp.ndarray:
     return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=1))
 
 
-def create(N) -> jnp.ndarray:
+def create(N) -> Qarray:
     """creation operator
 
     Args:
@@ -80,7 +88,7 @@ def create(N) -> jnp.ndarray:
     return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=-1))
 
 
-def num(N) -> jnp.ndarray:
+def num(N) -> Qarray:
     """Number operator
 
     Args:
@@ -92,7 +100,7 @@ def num(N) -> jnp.ndarray:
     return Qarray.create(jnp.diag(jnp.arange(N)))
 
 
-def identity(*args, **kwargs) -> jnp.ndarray:
+def identity(*args, **kwargs) -> Qarray:
     """Identity matrix.
 
     Returns:
@@ -101,7 +109,7 @@ def identity(*args, **kwargs) -> jnp.ndarray:
     return Qarray.create(jnp.eye(*args, **kwargs))
 
 
-def displace(N, α) -> jnp.ndarray:
+def displace(N, α) -> Qarray:
     """Displacement operator
 
     Args:
@@ -130,7 +138,7 @@ def basis(N, k):
     return Qarray.create(one_hot(k, N).reshape(N, 1))
 
 
-def coherent(N, α) -> jnp.ndarray:
+def coherent(N, α) -> Qarray:
     """Coherent state.
 
     Args:

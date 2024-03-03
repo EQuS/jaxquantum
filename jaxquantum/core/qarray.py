@@ -268,16 +268,7 @@ class Qarray:
         return Qarray.create(deepcopy(self.data), dims=self.dims)
     
     def unit(self):
-        data = self.data
-
-        if self.qtype == Qtypes.oper:
-            evals, _ = jnp.linalg.eigh(data @ jnp.conj(data).T)
-            rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)))
-            data = data / rho_norm
-        elif self.qtype in [Qtypes.ket, Qtypes.bra]:
-            data = data / jnp.linalg.norm(data)
-        
-        return Qarray.create(data, dims=self.dims)
+        return unit(self)
 
     def expm(self):
         return expm(self)
@@ -285,14 +276,38 @@ class Qarray:
     def tr(self, **kwargs):
         return tr(self, **kwargs)
 
-    def ptrace(self, indx, dims):
-        return ptrace(self, indx, dims)
+    def ptrace(self, indx):
+        return ptrace(self, indx)
+    
+    def is_dm(self):
+        return self.qtype == Qtypes.oper
 
 
 
 # Qarray operations ---------------------------------------------------------------------
     
-def tensor(*args, **kwargs) -> jnp.ndarray:
+def unit(qarr: Qarray) -> Qarray:
+    """Normalize the quantum array.
+
+    Args:
+        qarr (Qarray): quantum array
+
+    Returns:
+        Normalized quantum array
+    """
+    data = qarr.data
+
+    if qarr.qtype == Qtypes.oper:
+        evals, _ = jnp.linalg.eigh(data @ jnp.conj(data).T)
+        rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)))
+        data = data / rho_norm
+    elif qarr.qtype in [Qtypes.ket, Qtypes.bra]:
+        data = data / jnp.linalg.norm(data)
+    
+    return Qarray.create(data, dims=qarr.dims)
+    
+
+def tensor(*args, **kwargs) -> Qarray:
     """Tensor product.
 
     Args:
@@ -310,7 +325,7 @@ def tensor(*args, **kwargs) -> jnp.ndarray:
         dims[1] += arg.dims[1]
     return Qarray.create(data, dims=dims)
 
-def tr(qarr: Qarray, **kwargs) -> jnp.ndarray:
+def tr(qarr: Qarray, **kwargs) -> Qarray:
     """Full trace.
 
     Args:
@@ -321,7 +336,7 @@ def tr(qarr: Qarray, **kwargs) -> jnp.ndarray:
     """
     return jnp.trace(qarr.data, **kwargs)
 
-def expm(qarr: Qarray, **kwargs) -> jnp.ndarray:
+def expm(qarr: Qarray, **kwargs) -> Qarray:
     """Matrix exponential wrapper.
 
     Returns:
@@ -331,30 +346,25 @@ def expm(qarr: Qarray, **kwargs) -> jnp.ndarray:
     dims = deepcopy(qarr.dims)
     return Qarray.create(data, dims=dims)
 
-def ptrace(qarr: Qarray, indx, dims):
+def ptrace(qarr: Qarray, indx) -> Qarray:
     """Partial Trace.
 
     Args:
         rho: density matrix
-        indx: index to trace out
-        dims: list of dimensions of the tensored hilbert spaces
+        indx: index of quantum object to keep, rest will be partial traced out
 
     Returns:
         partial traced out density matrix
 
     TODO: Fix weird tracing errors that arise with reshape
-    TODO: return Qarray
     """
 
     qarr = ket2dm(qarr)
     rho = qarr.data
+    dims = qarr.dims
 
-    Nq = len(dims)
-
-    if isinstance(dims, jnp.ndarray):
-        dims2 = jnp.concatenate(jnp.array([dims, dims]))
-    else:
-        dims2 = dims + dims
+    Nq = len(dims[0])
+    dims2 = jnp.concatenate(jnp.array(dims))
 
     rho = rho.reshape(dims2)
 
@@ -369,7 +379,7 @@ def ptrace(qarr: Qarray, indx, dims):
     for j in range(Nq - 1):
         rho = jnp.trace(rho, axis1=2, axis2=3)
 
-    return rho
+    return Qarray.create(rho)
 
 # Kets & Density Matrices -----------------------------------------------------
 

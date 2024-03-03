@@ -4,11 +4,10 @@ from functools import partial
 from typing import Callable, List, Optional
 
 from diffrax import diffeqsolve, Dopri5, ODETerm, SaveAt, PIDController
-from jax import jit, vmap
+from jax import jit, vmap, Array
 import jax.numpy as jnp
 
 from jaxquantum.utils.utils import (
-    is_1d,
     real_to_complex_iso_matrix,
     real_to_complex_iso_vector,
     complex_to_real_iso_matrix,
@@ -26,7 +25,7 @@ from jaxquantum.core.conversions import jnps2jqts, jqts2jnps
 # ----
 
 @jit
-def calc_expect(op: Qarray, states: List[Qarray]) -> jnp.ndarray:
+def calc_expect(op: Qarray, states: List[Qarray]) -> Array:
     """Calculate expectation value of an operator given a list of states.
 
     Args:
@@ -38,24 +37,26 @@ def calc_expect(op: Qarray, states: List[Qarray]) -> jnp.ndarray:
     """
 
     op = op.data
+    is_dm = states[0].is_dm()
     states = jqts2jnps(states)
 
-    def calc_expect_ket_single(state: jnp.ndarray):
+    def calc_expect_ket_single(state: Array):
         return (jnp.conj(state).T @ op @ state)[0][0]
 
-    def calc_expect_dm_single(state: jnp.ndarray):
+    def calc_expect_dm_single(state: Array):
         return jnp.trace(op @ state)
 
-    if is_1d(states[0]):
-        return vmap(calc_expect_ket_single)(states)
-    else:
+    if is_dm:
         return vmap(calc_expect_dm_single)(states)
+    else:
+        return vmap(calc_expect_ket_single)(states)
+        
 
 # ----
 
 # ----
 
-def spre(op: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
+def spre(op: Array) -> Callable[[Array], Array]:
     """Superoperator generator.
 
     Args:
@@ -75,7 +76,7 @@ def spre(op: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
 )
 def mesolve(
     ρ0: Qarray,
-    t_list: jnp.ndarray,
+    t_list: Array,
     c_ops: Optional[List[Qarray]] = None,
     H0: Optional[Qarray] = None,
     Ht: Optional[Callable[[float], Qarray]] = None,
@@ -100,8 +101,8 @@ def mesolve(
 
     def f(
         t: float,
-        rho: jnp.ndarray,
-        args: jnp.ndarray,
+        rho: Array,
+        args: Array,
     ):
         H0_val = args[0]
         c_ops_val = args[1]
@@ -145,7 +146,7 @@ def mesolve(
 )
 def sesolve(
     ψ: Qarray,
-    t_list: jnp.ndarray,
+    t_list: Array,
     H0: Optional[Qarray] = None,
     Ht: Optional[Callable[[float], Qarray]] = None,
 ):
@@ -168,8 +169,8 @@ def sesolve(
 
     def f(
         t: float,
-        ψₜ: jnp.ndarray,
-        args: jnp.ndarray,
+        ψₜ: Array,
+        args: Array,
     ):
         H0_val = args[0]
 
@@ -208,7 +209,7 @@ def sesolve(
 
 # ----
 
-def spre_iso(op: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
+def spre_iso(op: Array) -> Callable[[Array], Array]:
     """Superoperator generator.
 
     Args:
@@ -228,7 +229,7 @@ def spre_iso(op: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
 )
 def mesolve_iso(
     ρ0: Qarray,
-    t_list: jnp.ndarray,
+    t_list: Array,
     c_ops: Optional[List[Qarray]] = None,
     H0: Optional[Qarray] = None,
     Ht: Optional[Callable[[float], Qarray]] = None,
@@ -259,8 +260,8 @@ def mesolve_iso(
 
     def f(
         t: float,
-        rho: jnp.ndarray,
-        args: jnp.ndarray,
+        rho: Array,
+        args: Array,
     ):
         H0_val = args[0]
         c_ops_val = args[1]
@@ -304,7 +305,7 @@ def mesolve_iso(
 )
 def sesolve_iso(
     ψ: Qarray,
-    t_list: jnp.ndarray,
+    t_list: Array,
     H0: Optional[Qarray] = None,
     Ht: Optional[Callable[[float], Qarray]] = None,
 ):
@@ -329,8 +330,8 @@ def sesolve_iso(
 
     def f(
         t: float,
-        ψₜ: jnp.ndarray,
-        args: jnp.ndarray,
+        ψₜ: Array,
+        args: Array,
     ):
         H0_val = args[0]
 
