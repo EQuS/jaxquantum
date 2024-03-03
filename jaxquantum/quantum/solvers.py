@@ -103,7 +103,7 @@ def mesolve(
     term = ODETerm(f)
     solver = Dopri5()
     saveat = SaveAt(ts=t_list)
-    stepsize_controller = PIDController(rtol=1e-6, atol=1e-6)
+    stepsize_controller = PIDController(rtol=1e-6, atol=1e-8)
 
     sol = diffeqsolve(
         term,
