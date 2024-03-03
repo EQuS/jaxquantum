@@ -3,9 +3,9 @@
 from jax import config
 
 import jax.numpy as jnp
+from jax.nn import one_hot
 
-from jaxquantum.core.operations import expm, dag
-
+from jaxquantum.core.qarray import Qarray
 
 config.update("jax_enable_x64", True)
 
@@ -17,7 +17,7 @@ def sigmax() -> jnp.ndarray:
     Returns:
         σx Pauli Operator
     """
-    return jnp.array([[0.0, 1.0], [1.0, 0.0]])
+    return Qarray.create(jnp.array([[0.0, 1.0], [1.0, 0.0]]))
 
 
 def sigmay() -> jnp.ndarray:
@@ -26,7 +26,7 @@ def sigmay() -> jnp.ndarray:
     Returns:
         σy Pauli Operator
     """
-    return jnp.array([[0.0, -1.0j], [1.0j, 0.0]])
+    return Qarray.create(jnp.array([[0.0, -1.0j], [1.0j, 0.0]]))
 
 
 def sigmaz() -> jnp.ndarray:
@@ -35,7 +35,7 @@ def sigmaz() -> jnp.ndarray:
     Returns:
         σz Pauli Operator
     """
-    return jnp.array([[1.0, 0.0], [0.0, -1.0]])
+    return Qarray.create(jnp.array([[1.0, 0.0], [0.0, -1.0]]))
 
 
 def sigmam() -> jnp.ndarray:
@@ -44,7 +44,7 @@ def sigmam() -> jnp.ndarray:
     Returns:
         σ- Pauli Operator
     """
-    return jnp.array([[0.0, 0.0], [1.0, 0.0]])
+    return Qarray.create(jnp.array([[0.0, 0.0], [1.0, 0.0]]))
 
 
 def sigmap() -> jnp.ndarray:
@@ -53,7 +53,7 @@ def sigmap() -> jnp.ndarray:
     Returns:
         σ+ Pauli Operator
     """
-    return jnp.array([[0.0, 1.0], [0.0, 0.0]])
+    return Qarray.create(jnp.array([[0.0, 1.0], [0.0, 0.0]]))
 
 
 def destroy(N) -> jnp.ndarray:
@@ -65,7 +65,7 @@ def destroy(N) -> jnp.ndarray:
     Returns:
         annilation operator in Hilber Space of size N
     """
-    return jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=1)
+    return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=1))
 
 
 def create(N) -> jnp.ndarray:
@@ -77,7 +77,7 @@ def create(N) -> jnp.ndarray:
     Returns:
         creation operator in Hilber Space of size N
     """
-    return jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=-1)
+    return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=-1))
 
 
 def num(N) -> jnp.ndarray:
@@ -89,7 +89,7 @@ def num(N) -> jnp.ndarray:
     Returns:
         number operator in Hilber Space of size N
     """
-    return jnp.diag(jnp.arange(N))
+    return Qarray.create(jnp.diag(jnp.arange(N)))
 
 
 def identity(*args, **kwargs) -> jnp.ndarray:
@@ -98,7 +98,7 @@ def identity(*args, **kwargs) -> jnp.ndarray:
     Returns:
         Identity matrix.
     """
-    return jnp.eye(*args, **kwargs)
+    return Qarray.create(jnp.eye(*args, **kwargs))
 
 
 def displace(N, α) -> jnp.ndarray:
@@ -112,4 +112,32 @@ def displace(N, α) -> jnp.ndarray:
         Displace operator D(α)
     """
     a = destroy(N)
-    return expm(α * dag(a) - jnp.conj(α) * a)
+    return (α * a.dag() - jnp.conj(α) * a).expm()
+
+
+# States ---------------------------------------------------------------------
+
+def basis(N, k):
+    """Creates a |k> (i.e. fock state) ket in a specified Hilbert Space.
+
+    Args:
+        N: Hilbert space dimension
+        k: fock number
+
+    Returns:
+        Fock State |k>
+    """
+    return Qarray.create(one_hot(k, N).reshape(N, 1))
+
+
+def coherent(N, α) -> jnp.ndarray:
+    """Coherent state.
+
+    Args:
+        N: Hilbert Space Size.
+        α: coherent state amplitude.
+
+    Return:
+        Coherent state |α⟩.
+    """
+    return displace(N, α) @ basis(N, 0)
