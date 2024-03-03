@@ -56,3 +56,26 @@ def jnp2jqt(arr: Array, dims: Optional[DIMS_TYPE] = None):
         QuTiP state.
     """
     return Qarray.create(arr, dims=dims)
+
+
+def jnps2jqts(arrs: Array, dims: Optional[DIMS_TYPE] = None):
+    """JAX array -> QuTiP state.
+
+    Args:
+        jnp_obj: JAX array.
+
+    Returns:
+        QuTiP state.
+    """
+    return [Qarray.create(arr, dims=dims) for arr in arrs]
+
+def jqts2jnps(qarrs: Qarray):
+    """QuTiP state -> JAX array.
+
+    Args:
+        qt_obj: QuTiP state.
+
+    Returns:
+        JAX array.
+    """
+    return jnp.array([qarr.data for qarr in qarrs])
