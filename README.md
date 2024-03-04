@@ -7,7 +7,7 @@
 
 [S. R. Jha](https://github.com/Phionx), [S. Chowdhury](https://github.com/shoumikdc), [M. Hays](https://scholar.google.com/citations?user=06z0MjwAAAAJ), [J. A. Grover](https://scholar.google.com/citations?user=igewch8AAAAJ), [W. D. Oliver](https://scholar.google.com/citations?user=4vNbnqcAAAAJ&hl=en)
 
-***Docs:** [github.com/pages/EQuS/jaxquantum](https://github.com/pages/EQuS/jaxquantum/)*
+***Docs:** [https://equs.github.io/jaxquantum](https://equs.github.io/jaxquantum)
 
 `jaxquantum` leverages [JAX](https://github.com/google/jax) to enable the auto differentiable and (CPU, GPU, TPU) accelerated simulation of quantum dynamical systems, including tooling such as operator construction, unitary evolution and master equation solving. As such, `jaxquantum` serves as a QuTiP drop-in replacement written entirely in JAX.
 
@@ -22,7 +22,7 @@ This package also serves as an essential dependency for [`bosonic-jax`](https://
 pip install jaxquantum
 ```
 
-For more details, please visit the getting started > installation section of our [docs](https://github.com/pages/EQuS/jaxquantum/).
+For more details, please visit the getting started > installation section of our [docs](https://equs.github.io/jaxquantum/getting_started/installation.html).
 
 ## An Example
 
