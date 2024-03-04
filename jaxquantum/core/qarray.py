@@ -454,3 +454,14 @@ def batch_dag_data(op: Array) -> Array:
     return jnp.moveaxis(
         jnp.conj(op), -1, -2
     )  # transposes last two axes, good for batching
+
+def dag_data(op: Array) -> Array:
+    """Conjugate transpose.
+
+    Args:
+        op: operator
+
+    Returns:
+        conjugate of op, and transposes last two axes
+    """
+    return jnp.conj(op.T) 
