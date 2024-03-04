@@ -6,13 +6,13 @@ import qutip as qt
 import numpy as np
 import matplotlib.pyplot as plt
 
-from jaxquantum.quantum.base import jax2qt
+from jaxquantum.core.conversions import jqt2qt
 
 WIGNER = "wigner"
 QFUNC = "qfunc"
 
 
-def plot_qp(state, pts, dims=None, ax=None, contour=True, qp_type=WIGNER):
+def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER):
     """Plot quasi-probability distribution.
 
     TODO: decouple this from qutip.
@@ -29,7 +29,7 @@ def plot_qp(state, pts, dims=None, ax=None, contour=True, qp_type=WIGNER):
         axis on which the plot was plotted.
     """
     pts = np.array(pts)
-    state = jax2qt(state, dims=dims)
+    state = jqt2qt(state)
     if ax is None:
         _, ax = plt.subplots(1, figsize=(4, 3), dpi=200)
     # fig = ax.get_figure()

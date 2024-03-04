@@ -5,7 +5,7 @@ jaxquantum
 import os
 
 from .utils import *
-from .quantum import *
+from .core import *
 
 
 with open(

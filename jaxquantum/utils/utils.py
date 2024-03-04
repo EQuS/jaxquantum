@@ -49,10 +49,6 @@ def comb(N, k):
     )
 
 
-def is_1d(jax_obj) -> bool:
-    return len(jax_obj.shape) == 1 or jax_obj.shape[1] == 1
-
-
 @jit
 def complex_to_real_iso_matrix(A): 
     return jnp.block([[jnp.real(A), -jnp.imag(A)], [jnp.imag(A), jnp.real(A)]])
