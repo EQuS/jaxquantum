@@ -55,7 +55,7 @@ setup(
     url="https://github.com/EQuS/jaxquantum",
     author="Shantanu Jha, Shoumik Chowdhury, Max Hays",
     author_email="shantanu.rajesh.jha@gmail.com",
-    license="Apache License 2.0",
+    license="Apache 2.0",
     packages=find_namespace_packages(exclude=["tutorials*"]),
     install_requires=REQUIREMENTS,
     extras_require=EXTRA_REQUIREMENTS,
