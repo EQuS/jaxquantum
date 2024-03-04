@@ -13,7 +13,8 @@ REQUIREMENTS = [
     "matplotlib",
     "qutip",
     "jax[cpu]",
-    "diffrax"
+    "diffrax",
+    "flax"
 ]
 
 EXTRA_REQUIREMENTS = {
