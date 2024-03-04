@@ -78,7 +78,7 @@ Thank you for taking the time to try our package out. If you found it useful in 
   title  = {An auto differentiable and hardware accelerated software toolkit for quantum circuit design, simulation and control},
   author = {Shantanu R. Jha, Shoumik Chowdhury, Max Hays, Jeff A. Grover, William D. Oliver},
   year   = {2024},
-  url    = {https://github.com/EQuS/jaxquantum}
+  url    = {https://github.com/EQuS/jaxquantum, https://github.com/EQuS/bosonic-jax, https://github.com/EQuS/qcsys}
 }
 ```
 > S. R. Jha, S. Chowdhury, M. Hays, J. A. Grover, W. D. Oliver. An auto differentiable and hardware accelerated software toolkit for quantum circuit design, simulation and control (2024), in preparation.
