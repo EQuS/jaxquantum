@@ -73,7 +73,7 @@ setup(
     keywords="quantum computing",
     python_requires=">=3.7",
     project_urls={
-        "Documentation": "https://github.com/EQuS/jaxquantum",
+        "Documentation": "https://equs.github.io/jaxquantum",
         "Source Code": "https://github.com/EQuS/jaxquantum",
         "Tutorials": "https://github.com/EQuS/jaxquantum/tree/main/tutorials",
     },
