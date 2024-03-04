@@ -273,6 +273,12 @@ class Qarray:
     def expm(self):
         return expm(self)
     
+    def cosm(self):
+        return cosm(self)
+    
+    def sinm(self):
+        return sinm(self)
+    
     def tr(self, **kwargs):
         return tr(self, **kwargs)
 
@@ -346,6 +352,16 @@ def expm(qarr: Qarray, **kwargs) -> Qarray:
     dims = deepcopy(qarr.dims)
     return Qarray.create(data, dims=dims)
 
+
+def cosm(qarr: Qarray) -> Qarray:
+    return (expm(1j*qarr) + expm(-1j*qarr))/2 
+
+def sinm(qarr: Qarray) -> Qarray:
+    return (expm(1j*qarr) - expm(-1j*qarr))/(2j)
+
+
+# More quantum specific -----------------------------------------------------
+
 def ptrace(qarr: Qarray, indx) -> Qarray:
     """Partial Trace.
 
@@ -381,8 +397,6 @@ def ptrace(qarr: Qarray, indx) -> Qarray:
 
     return Qarray.create(rho)
 
-# Kets & Density Matrices -----------------------------------------------------
-
 def dag(qarr: Qarray) -> Qarray:
     """Conjugate transpose.
 
@@ -415,3 +429,20 @@ def ket2dm(qarr: Qarray) -> Qarray:
         qarr = qarr.dag()
 
     return qarr @ qarr.dag()
+
+
+# Data level operations ----
+
+
+def batch_dag_data(op: Array) -> Array:
+    """Conjugate transpose.
+
+    Args:
+        op: operator
+
+    Returns:
+        conjugate of op, and transposes last two axes
+    """
+    return jnp.moveaxis(
+        jnp.conj(op), -1, -2
+    )  # transposes last two axes, good for batching
