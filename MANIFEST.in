@@ -1,2 +1,3 @@
+include docs/assets/logo.png
 include jaxquantum/VERSION.txt 
 include README.md
