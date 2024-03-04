@@ -18,7 +18,7 @@
 ```bash
 pip install jaxquantum
 ```
-If you also want to download the dependencies needed to run optional tutorials, please use `pip install jaxquantum[dev]` or `pip install 'jaxquantum[dev]'` (for `zsh` users).
+If you also want to download the dependencies needed to run optional tutorials, please use `pip install jaxquantum[dev,docs]` or `pip install 'jaxquantum[dev,docs]'` (for `zsh` users).
 
 
 To check if the installation was successful, run:
@@ -39,7 +39,7 @@ cd jaxquantum
 pip install --upgrade .
 ```
 
-If you also want to download the dependencies needed to run optional tutorials, please use `pip install --upgrade .[dev]` or `pip install --upgrade '.[dev]'` (for `zsh` users).
+If you also want to download the dependencies needed to run optional tutorials, please use `pip install --upgrade .[dev,docs]` or `pip install --upgrade '.[dev,docs]'` (for `zsh` users).
 
 #### Installation for Devs
 
