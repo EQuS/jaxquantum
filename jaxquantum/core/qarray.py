@@ -287,6 +287,9 @@ class Qarray:
     
     def is_dm(self):
         return self.qtype == Qtypes.oper
+    
+    def keep_only_diag_elements(self):
+        return keep_only_diag_elements(self)
 
 
 
@@ -359,6 +362,11 @@ def cosm(qarr: Qarray) -> Qarray:
 def sinm(qarr: Qarray) -> Qarray:
     return (expm(1j*qarr) - expm(-1j*qarr))/(2j)
 
+
+def keep_only_diag_elements(qarr: Qarray) -> Qarray:
+    dims = qarr.dims
+    data = jnp.diag(jnp.diag(qarr.data))
+    return Qarray.create(data, dims=dims)
 
 # More quantum specific -----------------------------------------------------
 
