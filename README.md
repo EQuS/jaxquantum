@@ -1,108 +1,89 @@
-# jaxquantum
-<p align="center">
-  <img src="https://img.shields.io/static/v1?style=for-the-badge&label=code-status&message=Good&color=orange"/>
-  <img src="https://img.shields.io/static/v1?style=for-the-badge&label=initial-commit&message=Shantanu&color=inactive"/>
-    <img src="https://img.shields.io/static/v1?style=for-the-badge&label=maintainer&message=EQuS&color=inactive"/>
-</p>
+<h1 align="center">
+    <img src="./docs/assets/logo.png" height="120" alt="jaxquantum logo">
+</h1>
 
-## Motivation
 
-`jaxquantum` leverages JAX to enable the auto differentiable and accelerated simulation of quantum dynamical systems, through tooling such as master equation solving. 
+[![License](https://img.shields.io/github/license/EQuS/jaxquantum.svg?style=popout-square)](https://opensource.org/license/apache-2-0) [![](https://img.shields.io/github/release/EQuS/jaxquantum.svg?style=popout-square)](https://github.com/EQuS/jaxquantum/releases) [![](https://img.shields.io/pypi/dm/jaxquantum.svg?style=popout-square)](https://pypi.org/project/jaxquantum/)
+
+[S. R. Jha](https://github.com/Phionx), [S. Chowdhury](https://github.com/shoumikdc), [M. Hays](https://scholar.google.com/citations?user=06z0MjwAAAAJ), [J. A. Grover](https://scholar.google.com/citations?user=igewch8AAAAJ), [W. D. Oliver](https://scholar.google.com/citations?user=4vNbnqcAAAAJ&hl=en)
+
+***Docs:** [github.com/pages/EQuS/jaxquantum](https://github.com/pages/EQuS/jaxquantum/)*
+
+`jaxquantum` leverages [JAX](https://github.com/google/jax) to enable the auto differentiable and (CPU, GPU, TPU) accelerated simulation of quantum dynamical systems, including tooling such as operator construction, unitary evolution and master equation solving. As such, `jaxquantum` serves as a QuTiP drop-in replacement written entirely in JAX.
+
+This package also serves as an essential dependency for [`bosonic-jax`](https://github.com/EQuS/bosonic-jax) and [`qcsys`](https://github.com/EQuS/qcsys). Together, these packages form an end-to-end toolkit for quantum circuit design, simulation and control. 
+
 
 ## Installation
-
-*Conda users, please make sure to `conda install pip` before running any pip installation if you want to install `jaxquantum` into your conda environment.*
 
 `jaxquantum` is published on PyPI. So, to install the latest version from PyPI, simply run the following code to install the package:
 
 ```bash
 pip install jaxquantum
 ```
-If you also want to download the dependencies needed to run optional tutorials, please use `pip install jaxquantum[dev,docs]` or `pip install 'jaxquantum[dev,docs]'` (for `zsh` users).
 
+For more details, please visit the getting started > installation section of our [docs](https://github.com/pages/EQuS/jaxquantum/).
 
-To check if the installation was successful, run:
+## An Example
 
-```bash
-python -c "import jaxquantum"
-```
-
-This should execute silently if installation was successful.
-
-## Building from source
-
-To build `jaxquantum` from source, pip install using:
-
-```bash
-git clone git@github.com:EQuS/jaxquantum.git jaxquantum
-cd jaxquantum
-pip install --upgrade .
-```
-
-If you also want to download the dependencies needed to run optional tutorials, please use `pip install --upgrade .[dev,docs]` or `pip install --upgrade '.[dev,docs]'` (for `zsh` users).
-
-#### Installation for Devs
-
-If you intend to contribute to this project, please install `jaxquantum` in editable mode as follows:
-```bash
-git clone git@github.com:EQuS/jaxquantum.git jaxquantum
-cd jaxquantum
-pip install -e .[dev, docs]
-```
-
-Please use `pip install -e '.[dev, docs]'` if you are a `zsh` user.
-
-Installing the package in the usual non-editable mode would require a developer to upgrade their pip installation (i.e. run `pip install --upgrade .`) every time they update the package source code.
-
-#### Install with GPU support (Linux)
-
-For linux users who wish to enable Nvidia GPU support, here are some steps ([ref](https://jax.readthedocs.io/en/latest/installation.html#nvidia-gpu)):
-
-1. Make sure you NVIDIA drivers by running:
-   `cat /proc/driver/nvidia/version` or `sudo ubuntu-drivers list`
-2. If your driver version is >= 525.60.13 then run:
-   `pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html` otherwise, use `cuda11_pip`
-3. Test that GPU support is enabled:
-4. Enjoy!
-
-***Notes:***
-If you receive this error:
-```
-2024-02-27 14:10:45.052355: W external/xla/xla/service/gpu/nvptx_compiler.cc:742] The NVIDIA driver's CUDA version is 12.0 which is older than the ptxas CUDA version (12.3.107). Because the driver is older than the ptxas version, XLA is disabling parallel compilation, which may slow down compilation. You should update your NVIDIA driver or use the NVIDIA-provided CUDA forward compatibility packages.
-```
-
-Then, you should update your NVIDIA driver by running:
-```
-conda install cuda -c nvidia
-```
-
-## Documentation
-
-Documentation should be viewable here: [https://github.com/pages/EQuS/jaxquantum/](https://github.com/pages/EQuS/jaxquantum/) 
-
-### Build and view locally
-
-To view documentation locally, plesae make sure the install the requirements under the `docs` extra, as specified above. Then, run the following:
+Here's an example of how to set up a simulation in jaxquantum.
 
 ```
-mkdocs serve
+from jax import jit
+import jaxquantum as jqt
+import jax.numpy as jnp
+import matplotlib.pyplot as plt
+
+omega_q = 5.0 #GHz
+Omega = .1
+g_state = jqt.basis(2,0) ^ jqt.basis(2,0)
+g_state_dm = g_state.to_dm()
+
+ts = jnp.linspace(0,5*jnp.pi/Omega,101)
+c_ops = [0.1*jqt.sigmam()^jqt.identity(N=2)]
+
+sz0 = jqt.sigmaz() ^ jqt.identity(N=2)
+
+@jit
+def Ht(t):
+    H0 = omega_q/2.0*((jqt.sigmaz()^jqt.identity(N=2)) + (jqt.identity(N=2)^jqt.sigmaz()))
+    H1 = Omega*jnp.cos((omega_q)*t)*((jqt.sigmax()^jqt.identity(N=2)) + (jqt.identity(N=2)^jqt.sigmax()))
+    return H0 + H1
+
+
+states = jqt.mesolve(g_state_dm, ts, c_ops=c_ops, Ht=Ht) 
+szt = jnp.real(jqt.calc_expect(sz0, states))
+
+
+fig, ax = plt.subplots(1, dpi=200, figsize=(4,3))
+ax.plot(ts, szt)
+ax.set_xlabel("Time (ns)")
+ax.set_ylabel("<σz(t)>")
+fig.tight_layout()
 ```
 
-The documentation should now be at the url provided by the above command. 
+## Acknowledgements & History
 
-### Updating Docs
+**Core Devs:** [Shantanu A. Jha](https://github.com/Phionx), [Shoumik Chowdhury](https://github.com/shoumikdc)
 
-The documentation should be updated automatically when any changes are made to the `main` branch. However, updates can also be forced by running:
 
+This package was initially a small part of [`bosonic-jax`](https://github.com/EQuS/bosonic-jax). In early 2022, `jaxquantum` was extracted and made into its own package. This package was briefly announced to the world at APS March Meeting 2023 and released to a select few academic groups shortly after. Since then, this package has been open sourced and developed while conducting research in the Engineering Quantum Systems Group at MIT with invaluable advice from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/). 
+
+## Citation
+
+Thank you for taking the time to try our package out. If you found it useful in your research, please cite us as follows:
+
+``` 
+@unpublished{jha2024jaxquantum,
+  title  = {An auto differentiable and hardware accelerated software toolkit for quantum circuit design, simulation and control},
+  author = {Shantanu R. Jha, Shoumik Chowdhury, Max Hays, Jeff A. Grover, William D. Oliver},
+  year   = {2024},
+  url    = {https://github.com/EQuS/jaxquantum}
+}
 ```
-mkdocs gh-deploy --force
-```
-This will build your documentation and deploy it to a branch gh-pages in your repository.
-
-## Acknowledgements
-
-**Core Devs:** [Shantanu Jha](https://github.com/Phionx), [Shoumik Chowdhury](https://github.com/shoumikdc)
+> S. R. Jha, S. Chowdhury, M. Hays, J. A. Grover, W. D. Oliver. An auto differentiable and hardware accelerated software toolkit for quantum circuit design, simulation and control (2024), in preparation.
 
 
-This package was developed while conducting research in the Engineering Quantum Systems Group at MIT with invaluable advice from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/). 
+## Contributions & Contact
 
+This package is open source and, as such, very open to contributions. Please don't hesitate to open an issue, report a bug, request a feature, or create a pull request. We are also open to deeper collaborations to create a tool that is more useful for everyone. If a discussion would be helpful, please email [shanjha@mit.edu](mailto:shanjha@mit.edu) to set up a meeting. 
