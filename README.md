@@ -28,7 +28,7 @@ For more details, please visit the getting started > installation section of our
 
 Here's an example of how to set up a simulation in jaxquantum.
 
-```
+```python
 from jax import jit
 import jaxquantum as jqt
 import jax.numpy as jnp
@@ -73,7 +73,7 @@ This package was initially a small part of [`bosonic-jax`](https://github.com/EQ
 
 Thank you for taking the time to try our package out. If you found it useful in your research, please cite us as follows:
 
-``` 
+```bibtex
 @unpublished{jha2024jaxquantum,
   title  = {An auto differentiable and hardware accelerated software toolkit for quantum circuit design, simulation and control},
   author = {Shantanu R. Jha, Shoumik Chowdhury, Max Hays, Jeff A. Grover, William D. Oliver},
