@@ -345,22 +345,63 @@ def tr(qarr: Qarray, **kwargs) -> Qarray:
     """
     return jnp.trace(qarr.data, **kwargs)
 
+
+def expm_data(data: Array, **kwargs) -> Array:
+    """Matrix exponential wrapper.
+
+    Returns:
+        matrix exponential
+    """
+    return jsp.linalg.expm(data, **kwargs)
+
 def expm(qarr: Qarray, **kwargs) -> Qarray:
     """Matrix exponential wrapper.
 
     Returns:
         matrix exponential
     """
-    data = jsp.linalg.expm(qarr.data, **kwargs)
-    dims = deepcopy(qarr.dims)
+    dims = qarr.dims
+    data = expm_data(qarr.data, **kwargs)
     return Qarray.create(data, dims=dims)
 
 
+def cosm_data(data: Array, **kwargs) -> Array:
+    """Matrix cosine wrapper.
+
+    Returns:
+        matrix cosine
+    """
+    return (expm_data(1j*data) + expm_data(-1j*data))/2 
+
 def cosm(qarr: Qarray) -> Qarray:
-    return (expm(1j*qarr) + expm(-1j*qarr))/2 
+    """Matrix cosine wrapper.
+
+    Args:
+        qarr (Qarray): quantum array
+
+    Returns:
+        matrix cosine
+    """
+    dims = qarr.dims
+    data = cosm_data(qarr.data)
+    return Qarray.create(data, dims=dims)
+
+
+def sinm_data(data: Array, **kwargs) -> Array:
+    """Matrix sine wrapper.
+
+    Args:
+        data: matrix
+
+    Returns:
+        matrix sine
+    """
+    return (expm_data(1j*data) - expm_data(-1j*data))/(2j)
 
 def sinm(qarr: Qarray) -> Qarray:
-    return (expm(1j*qarr) - expm(-1j*qarr))/(2j)
+    dims = qarr.dims
+    data = sinm_data(qarr.data)
+    return Qarray.create(data, dims=dims)
 
 
 def keep_only_diag_elements(qarr: Qarray) -> Qarray:
