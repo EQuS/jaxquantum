@@ -239,6 +239,9 @@ class Qarray:
     def data(self):
         return self._data
     
+    @property
+    def shaped_data(self):
+        return self._data.reshape(self.dims[0] + self.dims[1])
 
     def _str_header(self):
         out = ", ".join([
@@ -334,7 +337,7 @@ def tensor(*args, **kwargs) -> Qarray:
         dims[1] += arg.dims[1]
     return Qarray.create(data, dims=dims)
 
-def tr(qarr: Qarray, **kwargs) -> Qarray:
+def tr(qarr: Qarray, **kwargs) -> jnp.complex128:
     """Full trace.
 
     Args:
@@ -343,7 +346,7 @@ def tr(qarr: Qarray, **kwargs) -> Qarray:
     Returns:
         Full trace.
     """
-    return jnp.trace(qarr.data, **kwargs)
+    return trace(qarr, **kwargs)
 
 
 def expm_data(data: Array, **kwargs) -> Array:
@@ -425,13 +428,10 @@ def ptrace(qarr: Qarray, indx) -> Qarray:
     """
 
     qarr = ket2dm(qarr)
-    rho = qarr.data
+    rho = qarr.shaped_data
     dims = qarr.dims
 
     Nq = len(dims[0])
-    dims2 = jnp.concatenate(jnp.array(dims))
-
-    rho = rho.reshape(dims2)
 
     indxs = [indx, indx + Nq]
     for j in range(Nq):
@@ -445,6 +445,9 @@ def ptrace(qarr: Qarray, indx) -> Qarray:
         rho = jnp.trace(rho, axis1=2, axis2=3)
 
     return Qarray.create(rho)
+
+def trace(qarr: Qarray, **kwargs) -> Qarray:
+    return jnp.trace(qarr.data, **kwargs)
 
 def dag(qarr: Qarray) -> Qarray:
     """Conjugate transpose.

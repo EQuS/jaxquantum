@@ -2,9 +2,10 @@
 Converting between different object types.
 """
 
+from numbers import Number
 from jax import config, Array
 from qutip import Qobj
-from typing import Optional
+from typing import Optional, Union, List
 import jax.numpy as jnp
 import numpy as np
 
@@ -46,15 +47,37 @@ def jqt2qt(jqt_obj):
     
     return Qobj(np.array(jqt_obj.data), dims=jqt_obj.dims)
 
-def jnp2jqt(arr: Array, dims: Optional[DIMS_TYPE] = None):
+
+def extract_dims(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None):
+    """Extract dims from a JAX array or Qarray.
+
+    Args:
+        arr: JAX array or Qarray.
+        dims: Qarray dims.
+
+    Returns:
+        Qarray dims.
+    """
+    if isinstance(dims[0], Number):
+        is_op = len(arr.shape) == 2 and arr.shape[0] == arr.shape[1]
+        if is_op:
+            dims = [dims, dims]
+        else:
+            dims = [dims, [1] * len(dims)] # defaults to ket 
+    return dims
+                 
+
+def jnp2jqt(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None):
     """JAX array -> QuTiP state.
 
     Args:
         jnp_obj: JAX array.
+        dims: Qarray dims.
 
     Returns:
         QuTiP state.
     """
+    dims = extract_dims(arr, dims)
     return Qarray.create(arr, dims=dims)
 
 
@@ -67,6 +90,8 @@ def jnps2jqts(arrs: Array, dims: Optional[DIMS_TYPE] = None):
     Returns:
         QuTiP state.
     """
+
+    dims = extract_dims(arrs[0], dims)
     return [Qarray.create(arr, dims=dims) for arr in arrs]
 
 def jqts2jnps(qarrs: Qarray):
