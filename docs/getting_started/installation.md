@@ -55,3 +55,9 @@ Then, you should update your NVIDIA driver by running:
 ```
 conda install cuda -c nvidia
 ```
+
+If you receive this error:
+`CUDA backend failed to initialize: jaxlib/cuda/versions_helpers.cc:98: operation cuInit(0) failed: CUDA_ERROR_COMPAT_NOT_SUPPORTED_ON_DEVICE (Set TF_CPP_MIN_LOG_LEVEL=0 and rerun for more info.)`
+
+Try rebooting or running:
+`sudo reboot now`
