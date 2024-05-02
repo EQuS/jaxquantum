@@ -77,7 +77,7 @@ def jnp2jqt(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None):
     Returns:
         QuTiP state.
     """
-    dims = extract_dims(arr, dims)
+    dims = extract_dims(arr, dims) if dims is not None else None
     return Qarray.create(arr, dims=dims)
 
 
@@ -91,7 +91,7 @@ def jnps2jqts(arrs: Array, dims: Optional[DIMS_TYPE] = None):
         QuTiP state.
     """
 
-    dims = extract_dims(arrs[0], dims)
+    dims = extract_dims(arrs[0], dims) if dims is not None else None
     return [Qarray.create(arr, dims=dims) for arr in arrs]
 
 def jqts2jnps(qarrs: Qarray):
