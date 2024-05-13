@@ -74,11 +74,12 @@ This package was initially a small part of [`bosonic-jax`](https://github.com/EQ
 Thank you for taking the time to try our package out. If you found it useful in your research, please cite us as follows:
 
 ```bibtex
-@unpublished{jha2024jaxquantum,
+@software{jha2024jaxquantum,
+  author = {Shantanu R. Jha and Shoumik Chowdhury and Max Hays and Jeff A. Grover and William D. Oliver},
   title  = {An auto differentiable and hardware accelerated software toolkit for quantum circuit design, simulation and control},
-  author = {Shantanu R. Jha, Shoumik Chowdhury, Max Hays, Jeff A. Grover, William D. Oliver},
+  url    = {https://github.com/EQuS/jaxquantum, https://github.com/EQuS/bosonic-jax, https://github.com/EQuS/qcsys},
+  version = {0.1.0},
   year   = {2024},
-  url    = {https://github.com/EQuS/jaxquantum, https://github.com/EQuS/bosonic-jax, https://github.com/EQuS/qcsys}
 }
 ```
 > S. R. Jha, S. Chowdhury, M. Hays, J. A. Grover, W. D. Oliver. An auto differentiable and hardware accelerated software toolkit for quantum circuit design, simulation and control (2024), in preparation.
