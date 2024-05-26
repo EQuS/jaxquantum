@@ -11,7 +11,7 @@
 
 `jaxquantum` leverages [JAX](https://github.com/google/jax) to enable the auto differentiable and (CPU, GPU, TPU) accelerated simulation of quantum dynamical systems, including tooling such as operator construction, unitary evolution and master equation solving. As such, `jaxquantum` serves as a QuTiP drop-in replacement written entirely in JAX.
 
-This package also serves as an essential dependency for [`bosonic-jax`](https://github.com/EQuS/bosonic-jax) and [`qcsys`](https://github.com/EQuS/qcsys). Together, these packages form an end-to-end toolkit for quantum circuit design, simulation and control. 
+This package also serves as an essential dependency for [`bosonic`](https://github.com/EQuS/bosonic) and [`qcsys`](https://github.com/EQuS/qcsys). Together, these packages form an end-to-end toolkit for quantum circuit design, simulation and control. 
 
 
 ## Installation
@@ -67,7 +67,7 @@ fig.tight_layout()
 **Core Devs:** [Shantanu A. Jha](https://github.com/Phionx), [Shoumik Chowdhury](https://github.com/shoumikdc)
 
 
-This package was initially a small part of [`bosonic-jax`](https://github.com/EQuS/bosonic-jax). In early 2022, `jaxquantum` was extracted and made into its own package. This package was briefly announced to the world at APS March Meeting 2023 and released to a select few academic groups shortly after. Since then, this package has been open sourced and developed while conducting research in the Engineering Quantum Systems Group at MIT with invaluable advice from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/). 
+This package was initially a small part of [`bosonic`](https://github.com/EQuS/bosonic). In early 2022, `jaxquantum` was extracted and made into its own package. This package was briefly announced to the world at APS March Meeting 2023 and released to a select few academic groups shortly after. Since then, this package has been open sourced and developed while conducting research in the Engineering Quantum Systems Group at MIT with invaluable advice from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/). 
 
 ## Citation
 
@@ -77,7 +77,7 @@ Thank you for taking the time to try our package out. If you found it useful in 
 @software{jha2024jaxquantum,
   author = {Shantanu R. Jha and Shoumik Chowdhury and Max Hays and Jeff A. Grover and William D. Oliver},
   title  = {An auto differentiable and hardware accelerated software toolkit for quantum circuit design, simulation and control},
-  url    = {https://github.com/EQuS/jaxquantum, https://github.com/EQuS/bosonic-jax, https://github.com/EQuS/qcsys},
+  url    = {https://github.com/EQuS/jaxquantum, https://github.com/EQuS/bosonic, https://github.com/EQuS/qcsys},
   version = {0.1.0},
   year   = {2024},
 }
