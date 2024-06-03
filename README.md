@@ -1,5 +1,5 @@
 <h1 align="center">
-    <img src="./docs/assets/logo.png" height="120" alt="jaxquantum logo">
+    <img src="https://github.com/EQuS/jaxquantum/raw/main/docs/assets/logo.png" height="120" alt="jaxquantum logo">
 </h1>
 
 
