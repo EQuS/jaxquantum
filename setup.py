@@ -14,7 +14,8 @@ REQUIREMENTS = [
     "qutip",
     "jax[cpu]",
     "diffrax",
-    "flax"
+    "flax",
+    "tqdm"
 ]
 
 EXTRA_REQUIREMENTS = {

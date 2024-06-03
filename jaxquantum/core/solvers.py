@@ -1,14 +1,13 @@
 """Solvers"""
 
-from diffrax import diffeqsolve, ODETerm, SaveAt, PIDController
+from diffrax import diffeqsolve, ODETerm, SaveAt, PIDController, TqdmProgressMeter
 from functools import partial
 from jax import jit, vmap, Array
 from typing import Callable, List, Optional
 import diffrax
 import jax.numpy as jnp
 import warnings
-
-
+import tqdm
 
 
 from jaxquantum.core.qarray import Qarray
@@ -65,6 +64,12 @@ def spre(op: Array) -> Callable[[Array], Array]:
     )
 
 
+class CustomProgressMeter(TqdmProgressMeter):
+    @staticmethod
+    def _init_bar() -> tqdm.tqdm:
+        return tqdm.tqdm(total=100, unit='%', colour="MAGENTA", ascii="░▒█")
+    
+
 def solve(ρ0, f, t_list, args, solver_options):
     """ Gets teh desired solver from diffrax.
 
@@ -98,6 +103,7 @@ def solve(ρ0, f, t_list, args, solver_options):
             stepsize_controller=stepsize_controller,
             args=args,
             max_steps=solver_options.get("max_steps", 100_000),
+            progress_meter=CustomProgressMeter()
         )   
 
     return sol
