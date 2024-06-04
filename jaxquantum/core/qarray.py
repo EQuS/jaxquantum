@@ -291,6 +291,10 @@ class Qarray:
     def is_dm(self):
         return self.qtype == Qtypes.oper
     
+    def to_ket(self):
+        return to_ket(self)
+        
+    
     def keep_only_diag_elements(self):
         return keep_only_diag_elements(self)
 
@@ -411,6 +415,15 @@ def keep_only_diag_elements(qarr: Qarray) -> Qarray:
     dims = qarr.dims
     data = jnp.diag(jnp.diag(qarr.data))
     return Qarray.create(data, dims=dims)
+
+def to_ket(qarr: Qarray) -> Qarray:
+    if qarr.qtype == Qtypes.ket:
+        return qarr
+    elif qarr.qtype == Qtypes.bra:
+        return qarr.dag()
+    else:
+        raise ValueError("Can only get ket from a ket or bra.")
+    
 
 # More quantum specific -----------------------------------------------------
 

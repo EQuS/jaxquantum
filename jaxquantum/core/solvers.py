@@ -8,9 +8,10 @@ import diffrax
 import jax.numpy as jnp
 import warnings
 import tqdm
+import logging
 
 
-from jaxquantum.core.qarray import Qarray
+from jaxquantum.core.qarray import Qarray, Qtypes
 from jaxquantum.core.conversions import jnps2jqts, jqts2jnps
 
 
@@ -134,9 +135,18 @@ def mesolve(
     Returns:
         list of states
     """
+    
+    c_ops = c_ops or []
+
+    if len(c_ops) == 0 and ρ0.qtype != Qtypes.oper:
+        logging.warning(
+            "Consider using `jqt.sesolve()` instead, as `c_ops` is an empty list and the initial state is not a density matrix."
+        )
+
+    ρ0 = ρ0.to_dm()
     dims = ρ0.dims
     ρ0 = jnp.asarray(ρ0.data) + 0.0j
-    c_ops = c_ops or []
+
     c_ops = jnp.asarray([c_op.data for c_op in c_ops]) + 0.0j
     H0 = jnp.asarray(H0.data) + 0.0j if H0 is not None else None
     solver_options = solver_options or {}
@@ -190,6 +200,13 @@ def sesolve(
     Returns:
         list of states
     """
+
+    if ψ.qtype == Qtypes.oper:
+        raise ValueError(
+            "Please use `jqt.mesolve` for initial state inputs in density matrix form."
+        )
+    
+    ψ = ψ.to_ket()
 
     dims = ψ.dims
 
