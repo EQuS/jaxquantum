@@ -67,7 +67,8 @@ def spre(op: Array) -> Callable[[Array], Array]:
 class CustomProgressMeter(TqdmProgressMeter):
     @staticmethod
     def _init_bar() -> tqdm.tqdm:
-        return tqdm.tqdm(total=100, unit='%', colour="MAGENTA", ascii="░▒█")
+        bar_format = "{desc}: {percentage:3.0f}% |{bar}| [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
+        return tqdm.tqdm(total=100, bar_format=bar_format, unit='%', colour="MAGENTA", ascii="░▒█")
     
 
 def solve(ρ0, f, t_list, args, solver_options):
