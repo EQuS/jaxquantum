@@ -1,14 +1,17 @@
 """Solvers"""
 
-from diffrax import diffeqsolve, ODETerm, SaveAt, PIDController, TqdmProgressMeter
+
+from diffrax import diffeqsolve, ODETerm, SaveAt, PIDController, TqdmProgressMeter, NoProgressMeter
 from functools import partial
+from flax import struct
 from jax import jit, vmap, Array
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Dict
 import diffrax
 import jax.numpy as jnp
 import warnings
 import tqdm
 import logging
+
 
 
 from jaxquantum.core.qarray import Qarray, Qtypes
@@ -17,6 +20,18 @@ from jaxquantum.core.conversions import jnps2jqts, jqts2jnps
 
 
 # ----
+
+@struct.dataclass
+class SolverOptions:
+    progress_meter: bool = struct.field(pytree_node=False)
+    solver: str = struct.field(pytree_node=False),
+    max_steps: int = struct.field(pytree_node=False),
+    
+
+    @classmethod
+    def create(cls, progress_meter: bool = True, solver: str = "Tsit5", max_steps: int = 100_000):
+        return cls(progress_meter, solver, max_steps)
+
 
 @jit
 def calc_expect(op: Qarray, states: List[Qarray]) -> Array:
@@ -71,8 +86,7 @@ class CustomProgressMeter(TqdmProgressMeter):
         bar_format = "{desc}: {percentage:3.0f}% |{bar}| [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
         return tqdm.tqdm(total=100, bar_format=bar_format, unit='%', colour="MAGENTA", ascii="░▒█")
     
-
-def solve(ρ0, f, t_list, args, solver_options):
+def solve(ρ0, f, t_list, args, solver_options: Optional[SolverOptions] = None):
     """ Gets teh desired solver from diffrax.
 
     Args:
@@ -87,7 +101,9 @@ def solve(ρ0, f, t_list, args, solver_options):
     saveat = SaveAt(ts=t_list)
 
     # solver 
-    solver_name = solver_options.get("solver", "Tsit5")
+    solver_options = solver_options or SolverOptions.create()
+    
+    solver_name = solver_options.solver
     solver = getattr(diffrax, solver_name)()
     stepsize_controller = PIDController(rtol=1e-6, atol=1e-6)
 
@@ -104,8 +120,8 @@ def solve(ρ0, f, t_list, args, solver_options):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             args=args,
-            max_steps=solver_options.get("max_steps", 100_000),
-            progress_meter=CustomProgressMeter()
+            max_steps=solver_options.max_steps,
+            progress_meter=CustomProgressMeter() if solver_options.progress_meter else NoProgressMeter(),
         )   
 
     return sol
@@ -120,7 +136,7 @@ def mesolve(
     c_ops: Optional[List[Qarray]] = None,
     H0: Optional[Qarray] = None,
     Ht: Optional[Callable[[float], Qarray]] = None,
-    solver_options: Optional[dict] = None,
+    solver_options: Optional[SolverOptions] = None
 ):
     """Quantum Master Equation solver.
 
@@ -130,7 +146,7 @@ def mesolve(
         c_ops: list of collapse operators
         H0: time independent Hamiltonian. If H0 is not None, it will override Ht.
         Ht: time dependent Hamiltonian function.
-        solver_options: dictionary with solver options
+        solver_options: SolverOptions with solver options
 
     Returns:
         list of states
@@ -149,7 +165,6 @@ def mesolve(
 
     c_ops = jnp.asarray([c_op.data for c_op in c_ops]) + 0.0j
     H0 = jnp.asarray(H0.data) + 0.0j if H0 is not None else None
-    solver_options = solver_options or {}
 
     def f(
         t: float,
@@ -173,7 +188,7 @@ def mesolve(
         return rho_dot
 
     
-    sol = solve(ρ0, f, t_list, [H0, c_ops], solver_options)
+    sol = solve(ρ0, f, t_list, [H0, c_ops], solver_options=solver_options)
 
     return jnps2jqts(sol.ys, dims=dims)
 
@@ -186,7 +201,7 @@ def sesolve(
     t_list: Array,
     H0: Optional[Qarray] = None,
     Ht: Optional[Callable[[float], Qarray]] = None,
-    solver_options: Optional[dict] = None,
+    solver_options: Optional[SolverOptions] = None,
 ):
     """Schrödinger Equation solver.
 
@@ -195,7 +210,7 @@ def sesolve(
         t_list: time list
         H0: time independent Hamiltonian. If H0 is not None, it will override Ht.
         Ht: time dependent Hamiltonian function.
-        solver_options: dictionary with solver options
+        solver_options: SolverOptions with solver options
 
     Returns:
         list of states
@@ -233,7 +248,7 @@ def sesolve(
         return ψₜ_dot
 
 
-    sol = solve(ψ, f, t_list, [H0], solver_options)
+    sol = solve(ψ, f, t_list, [H0], solver_options=solver_options)
 
 
     return jnps2jqts(sol.ys, dims=dims)
