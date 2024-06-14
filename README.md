@@ -18,7 +18,12 @@ This package also serves as an essential dependency for [`bosonic`](https://gith
 
 ## Installation
 
-`jaxquantum` is published on PyPI. So, to install the latest version from PyPI, simply run the following code to install the package:
+**Recommended:** As this is a rapidly evolving project, we recommend installing the latest version of `jaxquantum` from source: 
+```
+pip install git+https://github.com/EQuS/jaxquantum.git
+```
+
+`jaxquantum` is also published on PyPI. So, to install the latest version from PyPI, simply run the following code to install the package:
 
 ```bash
 pip install jaxquantum
