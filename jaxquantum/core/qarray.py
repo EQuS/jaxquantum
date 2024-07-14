@@ -26,6 +26,9 @@ def isbra_dims(dims: DIMS_TYPE) -> bool:
 def isop_dims(dims: DIMS_TYPE) -> bool:
     return prod(dims[1]) == prod(dims[0])
 
+def ket_from_op_dims(dims: DIMS_TYPE) -> DIMS_TYPE:
+    return [dims[0], [1 for _ in dims[1]]]
+
 class Qtypes(str, Enum):
     ket = "ket"
     bra = "bra"
@@ -294,6 +297,12 @@ class Qarray:
     def to_ket(self):
         return to_ket(self)
         
+
+    def eigenstates(self):
+        return eigenstates(self)
+
+    def eigenenergies(self):
+        return eigenenergies(self)
     
     def keep_only_diag_elements(self):
         return keep_only_diag_elements(self)
@@ -424,6 +433,40 @@ def to_ket(qarr: Qarray) -> Qarray:
     else:
         raise ValueError("Can only get ket from a ket or bra.")
     
+
+def eigenstates(qarr: Qarray) -> Qarray:
+    """Eigenstates of a quantum array.
+
+    Args:
+        qarr (Qarray): quantum array
+
+    Returns:
+        eigenvalues and eigenstates
+    """
+
+    evals, evecs = jnp.linalg.eigh(qarr.data)
+    idxs_sorted = jnp.argsort(evals)
+    
+    dims = ket_from_op_dims(qarr.dims)
+
+    evals =  evals[idxs_sorted]
+    evecs = evecs[:, idxs_sorted]
+    evecs = [Qarray.create(arr, dims=dims) for arr in evecs]
+
+    return evals, evecs
+
+def eigenenergies(qarr: Qarray) -> Array:
+    """Eigenvalues of a quantum array.
+
+    Args:
+        qarr (Qarray): quantum array
+
+    Returns:
+        eigenvalues
+    """
+
+    evals = jnp.linalg.eigvalsh(qarr.data)
+    return evals
 
 # More quantum specific -----------------------------------------------------
 
