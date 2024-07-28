@@ -18,12 +18,25 @@ This package also serves as an essential dependency for [`bosonic`](https://gith
 
 ## Installation
 
-**Recommended:** As this is a rapidly evolving project, we recommend installing the latest version of `jaxquantum` from source: 
+
+### Installing from source (recommended)
+
+**Recommended:** As this is a rapidly evolving project, we recommend installing the latest version of `jaxquantum` from source as follows:
 ```
 pip install git+https://github.com/EQuS/jaxquantum.git
 ```
 
-`jaxquantum` is also published on PyPI. So, to install the latest version from PyPI, simply run the following code to install the package:
+### Installing from source in editable mode (recommended for developers)
+
+If you are interested in contributing to the package, please clone this repository and install this package in editable mode after changing into the root directory of this repository:
+```
+pip install -e ".[dev]"
+```
+This will also install extras from the `dev` flag, which can be useful when developing the package. Since this is installed in editable mode, the package will automatically be updated after pulling new changes in the repository. 
+
+### Installing from PyPI (not recommended)
+
+`jaxquantum` is also published on PyPI. Simply run the following code to install the package:
 
 ```bash
 pip install jaxquantum
