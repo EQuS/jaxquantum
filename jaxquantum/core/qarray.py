@@ -237,6 +237,16 @@ class Qarray:
     @property
     def dims(self):
         return self._qdims.dims
+
+    @property
+    def space_dims(self):
+        if self.qtype in [Qtypes.oper, Qtypes.ket]:
+            return self.dims[0]
+        elif self.qtype == Qtypes.bra:
+            return self.dims[1]
+        else:
+            raise ValueError("Unsupported qtype.")
+        
     
     @property
     def data(self):

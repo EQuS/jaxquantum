@@ -10,7 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 
 
-from jaxquantum.core.qarray import Qarray, DIMS_TYPE
+from jaxquantum.core.qarray import Qarray, DIMS_TYPE, Qtypes
 
 
 config.update("jax_enable_x64", True)
@@ -47,6 +47,26 @@ def jqt2qt(jqt_obj):
     
     return Qobj(np.array(jqt_obj.data), dims=jqt_obj.dims)
 
+
+def op2jqts(op: Qarray, cols=True):
+    """QuTiP operator -> JAX array.
+
+    Args:
+        op: QuTiP operator.
+
+    Returns:
+        JAX array.
+    """
+    if op.qtype != Qtypes.oper:
+        raise ValueError("Input must be a QuTiP operator.")
+
+    space_dims = op.space_dims
+    ones = [1] * len(space_dims)
+
+    if cols:
+        return [Qarray.create(op.data[i,:], dims=[space_dims, ones]) for i in range(op.data.shape[0])]
+    else:
+        return [Qarray.create(op.data[:,i][jnp.newaxis,...], dims=[ones, space_dims]) for i in range(op.data.shape[1])]
 
 def extract_dims(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None):
     """Extract dims from a JAX array or Qarray.

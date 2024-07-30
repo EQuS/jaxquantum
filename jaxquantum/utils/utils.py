@@ -90,3 +90,9 @@ def conj_transpose_iso_matrix(A):
     Ar = A[:N//2,:N//2].T
     Ai = A[N//2:,:N//2].T
     return jnp.block([[Ar, Ai],[-Ai,Ar]])
+
+def robust_isscalar(val):
+    is_scalar = isinstance(val, Number) or jnp.isscalar(val)
+    if isinstance(val, jnp.ndarray):
+        is_scalar = len(val.shape) == 0
+    return is_scalar

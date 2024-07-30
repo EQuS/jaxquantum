@@ -1,6 +1,7 @@
 """ States. """
 
 from jax import config
+from math import prod
 
 import jax.numpy as jnp
 from jax.nn import one_hot
@@ -107,6 +108,19 @@ def identity(*args, **kwargs) -> Qarray:
         Identity matrix.
     """
     return Qarray.create(jnp.eye(*args, **kwargs))
+
+def identity_like(A) -> Qarray:
+    """Identity matrix with the same shape as A.
+
+    Args:
+        A: Matrix.
+
+    Returns:
+        Identity matrix with the same shape as A.
+    """
+    space_dims = A.space_dims 
+    total_dim = prod(space_dims)
+    return Qarray.create(jnp.eye(total_dim, total_dim), dims=[space_dims, space_dims])
 
 
 def displace(N, α) -> Qarray:
