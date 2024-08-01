@@ -18,7 +18,7 @@ import logging
 from jaxquantum.core.qarray import Qarray, Qtypes
 from jaxquantum.core.conversions import jnps2jqts, jqts2jnps, jnp2jqt
 from jaxquantum.utils.utils import robust_isscalar
-
+from jaxquantum.core.operators import identity_like
 
 # ----
 
@@ -344,6 +344,9 @@ def propagator(
     if isinstance(H, Qarray):
         dims = H.dims 
         if t_is_scalar:
+            if t == 0:
+                return identity_like(H)
+
             return jnp2jqt(propagator_0_data(H.data,t), dims=dims)
         else:
             f = lambda t: propagator_0_data(H.data,t)
@@ -352,13 +355,18 @@ def propagator(
         dims = H(0.0).dims
         H_data = lambda t: H(t).data
         if t_is_scalar:
+            if t == 0:
+                return identity_like(H(0.0))
+
+            ts = jnp.linspace(0,t,2)
             return jnp2jqt(
-                propagator_t_data(H_data, t, solver_options=solver_options),
+                propagator_t_data(H_data, ts, solver_options=solver_options)[1],
                 dims=dims
             )
         else:
-            f = lambda t: propagator_t_data(H_data, t, solver_options=solver_options)
-            return jnps2jqts(vmap(f)(t), dims)
+            ts = t 
+            U_props = propagator_t_data(H_data, ts, solver_options=solver_options)
+            return jnps2jqts(U_props, dims)
 
 def propagator_0_data(
     H0: Array,
@@ -376,13 +384,13 @@ def propagator_0_data(
 
 def propagator_t_data(
     Ht: Callable[[float], Array],
-    t: float, 
+    ts: Array, 
     solver_options=None
 ):
     """ Generate the propagator for a time dependent Hamiltonian. 
 
     Args:
-        t (float): The final time of the propagator. 
+        ts (float): The final time of the propagator. 
             Warning: Do not send in t. In this case, just do exp(-1j*Ht(0.0)).
         Ht (callable): A function that takes a time argument and returns a Hamiltonian. 
         solver_options (dict): Options to pass to the solver.
@@ -390,12 +398,12 @@ def propagator_t_data(
     Returns:
         Qarray: The propagator for the time dependent Hamiltonian for the time range [0, t_final].
     """
-    ts = jnp.linspace(0,t,2)
     N = Ht(0).shape[0]
     basis_states = jnp.eye(N)
 
     def propogate_state(initial_state):
-        return sesolve_data(initial_state, ts, Ht=Ht, solver_options=solver_options)[1]
+        return sesolve_data(initial_state, ts, Ht=Ht, solver_options=solver_options)
         
     U_prop = vmap(propogate_state)(basis_states)
+    U_prop = U_prop.transpose(1,0,2) # move time axis to the front
     return U_prop
