@@ -1,12 +1,13 @@
 """ States. """
 
+from typing import List
 from jax import config
 from math import prod
 
 import jax.numpy as jnp
 from jax.nn import one_hot
 
-from jaxquantum.core.qarray import Qarray
+from jaxquantum.core.qarray import Qarray, Qtypes, tensor
 
 config.update("jax_enable_x64", True)
 
@@ -122,7 +123,6 @@ def identity_like(A) -> Qarray:
     total_dim = prod(space_dims)
     return Qarray.create(jnp.eye(total_dim, total_dim), dims=[space_dims, space_dims])
 
-
 def displace(N, α) -> Qarray:
     """Displacement operator
 
@@ -139,7 +139,7 @@ def displace(N, α) -> Qarray:
 
 # States ---------------------------------------------------------------------
 
-def basis(N, k):
+def basis(N: int, k: int):
     """Creates a |k> (i.e. fock state) ket in a specified Hilbert Space.
 
     Args:
@@ -152,7 +152,7 @@ def basis(N, k):
     return Qarray.create(one_hot(k, N).reshape(N, 1))
 
 
-def coherent(N, α) -> Qarray:
+def coherent(N: int, α: complex) -> Qarray:
     """Coherent state.
 
     Args:
@@ -163,3 +163,22 @@ def coherent(N, α) -> Qarray:
         Coherent state |α⟩.
     """
     return displace(N, α) @ basis(N, 0)
+
+
+def basis_like(A: Qarray, ks: List[int]) -> Qarray:
+    """Creates a |k> (i.e. fock state) ket with the same space dims as A.
+
+    Args:
+        A: state or operator.
+        k: fock number.
+
+    Returns:
+        Fock State |k> with the same space dims as A.
+    """
+    space_dims = A.space_dims 
+    assert len(space_dims) == len(ks), "len(ks) must be equal to len(space_dims)"
+    
+    kets = []
+    for j, k in enumerate(ks):
+        kets.append(basis(space_dims[j], k))
+    return tensor(*kets)
