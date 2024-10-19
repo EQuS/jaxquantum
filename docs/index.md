@@ -1,9 +1,5 @@
 # Welcome to jaxquantum
 
-<h1 align="center">
-    <img src="https://github.com/EQuS/jaxquantum/raw/main/docs/assets/logo.png" height="120" alt="jaxquantum logo">
-</h1>
-
 
 [![License](https://img.shields.io/github/license/EQuS/jaxquantum.svg?style=popout-square)](https://opensource.org/license/apache-2-0) [![](https://img.shields.io/github/release/EQuS/jaxquantum.svg?style=popout-square)](https://github.com/EQuS/jaxquantum/releases) [![](https://img.shields.io/pypi/dm/jaxquantum.svg?style=popout-square)](https://pypi.org/project/jaxquantum/)
 
