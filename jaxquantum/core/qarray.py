@@ -200,6 +200,12 @@ class Qarray:
             self.data * multiplier,
             dims=self._qdims.dims,
         )
+
+    def __pow__(self, other):
+        if not isinstance(other, int):
+            return NotImplemented
+        
+        return powm(self, other)
     
     def __rmul__(self, other):
         return self.__mul__(other)
@@ -247,7 +253,6 @@ class Qarray:
         else:
             raise ValueError("Unsupported qtype.")
         
-    
     @property
     def data(self):
         return self._data
@@ -320,7 +325,7 @@ class Qarray:
 
 
 # Qarray operations ---------------------------------------------------------------------
-    
+
 def unit(qarr: Qarray) -> Qarray:
     """Normalize the quantum array.
 
@@ -390,6 +395,18 @@ def expm(qarr: Qarray, **kwargs) -> Qarray:
     data = expm_data(qarr.data, **kwargs)
     return Qarray.create(data, dims=dims)
 
+def powm(qarr: Qarray, n: int) -> Qarray:
+    """Matrix power.
+
+    Args:
+        qarr (Qarray): quantum array
+        n (int): power
+
+    Returns:
+        matrix power
+    """
+    data = jnp.linalg.matrix_power(qarr.data, n)
+    return Qarray.create(data, dims=qarr.dims)
 
 def cosm_data(data: Array, **kwargs) -> Array:
     """Matrix cosine wrapper.

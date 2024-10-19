@@ -30,9 +30,9 @@ pip install git+https://github.com/EQuS/jaxquantum.git
 
 If you are interested in contributing to the package, please clone this repository and install this package in editable mode after changing into the root directory of this repository:
 ```
-pip install -e ".[dev]"
+pip install -e ".[dev,docs]"
 ```
-This will also install extras from the `dev` flag, which can be useful when developing the package. Since this is installed in editable mode, the package will automatically be updated after pulling new changes in the repository. 
+This will also install extras from the `dev` and `docs` flags, which can be useful when developing the package. Since this is installed in editable mode, the package will automatically be updated after pulling new changes in the repository. 
 
 ### Installing from PyPI (not recommended)
 

@@ -1,40 +1,30 @@
-# Installation
+## Installation
 
-*Conda users, please make sure to `conda install pip` before running any pip installation if you want to install `jaxquantum` into your conda environment.*
 
-`jaxquantum` is published on PyPI. So, to install the latest version from PyPI, simply run the following code to install the package:
+### Installing from source (recommended)
+
+**Recommended:** As this is a rapidly evolving project, we recommend installing the latest version of `jaxquantum` from source as follows:
+```
+pip install git+https://github.com/EQuS/jaxquantum.git
+```
+
+### Installing from source in editable mode (recommended for developers)
+
+If you are interested in contributing to the package, please clone this repository and install this package in editable mode after changing into the root directory of this repository:
+```
+pip install -e ".[dev,docs]"
+```
+This will also install extras from the `dev` and `docs` flags, which can be useful when developing the package. Since this is installed in editable mode, the package will automatically be updated after pulling new changes in the repository. 
+
+### Installing from PyPI (not recommended)
+
+`jaxquantum` is also published on PyPI. Simply run the following code to install the package:
 
 ```bash
 pip install jaxquantum
 ```
-If you also want to download the dependencies needed to run optional tutorials, please use `pip install jaxquantum[dev,docs]` or `pip install 'jaxquantum[dev,docs]'` (for `zsh` users).
 
-#### Building from source
-
-To build `jaxquantum` from source, pip install using:
-
-```bash
-git clone git@github.com:EQuS/jaxquantum.git jaxquantum
-cd jaxquantum
-pip install --upgrade .
-```
-
-If you also want to download the dependencies needed to run optional tutorials, please use `pip install --upgrade .[dev,docs]` or `pip install --upgrade '.[dev,docs]'` (for `zsh` users).
-
-#### Installation for Devs
-
-If you intend to contribute to this project, please install `jaxquantum` in editable mode as follows:
-```bash
-git clone git@github.com:EQuS/jaxquantum.git jaxquantum
-cd jaxquantum
-pip install -e .[dev, docs]
-```
-
-Please use `pip install -e '.[dev, docs]'` if you are a `zsh` user.
-
-Installing the package in the usual non-editable mode would require a developer to upgrade their pip installation (i.e. run `pip install --upgrade .`) every time they update the package source code.
-
-#### Install with GPU support (Linux)
+### Install with GPU support (Linux)
 
 For linux users who wish to enable Nvidia GPU support, here are some steps ([ref](https://jax.readthedocs.io/en/latest/installation.html#nvidia-gpu)):
 
