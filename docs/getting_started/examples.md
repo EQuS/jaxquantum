@@ -7,6 +7,11 @@ Here are some examples to help you get started with `jaxquantum`.
 Let's simulate the time dynamics of a quantum harmonic oscillator with single photon loss. 
 
 ```python 
+from jax import jit
+import jaxquantum as jqt 
+import jax.numpy as jnp
+import matplotlib.pyplot as plt
+
 N = 100
 
 omega_a = 2.0*jnp.pi*5.0
