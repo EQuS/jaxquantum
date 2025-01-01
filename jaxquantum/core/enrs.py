@@ -8,7 +8,7 @@ import jax.numpy as jnp
 from jax.nn import one_hot
 
 
-def enr_state_dictionaries(dims: list, excitaitons: int) -> tuple[int, dict, dict]:
+def enr_state_dictionaries(dims: list, excitations: int) -> tuple[int, dict, dict]:
     """Generate state dictionaries about the restricted space
 
     Args:
@@ -23,8 +23,8 @@ def enr_state_dictionaries(dims: list, excitaitons: int) -> tuple[int, dict, dic
     
     if any(dim <= 0 for dim in dims):
         raise ValueError("Invalid dims")
-    if excitaitons < 0:
-        raise ValueError("Invalid excitaitons")
+    if excitations < 0:
+        raise ValueError("Invalid excitations")
 
     N = len(dims)
     state_list = []
@@ -38,7 +38,7 @@ def enr_state_dictionaries(dims: list, excitaitons: int) -> tuple[int, dict, dic
         if len(state) < N:
             state_stack.append(state + [0,])
             sum_stack.append(partial_sum)
-        if partial_sum < excitaitons and state[-1] < dims[len(state)-1]-1:
+        if partial_sum < excitations and state[-1] < dims[len(state)-1]-1:
             new_state = state.copy()
             new_state[-1] += 1
             state_stack.append(new_state)
