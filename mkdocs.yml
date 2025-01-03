@@ -63,6 +63,7 @@ nav:
     - Installation: getting_started/installation.md
     - Examples: getting_started/examples.md
     - The Sharp Bits 🔪: getting_started/sharp_bits.md
+    - Tests: getting_started/tests.md
   - Tutorials:
     - tutorials/index.md
   - Advanced Concepts:
