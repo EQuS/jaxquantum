@@ -4,7 +4,7 @@ import functools
 from flax import struct
 from enum import Enum
 from jax import Array, config
-from typing import List
+from typing import List, Dict, Any, Optional, Callable, Union
 from math import prod
 from copy import deepcopy
 from numbers import Number
@@ -20,27 +20,60 @@ config.update("jax_enable_x64", True)
 
 @struct.dataclass
 class Gate:
-    _U: Array
-    _H: Array
-    _params
+    dims: List[int] = struct.field(pytree_node=False)
+    _U: Array # Unitary
+    _H: Array # Hamiltonian
+    _KM: List[Array] # Kraus map
+    _params: Dict[str, Any]
     _ts: Array
     _name: str = struct.field(pytree_node=False)
+    num_modes: int = struct.field(pytree_node=False)
     
     @classmethod
     def create(
+        cls,
+        dims: Union[int, List[int]],
         name: str = "Gate",
         params: Optional[Dict[str, Any]] = None,
         ts: Optional[Array] = None,
         gen_U: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
         gen_H: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
+        gen_kraus_map: Optional[Callable[[Dict[str, Any]], List[Qarray]]] = None,
+        num_modes: int = 1,
     ):
 
         # TODO: add params to device?
+
+        if isinstance(dims, int):
+            dims = [dims]
+        
+        assert len(dims) == num_modes, "Number of dimensions must match number of modes."
         
         return Gate(
+            dims = dims,
             _U = gen_U(params) if gen_U is not None else jnp.array([]),
             _H = gen_H(params) if gen_H is not None else jnp.array([]),
+            _KM = gen_kraus_map(params) if gen_kraus_map is not None else [],
             _params = params if params is not None else {},
             _ts=ts if ts is not None else jnp.array([]),
             _name = name,
+            num_modes = num_modes
         )
+
+    def __str__(self):
+        return self._name
+
+    def __repr__(self):
+        return self._name
+
+    @property
+    def U(self):
+        return self._U
+
+    @property
+    def H(self):
+        return self._H
+
+    @property
+    def KM(self):
+        return self._KM

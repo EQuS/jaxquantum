@@ -1,4 +1,6 @@
 """ Quantum Circuits """
 
-from .circuit import *
+from .circuits import *
 from .gates import *
+from .simulate import *
+from .library import *

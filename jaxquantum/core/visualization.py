@@ -70,7 +70,7 @@ def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER):
     ax.axvline(0, linestyle="-", color="black", alpha=0.7)
     ax.grid()
     ax.set_aspect("equal", adjustable="box")
-    return im
+    return ax
 
 
 plot_wigner = lambda state, pts, ax=None, contour=True: plot_qp(

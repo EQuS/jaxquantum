@@ -322,9 +322,36 @@ class Qarray:
     def keep_only_diag_elements(self):
         return keep_only_diag_elements(self)
 
+    def transpose(self, *args):
+        return transpose(self, *args)
+
 
 
 # Qarray operations ---------------------------------------------------------------------
+
+def transpose(qarr: Qarray, indices: List[int]) -> Qarray:
+    """ Transpose the quantum array.
+
+    Args:
+        qarr (Qarray): quantum array
+        *args: axes to transpose
+    
+    Returns:
+        tranposed Qarray
+    """
+    shaped_data = qarr.shaped_data
+    dims = qarr.dims
+
+    reshape_indices = indices + [j + len(dims[0]) for j in indices]
+    shaped_data = shaped_data.transpose(reshape_indices)
+    new_dims = [[dims[0][j] for j in indices] , [dims[1][j] for j in indices]]
+
+    full_dims = prod(dims[0])
+    full_data = shaped_data.reshape(full_dims, -1)
+    
+    return Qarray.create(full_data, dims = new_dims)
+
+    
 
 def unit(qarr: Qarray) -> Qarray:
     """Normalize the quantum array.
