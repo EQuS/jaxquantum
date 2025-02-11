@@ -19,6 +19,7 @@ from jaxquantum.core.settings import SETTINGS
 from jaxquantum.core.qarray import Qarray
 from jaxquantum.core.operators import identity
 from jaxquantum.circuits.gates import Gate
+from jaxquantum.circuits.constants import SimulateMode
 
 config.update("jax_enable_x64", True)
 
@@ -74,10 +75,11 @@ class Operation:
 class Layer:
     operations: List[Operation] = struct.field(pytree_node=False)
     _unique_indices: List[int] = struct.field(pytree_node=False)
+    _default_simulate_mode: SimulateMode = struct.field(pytree_node=False)
 
     @classmethod
     def create(
-        cls, operations: List[Operation]
+        cls, operations: List[Operation], default_simulate_mode=SimulateMode.UNITARY
     ):
         all_indices = [ind for op in operations for ind in op.indices]
         unique_indices = list(set(all_indices))
@@ -85,7 +87,8 @@ class Layer:
             raise ValueError("Operations must not have overlapping indices.")
         return Layer(
             operations = operations,
-            _unique_indices = unique_indices
+            _unique_indices = unique_indices,
+            _default_simulate_mode = default_simulate_mode
         )
 
     def add(self, operation: Operation):
@@ -121,6 +124,45 @@ class Layer:
         U = U.transpose(sorted_ind)
         return U
 
+    def gen_KM(self):
+        KM = []
+
+        if len(self.operations) == 0:
+            return KM
+
+        
+        indices_order = []
+        for operation in self.operations:
+            indices_order += operation.indices
+
+            if len(KM) == 0:
+                KM = deepcopy(operation.gate.KM)
+            else:
+                updated_KM = []
+                
+                # TODO : vectorize this
+                for op1 in KM:
+                    for op2 in operation.gate.KM:
+                        updated_KM.append(op1^op2)
+                KM = updated_KM
+        
+        register = self.operations[0].register
+        missing_indices = [i for i in range(len(register.dims)) if i not in indices_order]
+        
+        for j in missing_indices:
+            # TODO : vectorize this
+            for k in range(len(KM)):
+                KM[k] = KM[k] ^ identity(register.dims[j])
+        
+        combined_indices = indices_order + missing_indices
+        sorted_ind = list(argsort(combined_indices))
+        
+        for k in range(len(KM)):
+            KM[k] = KM[k].transpose(sorted_ind)
+        
+        return KM
+
+
 @struct.dataclass
 class Circuit:
     register: Register
@@ -142,10 +184,10 @@ class Circuit:
     def append_layer(self, layer: Layer):
         self.layers.append(layer)
 
-    def append_operation(self, operation: Operation):
+    def append_operation(self, operation: Operation, default_simulate_mode=SimulateMode.UNITARY):
         assert operation.register == self.register, f"Mismatch in operation register {operation.register} and circuit register {circuit.register}."
-        self.append_layer(Layer.create([operation]))
+        self.append_layer(Layer.create([operation], default_simulate_mode=default_simulate_mode))
 
-    def append(self, gate: Gate, indices: Union[int, List[int]]):
+    def append(self, gate: Gate, indices: Union[int, List[int]], default_simulate_mode=SimulateMode.UNITARY):
         operation = Operation.create(gate, indices, self.register)
-        self.append_operation(operation)
+        self.append_operation(operation, default_simulate_mode=default_simulate_mode)

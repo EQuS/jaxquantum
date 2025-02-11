@@ -3,8 +3,8 @@
 import functools
 from flax import struct
 from enum import Enum
-from jax import Array, config
-from typing import List
+from jax import Array, config, vmap
+from typing import List, Optional
 from math import prod
 from copy import deepcopy
 from numbers import Number
@@ -312,7 +312,6 @@ class Qarray:
     def to_ket(self):
         return to_ket(self)
         
-
     def eigenstates(self):
         return eigenstates(self)
 
@@ -325,7 +324,152 @@ class Qarray:
     def transpose(self, *args):
         return transpose(self, *args)
 
+    def __getattr__(self, method_name):
 
+        modules = [jnp, jnp.linalg, jsp, jsp.linalg]
+
+        method_f = None 
+        for mod in modules:
+            method_f = getattr(mod, method_name, None)
+            if method_f is not None:
+                break
+
+        if method_f is None:
+            raise ValueError(f"Method {method_name} does not exist. No backup method found in jax.numpy or jax.numpy.linalg.")
+
+        def func(*args, **kwargs): 
+            res = method_f(self.data, *args, **kwargs)
+            
+            if getattr(res, "shape", None) is None or res.shape != self.data.shape:
+                return res
+            else:
+                return Qarray(
+                    _data=res,
+                    _qdims=self._qdims
+                )
+        return func
+
+@struct.dataclass # this allows us to send in and return Qarray from jitted functions
+class QarrayArray:
+    """ This class provides a way to construct arrays of Qarrays for vectorized operations on Qarrays.
+    """ 
+    _data: Array
+    _qdims: Optional[Qdims] = struct.field(pytree_node=False)
+
+    @classmethod
+    def create(cls, qarr_list: List[Qarray]):
+        if len(qarr_list) == 0:
+            return cls(_data=jnp.array([]), _qdims=None)
+
+        data = jnp.array([qarr._data for qarr in qarr_list])
+
+        qdims_list = [qarr._qdims for qarr in qarr_list]
+        if len(qdims_list) > 0:
+            assert qdims_list[:-1] == qdims_list[1:], "All qdims of Qarrays in the list must be the same." # equal dims
+        
+        return cls(_data=data, _qdims=deepcopy(qdims_list[0]))
+
+    def append(self, qarr: Qarray):
+        if len(self._data) == 0:
+            data = jnp.array([qarr._data])
+            qdims = qarr._qdims
+        else:
+            assert qarr._qdims == self._qdims, "qdim of Qarray must match that of the current members of this QarrayArray" # equal dims
+            data = jnp.concatenate([self._data, jnp.array([qarr._data])])
+            qdims = qarr._qdims 
+        return QarrayArray(_data=data, _qdims=qdims)
+
+    def __getitem__(self, index):
+        return Qarray.create(self.data[index], dims=self.dims)
+
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def qtype(self):
+        return self._qdims.qtype
+    
+    @property
+    def dtype(self):
+        return self._data.dtype
+
+    @property
+    def dims(self):
+        return self._qdims.dims
+    
+    @property
+    def qdims(self):
+        return self._qdims
+
+    def __len__(self):
+        return self._data.shape[0]
+
+    def __add__(self, other):
+        if not isinstance(other, QarrayArray):
+            return ValueError("Both objects must be of type QarrayArray.")
+        
+        if len(self._data) == 0:
+            return other 
+        elif len(other._data) == 0:
+            return self 
+        else: 
+            assert self._qdims == other._qdims, "qdims of each QarrayArray must match."
+            data = jnp.concatenate([self._data, other._data])
+            return QarrayArray(
+                _data=data,
+                _qdims=self._qdims
+            )
+            
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def _str_header(self):
+        out = ", ".join([
+            "Array of quantum arrays with: dims = " + str(self.dims),
+            "shape = " + str(self._data.shape),
+            "type = " + str(self.qtype),
+        ])
+        return out
+
+    def __str__(self):
+        if len(self._data) == 0:
+            return "QarrayArray is empty."
+
+        return self._str_header() + "\nQarrayArray data =\n" + str(self.data)
+    
+    def __repr__(self):
+        return self.__str__()
+
+    @property
+    def shaped_data(self):
+        return self._data.reshape([-1] + self.dims[0] + self.dims[1])
+
+    def __getattr__(self, method_name):
+
+        modules = [jnp, jnp.linalg, jsp, jsp.linalg]
+
+        method_f = None 
+        for mod in modules:
+            method_f = getattr(mod, method_name, None)
+            if method_f is not None:
+                break
+
+        if method_f is None:
+            raise ValueError(f"Method {method_name} does not exist. No backup method found in jax.numpy or jax.numpy.linalg.")
+
+        def func(*args, **kwargs): 
+            res = vmap(method_f)(self.data, *args, **kwargs)
+
+            if getattr(res, "shape", None) is None or res.shape != self.data.shape:
+                return res
+            else:
+                return QarrayArray(
+                    _data=res,
+                    _qdims=self._qdims
+                )
+        return func
+    
 
 # Qarray operations ---------------------------------------------------------------------
 
@@ -350,8 +494,6 @@ def transpose(qarr: Qarray, indices: List[int]) -> Qarray:
     full_data = shaped_data.reshape(full_dims, -1)
     
     return Qarray.create(full_data, dims = new_dims)
-
-    
 
 def unit(qarr: Qarray) -> Qarray:
     """Normalize the quantum array.
