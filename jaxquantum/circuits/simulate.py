@@ -4,7 +4,7 @@ import functools
 from flax import struct
 from enum import Enum
 from jax import Array, config
-from typing import List
+from typing import List, Union
 from math import prod
 from copy import deepcopy
 from numbers import Number
@@ -13,7 +13,7 @@ import jax.scipy as jsp
 
 
 from jaxquantum.core.settings import SETTINGS
-from jaxquantum.core.qarray import Qarray
+from jaxquantum.core.qarray import Qarray, QarrayArray
 from jaxquantum.circuits.circuits import Circuit, Layer
 from jaxquantum.circuits.constants import SimulateMode
 
@@ -21,13 +21,16 @@ config.update("jax_enable_x64", True)
 
 @struct.dataclass
 class Result:
-    states: List[Qarray] = struct.field(pytree_node=False)
+    states: QarrayArray
 
     @classmethod
     def create(
         cls,
-        states: List[Qarray]
+        states: Union[QarrayArray, List[Qarray]]
     ):
+        if isinstance(states, List):
+            states = QarrayArray.create(states)
+
         return Result(
             states = states
         )

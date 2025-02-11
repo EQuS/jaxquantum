@@ -70,7 +70,7 @@ def check_dims(dims: Array, data_shape: Array) -> bool:
 
 class Qdims:
     def __init__(self, dims):
-        self._dims = dims
+        self._dims = deepcopy(dims)
         self._qtype = Qtypes.from_dims(self._dims)
 
     @property
@@ -163,8 +163,6 @@ class Qarray:
         check_dims(dims, data.shape)
 
         qdims = Qdims(dims)
-
-        dims = deepcopy(dims)
 
         # TODO: Constantly tidying up on Qarray creation might be a bit overkill.
         # It increases the compilation time, but only very slightly 
@@ -285,8 +283,9 @@ class Qarray:
     def to_dm(self):
         return ket2dm(self)
     
-    def copy(self):
-        return Qarray.create(deepcopy(self.data), dims=self.dims)
+    def copy(self, memo=None):
+        # return Qarray.create(deepcopy(self.data), dims=self.dims)
+        return self.__deepcopy__(memo)
     
     def unit(self):
         return unit(self)
@@ -324,7 +323,19 @@ class Qarray:
     def transpose(self, *args):
         return transpose(self, *args)
 
+    def __deepcopy__(self, memo):
+        """ Need to override this when defininig __getattr__. """
+
+        return Qarray(
+            _data = deepcopy(self._data, memo=memo),
+            _qdims = deepcopy(self._qdims, memo=memo)
+        )
+
     def __getattr__(self, method_name):
+
+        if "__" == method_name[:2]:
+            # NOTE: we return NotImplemented for binary special methods logic in python, plus things like __jax_array__
+            return lambda *args, **kwargs: NotImplemented
 
         modules = [jnp, jnp.linalg, jsp, jsp.linalg]
 
@@ -335,7 +346,7 @@ class Qarray:
                 break
 
         if method_f is None:
-            raise ValueError(f"Method {method_name} does not exist. No backup method found in jax.numpy or jax.numpy.linalg.")
+            raise NotImplementedError(f"Method {method_name} does not exist. No backup method found in {modules}.")
 
         def func(*args, **kwargs): 
             res = method_f(self.data, *args, **kwargs)
@@ -445,7 +456,22 @@ class QarrayArray:
     def shaped_data(self):
         return self._data.reshape([-1] + self.dims[0] + self.dims[1])
 
+    def copy(self, memo=None):
+        return self.__deepcopy__(memo)
+        
+    def __deepcopy__(self, memo):
+        """ Need to override this when defininig __getattr__. """
+
+        return QarrayArray(
+            _data = deepcopy(self._data, memo=memo),
+            _qdims = deepcopy(self._qdims, memo=memo)
+        )
+
     def __getattr__(self, method_name):
+
+        if "__" == method_name[:2]:
+            # NOTE: we return NotImplemented for binary special methods logic in python, plus things like __jax_array__
+            return lambda *args, **kwargs: NotImplemented
 
         modules = [jnp, jnp.linalg, jsp, jsp.linalg]
 
@@ -456,7 +482,7 @@ class QarrayArray:
                 break
 
         if method_f is None:
-            raise ValueError(f"Method {method_name} does not exist. No backup method found in jax.numpy or jax.numpy.linalg.")
+            raise NotImplementedError(f"Method {method_name} does not exist. No backup method found in {modules}.")
 
         def func(*args, **kwargs): 
             res = vmap(method_f)(self.data, *args, **kwargs)
