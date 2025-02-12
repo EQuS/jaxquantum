@@ -149,6 +149,7 @@ class Qarray:
     _data: Array
     _qdims: Qdims = struct.field(pytree_node=False)
 
+    # Initialization ----
     @classmethod
     def create(cls, data, dims=None):
         # Prepare data ----
@@ -172,7 +173,6 @@ class Qarray:
 
         return cls(data, qdims)
 
-
     def _covert_to_qarray(self, other):
         if not isinstance(other, Qarray):
             try:
@@ -181,55 +181,9 @@ class Qarray:
                 return NotImplemented
         return other
     
-    def __matmul__(self, other):
-        other = self._covert_to_qarray(other)
-        _qdims_new = self._qdims @ other._qdims
-        return Qarray.create(
-            self.data @ other.data,
-            dims=_qdims_new.dims,
-        )
-    
-    def __mul__(self, other):
-        if isinstance(other, Qarray):
-            return self.__matmul__(other)
-        
-        multiplier = other + 0.0j
-        return Qarray.create(
-            self.data * multiplier,
-            dims=self._qdims.dims,
-        )
+    # ----
 
-    def __pow__(self, other):
-        if not isinstance(other, int):
-            return NotImplemented
-        
-        return powm(self, other)
-    
-    def __rmul__(self, other):
-        return self.__mul__(other)
-        
-    def __truediv__(self, other):
-        return self.__mul__(1 / other)
-    
-    def __neg__(self):
-        return self.__mul__(-1)
-    
-    @_ensure_equal_type
-    def __add__(self, other):
-        return Qarray.create(self.data + other.data, dims=self.dims)
-    
-    def __radd__(self, other):
-        return self.__add__(other)
-    
-    @_ensure_equal_type
-    def __sub__(self, other):
-        if other == 0:
-            return self.copy()
-        return Qarray.create(self.data - other.data, dims=self.dims)
-        
-    def __rsub__(self, other):
-        return self.__neg__().__add__(other)
-    
+    # Properties ----
     @property
     def qtype(self):
         return self._qdims.qtype
@@ -259,6 +213,66 @@ class Qarray:
     def shaped_data(self):
         return self._data.reshape(self.dims[0] + self.dims[1])
 
+    # ----
+
+
+    # Math Magic ----
+    def __matmul__(self, other):
+        other = self._covert_to_qarray(other)
+        _qdims_new = self._qdims @ other._qdims
+        return Qarray.create(
+            self.data @ other.data,
+            dims=_qdims_new.dims,
+        )
+    
+    def __mul__(self, other):
+        if isinstance(other, Qarray):
+            return self.__matmul__(other)
+        
+        multiplier = other + 0.0j
+        return Qarray.create(
+            self.data * multiplier,
+            dims=self._qdims.dims,
+        )
+
+    def __rmul__(self, other):
+        return self.__mul__(other) 
+
+    def __neg__(self):
+        return self.__mul__(-1)
+    
+    def __truediv__(self, other):
+        return self.__mul__(1 / other)
+    
+    @_ensure_equal_type
+    def __add__(self, other):
+        return Qarray.create(self.data + other.data, dims=self.dims)
+    
+    def __radd__(self, other):
+        return self.__add__(other)
+    
+    @_ensure_equal_type
+    def __sub__(self, other):
+        if other == 0:
+            return self.copy()
+        return Qarray.create(self.data - other.data, dims=self.dims)
+        
+    def __rsub__(self, other):
+        return self.__neg__().__add__(other)
+    
+    def __xor__(self, other):
+        other = self._covert_to_qarray(other)
+        return tensor(self, other)
+    
+    def __pow__(self, other):
+        if not isinstance(other, int):
+            return NotImplemented
+        
+        return powm(self, other)
+    
+    # ----
+
+    # String Representation ----
     def _str_header(self):
         out = ", ".join([
             "Quantum array: dims = " + str(self.dims),
@@ -273,56 +287,13 @@ class Qarray:
     def __repr__(self):
         return self.__str__()
     
-    def __xor__(self, other):
-        other = self._covert_to_qarray(other)
-        return tensor(self, other)
-    
-    def dag(self):
-        return dag(self)
-    
-    def to_dm(self):
-        return ket2dm(self)
-    
+    # ----
+
+    # Utilities ----
     def copy(self, memo=None):
         # return Qarray.create(deepcopy(self.data), dims=self.dims)
         return self.__deepcopy__(memo)
     
-    def unit(self):
-        return unit(self)
-
-    def expm(self):
-        return expm(self)
-    
-    def cosm(self):
-        return cosm(self)
-    
-    def sinm(self):
-        return sinm(self)
-    
-    def tr(self, **kwargs):
-        return tr(self, **kwargs)
-
-    def ptrace(self, indx):
-        return ptrace(self, indx)
-    
-    def is_dm(self):
-        return self.qtype == Qtypes.oper
-    
-    def to_ket(self):
-        return to_ket(self)
-        
-    def eigenstates(self):
-        return eigenstates(self)
-
-    def eigenenergies(self):
-        return eigenenergies(self)
-    
-    def keep_only_diag_elements(self):
-        return keep_only_diag_elements(self)
-
-    def transpose(self, *args):
-        return transpose(self, *args)
-
     def __deepcopy__(self, memo):
         """ Need to override this when defininig __getattr__. """
 
@@ -360,6 +331,56 @@ class Qarray:
                 )
         return func
 
+    # ----
+
+    # Conversions / Reshaping ----
+    def dag(self):
+        return dag(self)
+    
+    def to_dm(self):
+        return ket2dm(self)
+    
+    def is_dm(self):
+        return self.qtype == Qtypes.oper
+    
+    def to_ket(self):
+        return to_ket(self)
+    
+    def transpose(self, *args):
+        return transpose(self, *args)
+
+    def keep_only_diag_elements(self):
+        return keep_only_diag_elements(self)
+    
+    # ----
+
+    # Math Functions ----
+    def unit(self):
+        return unit(self)
+
+    def expm(self):
+        return expm(self)
+    
+    def cosm(self):
+        return cosm(self)
+    
+    def sinm(self):
+        return sinm(self)
+    
+    def tr(self, **kwargs):
+        return tr(self, **kwargs)
+
+    def ptrace(self, indx):
+        return ptrace(self, indx)
+        
+    def eigenstates(self):
+        return eigenstates(self)
+
+    def eigenenergies(self):
+        return eigenenergies(self)
+    
+    # ----
+
 @struct.dataclass # this allows us to send in and return Qarray from jitted functions
 class QarrayArray:
     """ This class provides a way to construct arrays of Qarrays for vectorized operations on Qarrays.
@@ -367,6 +388,7 @@ class QarrayArray:
     _data: Array
     _qdims: Optional[Qdims] = struct.field(pytree_node=False)
 
+    # Initialization ----
     @classmethod
     def create(cls, qarr_list: List[Qarray]):
         if len(qarr_list) == 0:
@@ -379,7 +401,10 @@ class QarrayArray:
             assert qdims_list[:-1] == qdims_list[1:], "All qdims of Qarrays in the list must be the same." # equal dims
         
         return cls(_data=data, _qdims=deepcopy(qdims_list[0]))
+    
+    # ----
 
+    # List Methods ----
     def append(self, qarr: Qarray):
         if len(self._data) == 0:
             data = jnp.array([qarr._data])
@@ -393,6 +418,11 @@ class QarrayArray:
     def __getitem__(self, index):
         return Qarray.create(self.data[index], dims=self.dims)
 
+    def __len__(self):
+        return self._data.shape[0]
+    # ----
+
+    # Properties ----
     @property
     def data(self):
         return self._data
@@ -413,9 +443,13 @@ class QarrayArray:
     def qdims(self):
         return self._qdims
 
-    def __len__(self):
-        return self._data.shape[0]
+    @property
+    def shaped_data(self):
+        return self._data.reshape([-1] + self.dims[0] + self.dims[1])
+    
+    # ----
 
+    # Math Magic ----
     def __add__(self, other):
         if not isinstance(other, QarrayArray):
             return ValueError("Both objects must be of type QarrayArray.")
@@ -435,6 +469,9 @@ class QarrayArray:
     def __radd__(self, other):
         return self.__add__(other)
 
+    # ----
+    
+    # String Representation ----
     def _str_header(self):
         out = ", ".join([
             "Array of quantum arrays with: dims = " + str(self.dims),
@@ -451,14 +488,13 @@ class QarrayArray:
     
     def __repr__(self):
         return self.__str__()
+    
+    # ----
 
-    @property
-    def shaped_data(self):
-        return self._data.reshape([-1] + self.dims[0] + self.dims[1])
-
+    # Utilities ----
     def copy(self, memo=None):
         return self.__deepcopy__(memo)
-        
+
     def __deepcopy__(self, memo):
         """ Need to override this when defininig __getattr__. """
 
@@ -496,6 +532,7 @@ class QarrayArray:
                 )
         return func
     
+    # ----
 
 # Qarray operations ---------------------------------------------------------------------
 
@@ -541,7 +578,6 @@ def unit(qarr: Qarray) -> Qarray:
     
     return Qarray.create(data, dims=qarr.dims)
     
-
 def tensor(*args, **kwargs) -> Qarray:
     """Tensor product.
 
@@ -624,7 +660,6 @@ def cosm(qarr: Qarray) -> Qarray:
     data = cosm_data(qarr.data)
     return Qarray.create(data, dims=dims)
 
-
 def sinm_data(data: Array, **kwargs) -> Array:
     """Matrix sine wrapper.
 
@@ -641,7 +676,6 @@ def sinm(qarr: Qarray) -> Qarray:
     data = sinm_data(qarr.data)
     return Qarray.create(data, dims=dims)
 
-
 def keep_only_diag_elements(qarr: Qarray) -> Qarray:
     dims = qarr.dims
     data = jnp.diag(jnp.diag(qarr.data))
@@ -655,7 +689,6 @@ def to_ket(qarr: Qarray) -> Qarray:
     else:
         raise ValueError("Can only get ket from a ket or bra.")
     
-
 def eigenstates(qarr: Qarray) -> Qarray:
     """Eigenstates of a quantum array.
 

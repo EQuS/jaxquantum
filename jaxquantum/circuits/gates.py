@@ -13,7 +13,7 @@ import jax.scipy as jsp
 
 
 from jaxquantum.core.settings import SETTINGS
-from jaxquantum.core.qarray import Qarray
+from jaxquantum.core.qarray import Qarray, QarrayArray
 
 config.update("jax_enable_x64", True)
 
@@ -23,7 +23,7 @@ class Gate:
     dims: List[int] = struct.field(pytree_node=False)
     _U: Optional[Array] # Unitary
     _H: Optional[Array] # Hamiltonian
-    _KM: Optional[List[Array]] # Kraus map
+    _KM: Optional[QarrayArray] # Kraus map
     _params: Dict[str, Any]
     _ts: Array
     _name: str = struct.field(pytree_node=False)
@@ -57,7 +57,7 @@ class Gate:
         if gen_kraus_map is not None:
             _KM = gen_kraus_map(params)
         elif _U is not None:
-            _KM = [_U]
+            _KM = QarrayArray.create([_U])
 
         return Gate(
             dims = dims,
