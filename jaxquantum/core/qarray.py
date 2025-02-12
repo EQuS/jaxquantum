@@ -197,6 +197,10 @@ class Qarray:
         return self._qdims.dims
 
     @property
+    def qdims(self):
+        return self._qdims
+        
+    @property
     def space_dims(self):
         if self.qtype in [Qtypes.oper, Qtypes.ket]:
             return self.dims[0]
@@ -424,10 +428,6 @@ class QarrayArray:
 
     # Properties ----
     @property
-    def data(self):
-        return self._data
-
-    @property
     def qtype(self):
         return self._qdims.qtype
     
@@ -442,6 +442,19 @@ class QarrayArray:
     @property
     def qdims(self):
         return self._qdims
+
+    @property
+    def space_dims(self):
+        if self.qtype in [Qtypes.oper, Qtypes.ket]:
+            return self.dims[0]
+        elif self.qtype == Qtypes.bra:
+            return self.dims[1]
+        else:
+            raise ValueError("Unsupported qtype.")
+
+    @property
+    def data(self):
+        return self._data
 
     @property
     def shaped_data(self):
