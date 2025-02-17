@@ -742,7 +742,7 @@ class QarrayArray:
         return NotImplemented
 
     def __add__(self, other):
-        if isinstance(other, (QarrayArray,Array)):
+        if isinstance(other, (QarrayArray,Qarray)):
             if isinstance(other, QarrayArray):
                 if len(self) != len(other):
                     raise ValueError("Both QarrayArrays must have the same length. If you are looking to combine the two lists, please use the extend method.")
@@ -776,7 +776,7 @@ class QarrayArray:
         return self.__add__(other)
 
     def __sub__(self, other):
-        if isinstance(other, (QarrayArray,Array)):
+        if isinstance(other, (QarrayArray,Qarray)):
             if isinstance(other, QarrayArray):
                 if len(self) != len(other):
                     raise ValueError("Both QarrayArrays must have the same length. If you are looking to combine the two lists, please use the extend method.")
