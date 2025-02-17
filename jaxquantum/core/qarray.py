@@ -315,6 +315,9 @@ class Qarray:
                 return self.__add__(other)
 
         if jnp.isscalar(other):
+            if other == 0:
+                return self.copy()
+                
             scalar = other + 0.0j
             if (self.data.shape[-2] == self.data.shape[-1]):
                 other = Qarray.create(jnp.eye(self.data.shape[-2], dtype=self.data.dtype) * scalar, dims=self.dims)
@@ -325,10 +328,7 @@ class Qarray:
     def __radd__(self, other):
         return self.__add__(other)
     
-    def __sub__(self, other):
-        if other == 0:
-            return self.copy()
-            
+    def __sub__(self, other):    
         if isinstance(other, Qarray):
             if self.dims != other.dims:
                 msg = (
@@ -347,6 +347,9 @@ class Qarray:
                 return self.__sub__(other)
 
         if jnp.isscalar(other):
+            if other == 0:
+                return self.copy()
+                
             scalar = other + 0.0j
             if (self.data.shape[-2] == self.data.shape[-1]):
                 other = Qarray.create(jnp.eye(self.data.shape[-2], dtype=self.data.dtype) * scalar, dims=self.dims)
@@ -765,6 +768,9 @@ class QarrayArray:
                 return self.__add__(other)
         
         if jnp.isscalar(other):
+            if other == 0:
+                return self.copy()
+
             scalar = other + 0.0j
             if (self.data.shape[-2] == self.data.shape[-1]):
                 other = Qarray.create(jnp.eye(self.data.shape[-2], dtype=self.data.dtype) * scalar, dims=self.dims)
@@ -799,6 +805,9 @@ class QarrayArray:
                 return self.__sub__(other)
         
         if jnp.isscalar(other):
+            if other == 0:
+                return self.copy()
+
             scalar = other + 0.0j
             if (self.data.shape[-2] == self.data.shape[-1]):
                 other = Qarray.create(jnp.eye(self.data.shape[-2], dtype=self.data.dtype) * scalar, dims=self.dims)

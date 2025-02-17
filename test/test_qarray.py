@@ -29,23 +29,100 @@ def test_qarray_basic_math_add():
     a = jqt.displace(2,1.0)
     b = jqt.displace(2,1.25)
     c = jqt.displace(2,1.5)
+    
+    scalar = 1.23
+    scalar_id_data = scalar*jnp.eye(2)
 
     arr = jqt.QarrayArray.create([a,b])
 
-    # Qarray + Qarray
-    assert jnp.max(jnp.abs((a._data + b._data) - (a+b)._data)) < 1e-10
-    
+    # Scalar + Qarray 
+    assert jnp.max(jnp.abs(((scalar+a)._data) - (scalar_id_data + a._data))) < 1e-10
+
+    # Qarray + Scalar
+    assert jnp.max(jnp.abs(((a+scalar)._data) - (a._data + scalar_id_data))) < 1e-10
+
+    # Scalar + QarrayArray
+    assert jnp.max(jnp.abs(((scalar + arr)._data - (scalar_id_data + arr._data)))) < 1e-10
+
+    # QarrayArray + Scalar
+    assert jnp.max(jnp.abs(((arr + scalar)._data - (arr._data + scalar_id_data))) < 1e-10)
+
+    # Array + Qarray
+    assert jnp.max(jnp.abs((a._data+b)._data - (a._data + b._data))) < 1e-10
+
+    # Qarray + Array
+    assert jnp.max(jnp.abs((a+b._data)._data - (a._data + b._data)) < 1e-10)
+
+    # QarrayArray + Array 
+    assert jnp.max(jnp.abs((arr + c._data)._data - (arr._data + c._data))) < 1e-10
+
+    # Array + QarrayArray
+    assert jnp.max(jnp.abs((c._data + arr)._data - (c._data + arr._data))) < 1e-10
+
     # QarrayArray + Qarray
-    assert jnp.max(jnp.abs((arr + c)._data - jqt.QarrayArray.create([a+c,b+c])._data)) < 1e-10
+    assert jnp.max(jnp.abs((arr + c)._data - (arr._data + c._data))) < 1e-10
     
     # Qarray + QarrayArray
-    assert jnp.max(jnp.abs((c + arr)._data - jqt.QarrayArray.create([a+c,b+c])._data)) < 1e-10
+    assert jnp.max(jnp.abs((c + arr)._data - (c._data + arr._data))) < 1e-10
 
+    # Qarray + Qarray
+    assert jnp.max(jnp.abs((a+b)._data - (a._data + b._data))) < 1e-10
+    
     # QarrayArray + QarrayArray
-    assert jnp.max(jnp.abs((arr + arr)._data - jqt.QarrayArray.create([a+a,b+b])._data)) < 1e-10
+    assert jnp.max(jnp.abs((arr + arr)._data - (arr._data + arr._data))) < 1e-10
 
     # QarrayArray + QarrayArray (of different size)
     with pytest.raises(ValueError):
         jqt.QarrayArray.create([a,b]) + jqt.QarrayArray.create([a,b,c])
+
+def test_qarray_basic_math_sub():
+    a = jqt.displace(2,1.0)
+    b = jqt.displace(2,1.25)
+    c = jqt.displace(2,1.5)
+    
+    scalar = 1.23
+    scalar_id_data = scalar*jnp.eye(2)
+
+    arr = jqt.QarrayArray.create([a,b])
+
+    # Scalar - Qarray 
+    assert jnp.max(jnp.abs(((scalar-a)._data) - (scalar_id_data - a._data))) < 1e-10
+
+    # Qarray - Scalar
+    assert jnp.max(jnp.abs(((a-scalar)._data) - (a._data - scalar_id_data))) < 1e-10
+
+    # Scalar - QarrayArray
+    assert jnp.max(jnp.abs((scalar - arr)._data - (scalar_id_data - arr._data))) < 1e-10
+
+    # QarrayArray - Scalar
+    assert jnp.max(jnp.abs((arr - scalar)._data - (arr._data - scalar_id_data))) < 1e-10
+
+    # Array - Qarray
+    assert jnp.max(jnp.abs((a._data-b)._data - (a._data - b._data))) < 1e-10
+
+    # Qarray - Array
+    assert jnp.max(jnp.abs((a-b._data)._data - (a._data - b._data))) < 1e-10
+
+    # QarrayArray - Array 
+    assert jnp.max(jnp.abs((arr - c._data)._data - (arr._data - c._data))) < 1e-10
+
+    # Array - QarrayArray
+    assert jnp.max(jnp.abs((c._data - arr)._data - (c._data - arr._data))) < 1e-10
+
+    # QarrayArray - Qarray
+    assert jnp.max(jnp.abs((arr - c)._data - (arr._data - c._data))) < 1e-10
+    
+    # Qarray - QarrayArray
+    assert jnp.max(jnp.abs((c - arr)._data - (c._data - arr._data))) < 1e-10
+
+    # Qarray - Qarray
+    assert jnp.max(jnp.abs((a-b)._data - (a._data - b._data))) < 1e-10
+
+    # QarrayArray - QarrayArray
+    assert jnp.max(jnp.abs((arr - arr)._data - (arr._data - arr._data))) < 1e-10
+
+    # QarrayArray - QarrayArray (of different size)
+    with pytest.raises(ValueError):
+        jqt.QarrayArray.create([a,b]) - jqt.QarrayArray.create([a,b,c])
 
 # ========================================s
