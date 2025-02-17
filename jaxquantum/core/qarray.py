@@ -614,7 +614,7 @@ class QarrayArray:
         """ 
 
         if not isinstance(other, QarrayArray):    
-            raise NotImplementedError("This method is only implemented for two QarrayArrays. For other matrix multiplication, please use @.")
+            raise ValueError("This method is only implemented for two QarrayArrays. For other matrix multiplication, please use @.")
         
         _qdims_new = self._qdims @ other._qdims 
         
@@ -650,7 +650,7 @@ class QarrayArray:
         # Case 1: QarrayArray @ QarrayArray
         if isinstance(other, QarrayArray):
             if len(self) != len(other):
-                raise NotImplementedError("Both QarrayArrays must have the same length. For an array product of these two lists, please use the arrayprod method.")
+                raise ValueError("Both QarrayArrays must have the same length. For an array product of these two lists, please use the arrayprod method.")
             _qdims_new = self._qdims @ other._qdims
             _data_new = self._data @ other._data
             return QarrayArray.init(
@@ -683,7 +683,7 @@ class QarrayArray:
         # Case 1: QarrayArray @ QarrayArray
         if isinstance(other, QarrayArray):
             if len(self) != len(other):
-                raise NotImplementedError("Both QarrayArrays must have the same length. For an array product of these two lists, please use the arrayprod method.")
+                raise ValueError("Both QarrayArrays must have the same length. For an array product of these two lists, please use the arrayprod method.")
             _qdims_new = other._qdims @ self._qdims
             _data_new = other._data @ self._data
             return QarrayArray.init(
