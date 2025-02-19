@@ -228,4 +228,46 @@ def test_qarray_basic_math_matmul():
     with pytest.raises(ValueError):
         jqt.QarrayArray.create([a,b]) @ jqt.QarrayArray.create([a,b,c])
 
-# ========================================s
+def test_qarray_basic_math_tensor():
+    a = jqt.displace(3,1.0)
+    b = jqt.displace(3,1.25)
+    c = jqt.displace(5,1.5)
+    
+    arr = jqt.QarrayArray.create([a,b])
+
+    # ----
+    # Array ^ Qarray
+    assert jnp.max(jnp.abs((a._data ^ b)._data - (jnp.kron(a._data,b._data)))) < 1e-10
+
+    # Qarray ^ Array
+    assert jnp.max(jnp.abs((a ^ b._data)._data - (jnp.kron(a._data,b._data))) < 1e-10)
+
+    # Array ^ QarrayArray
+    assert jnp.max(jnp.abs((a._data ^ arr)._data - (jnp.kron(a._data,arr._data))) < 1e-10)
+
+    # QarrayArray ^ Array
+    assert jnp.max(jnp.abs((arr ^ b._data)._data - (jnp.kron(arr._data,b._data))) < 1e-10)
+
+    # ----
+
+    # QarrayArray ^ Qarray
+    assert jnp.max(jnp.abs((arr ^ b)._data - (jnp.kron(arr._data,b._data))) < 1e-10)
+
+    # Qarray ^ QarrayArray
+    assert jnp.max(jnp.abs((a ^ arr)._data - (jnp.kron(a._data,arr._data))) < 1e-10)
+
+    # Qarray ^ Qarray
+    assert jnp.max(jnp.abs((a ^ b)._data - (jnp.kron(a._data,b._data))) < 1e-10)
+
+    # QarrayArray ^ QarrayArray
+    assert jnp.max(jnp.abs((arr ^ arr)._data - jnp.einsum("nij,nkl->nijkl", arr._data, arr._data).reshape(
+                arr._data.shape[0],
+                arr._data.shape[1] * arr._data.shape[1],
+                -1
+            )) < 1e-10)
+
+    # QarrayArray ^ QarrayArray (of different size)
+    with pytest.raises(ValueError):
+        jqt.QarrayArray.create([a,b]) ^ jqt.QarrayArray.create([a,b,c])
+
+# ========================================
