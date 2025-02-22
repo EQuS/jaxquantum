@@ -562,8 +562,21 @@ class QarrayArray:
     def __getitem__(self, index):
         return Qarray.create(self.data[index], dims=self.dims)
 
+    # def set(self, index, value: Qarray):
+    #     if not isinstance(value, Qarray):
+    #         raise ValueError("Only Qarray objects can be set in a QarrayArray.")
+        
+    #     if value._qdims != self._qdims:
+    #         raise ValueError("Qarray must have the same qdims as the QarrayArray.")
+
+    #     return QarrayArray.init(
+    #         _data = self._data.at[index].set(value._data),
+    #         _qdims = self._qdims
+    #     )
+
     def __len__(self):
         return self._data.shape[0]
+
     # ----
 
     # Properties ----
@@ -599,7 +612,7 @@ class QarrayArray:
     @property
     def shaped_data(self):
         return self._data.reshape([-1] + self.dims[0] + self.dims[1])
-    
+
     # ----
 
     # Elementary Math ----
@@ -636,6 +649,24 @@ class QarrayArray:
             _data = _data_new,
             _qdims = _qdims_new
         )
+
+    def arraytensor(self, other):
+
+        if not isinstance(other, QarrayArray):    
+            raise ValueError("This method is only implemented for two QarrayArrays. For other tensor products, please use ^.")
+        
+
+        new_data = jnp.kron(self._data, other._data)
+
+        new_dims = deepcopy(self.dims)
+        new_dims[0] += other.dims[0]
+        new_dims[1] += other.dims[1]
+
+        return QarrayArray.init(
+            _data = new_data,
+            _qdims = Qdims(new_dims)
+        )
+
 
     def __matmul__(self, other):
         """ This will handle several cases of matrix multiplication.
@@ -834,6 +865,12 @@ class QarrayArray:
         
         return NotImplemented
 
+    def __pow__(self, other: int):
+        if not isinstance(other, int):
+            return NotImplemented
+        
+        return powm(self, other)
+
     # ----
     
     # String Representation ----
@@ -899,11 +936,43 @@ class QarrayArray:
     
     # ----
 
+    # Conversions / Reshaping ----
+    def dag(self):
+        return dag(self)
+
+    def transpose(self, *args):
+        return transpose(self, *args)
+    # ----
+
+
+    # Math Functions ----
+
+    def collapse(self, mode="sum"):
+        return collapse(self, mode)
+    # ----
+
+
 ARRAY_TYPES = (Array, ndarray, Qarray, QarrayArray)
 
-# Qarray operations ---------------------------------------------------------------------
+# Qarray/QarrayArray operations ---------------------------------------------------------------------
 
-def transpose(qarr: Qarray, indices: List[int]) -> Qarray:
+def collapse(qarrarr: QarrayArray, mode="sum") -> Qarray:
+    """Collapse the QarrayArray.
+
+    Args:
+        qarrarr (QarrayArray): quantum array array
+    
+    Returns:
+        Collapsed quantum array
+    """
+    if mode == "sum":
+        return Qarray.create(
+            jnp.sum(qarrarr.data, axis=0),
+            dims=qarrarr.dims
+        )
+    
+
+def transpose(qarr: Union[Qarray,QarrayArray], indices: List[int]) -> Qarray:
     """ Transpose the quantum array.
 
     Args:
@@ -913,17 +982,27 @@ def transpose(qarr: Qarray, indices: List[int]) -> Qarray:
     Returns:
         tranposed Qarray
     """
+    is_qarryarray = isinstance(qarr, QarrayArray)
+
     shaped_data = qarr.shaped_data
     dims = qarr.dims
 
     reshape_indices = indices + [j + len(dims[0]) for j in indices]
+
+    if is_qarryarray:
+        reshape_indices = [0] + [j + 1 for j in reshape_indices]
+
     shaped_data = shaped_data.transpose(reshape_indices)
     new_dims = [[dims[0][j] for j in indices] , [dims[1][j] for j in indices]]
 
     full_dims = prod(dims[0])
-    full_data = shaped_data.reshape(full_dims, -1)
-    
-    return Qarray.create(full_data, dims = new_dims)
+
+    if is_qarryarray:
+        full_data = shaped_data.reshape(len(qarr), full_dims, -1)
+        return QarrayArray.init(full_data, Qdims(new_dims))
+    else:
+        full_data = shaped_data.reshape(full_dims, -1)
+        return Qarray.create(full_data, dims = new_dims)
 
 def unit(qarr: Qarray) -> Qarray:
     """Normalize the quantum array.
@@ -1014,7 +1093,7 @@ def expm(qarr: Qarray, **kwargs) -> Qarray:
     data = expm_data(qarr.data, **kwargs)
     return Qarray.create(data, dims=dims)
 
-def powm(qarr: Qarray, n: int) -> Qarray:
+def powm(qarr: Union[Qarray,QarrayArray], n: int) -> Qarray:
     """Matrix power.
 
     Args:
@@ -1024,8 +1103,12 @@ def powm(qarr: Qarray, n: int) -> Qarray:
     Returns:
         matrix power
     """
-    data = jnp.linalg.matrix_power(qarr.data, n)
-    return Qarray.create(data, dims=qarr.dims)
+    if isinstance(qarr, Qarray):
+        data = jnp.linalg.matrix_power(qarr.data, n)
+        return Qarray.create(data, dims=qarr.dims)
+    elif isinstance(qarr, QarrayArray):
+        data = jnp.linalg.matrix_power(qarr.data, n)
+        return QarrayArray.init(data, qarr.qdims)
 
 def cosm_data(data: Array, **kwargs) -> Array:
     """Matrix cosine wrapper.
@@ -1148,7 +1231,7 @@ def ptrace(qarr: Qarray, indx) -> Qarray:
 def trace(qarr: Qarray, **kwargs) -> Qarray:
     return jnp.trace(qarr.data, **kwargs)
 
-def dag(qarr: Qarray) -> Qarray:
+def dag(qarr: Union[Qarray,QarrayArray]) -> Qarray:
     """Conjugate transpose.
 
     Args:
@@ -1157,10 +1240,15 @@ def dag(qarr: Qarray) -> Qarray:
     Returns:
         conjugate transpose of qarr
     """
-    data = jnp.conj(qarr.data).T
-    dims = deepcopy(qarr.dims)
-    dims = dims[::-1]
-    return Qarray.create(data, dims=dims)
+    is_qarrayarray = isinstance(qarr, QarrayArray)
+    dims = qarr.dims[::-1]
+
+    if is_qarrayarray:
+        data = jnp.conj(qarr.data).transpose(0,2,1)
+        return QarrayArray.init(data, Qdims(dims))
+    else:
+        data = jnp.conj(qarr.data).T
+        return Qarray.create(data, dims=dims)
 
 def ket2dm(qarr: Qarray) -> Qarray:
     """Turns ket into density matrix.
@@ -1183,6 +1271,19 @@ def ket2dm(qarr: Qarray) -> Qarray:
 
 
 # Data level operations ----
+
+
+def powm_data(data: Array, n: int) -> Array:
+    """Matrix power.
+
+    Args:
+        data: matrix
+        n: power
+
+    Returns:
+        matrix power
+    """
+    return jnp.linalg.matrix_power(data, n)
 
 
 def batch_dag_data(op: Array) -> Array:

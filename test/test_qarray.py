@@ -268,6 +268,32 @@ def test_qarray_basic_math_tensor():
 
     # QarrayArray ^ QarrayArray (of different size)
     with pytest.raises(ValueError):
-        jqt.QarrayArray.create([a,b]) ^ jqt.QarrayArray.create([a,b,c])
+        jqt.QarrayArray.create([a,b]) ^ jqt.QarrayArray.create([a,b,b])
+
+    # QarrayArray arraytensor
+    arr1 = jqt.QarrayArray.create([a,b])
+    arr2 = jqt.QarrayArray.create([a,b,b])
+    assert jnp.max(jnp.abs((arr1.arraytensor(arr2))._data - (
+        jnp.kron(arr1._data, arr2._data)
+    ))) < 1e-10
+
+
+def test_qarray_basic_math_pow():
+    a = jqt.displace(3,1.0)
+    b = jqt.displace(3,1.25)
+    c = jqt.displace(5,1.5)
+    
+    arr = jqt.QarrayArray.create([a,b])
+
+    scalar = 3
+
+    # ----
+    # Qarray ** scalar
+
+    assert jnp.max(jnp.abs((a ** scalar)._data - jnp.linalg.matrix_power(a._data, scalar))) < 1e-10
+
+    # QarrayArray ** scalar
+    assert jnp.max(jnp.abs((arr ** scalar)._data - jnp.linalg.matrix_power(arr._data, scalar))) < 1e-10
+    assert jnp.max(jnp.abs((arr ** scalar)._data - jqt.QarrayArray.create([a**scalar, b**scalar])._data)) < 1e-10
 
 # ========================================

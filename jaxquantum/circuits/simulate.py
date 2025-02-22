@@ -153,11 +153,14 @@ def simulate_layer(layer: Layer, initial_state: Qarray, mode: SimulateMode = Sim
     elif mode == SimulateMode.KRAUS:
         KM = layer.gen_KM()
         
-        # TODO: vectorize this
-        new_state = 0
-        for op in KM:
-            new_state += op @ state @ op.dag()
-        state = new_state
+        
+        state = (KM @ state @ KM.dag()).collapse()
+
+        # new_state = 0
+        # for op_j in range(len(KM)):
+        #     op = KM[op_j]
+        #     new_state += op @ state @ op.dag()
+        # state = new_state
 
         result = Result.create([state])
     

@@ -138,28 +138,24 @@ class Layer:
             if len(KM) == 0:
                 KM = deepcopy(operation.gate.KM)
             else:
-                updated_KM = []
-                
-                # TODO : vectorize this
-                for op1 in KM:
-                    for op2 in operation.gate.KM:
-                        updated_KM.append(op1^op2)
-                KM = updated_KM
+                # updated_KM = []                
+                # for op1 in KM:
+                #     for op2 in operation.gate.KM:
+                #         updated_KM.append(op1^op2)
+                # KM = updated_KM
+                KM = KM.arraytensor(operation.gate.KM)
         
         register = self.operations[0].register
         missing_indices = [i for i in range(len(register.dims)) if i not in indices_order]
         
         for j in missing_indices:
-            # TODO : vectorize this
-            for k in range(len(KM)):
-                KM[k] = KM[k] ^ identity(register.dims[j])
+            KM = KM ^ identity(register.dims[j])
         
         combined_indices = indices_order + missing_indices
         sorted_ind = list(argsort(combined_indices))
-        
-        for k in range(len(KM)):
-            KM[k] = KM[k].transpose(sorted_ind)
-        
+                
+        KM = KM.transpose(sorted_ind)
+
         return KM
 
 
