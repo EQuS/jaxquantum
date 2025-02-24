@@ -5,9 +5,7 @@ JAX Utils
 from numbers import Number
 from typing import Dict
 
-from jax import lax
-from jax import device_put
-from jax import config
+from jax import lax, Array, device_put, config
 from jax._src.scipy.special import gammaln
 import jax.numpy as jnp
 import numpy as np
@@ -86,6 +84,7 @@ def conj_transpose_iso_matrix(A):
 
 def robust_isscalar(val):
     is_scalar = isinstance(val, Number) or jnp.isscalar(val)
-    if isinstance(val, jnp.ndarray):
-        is_scalar = len(val.shape) == 0
+    if isinstance(val, Array):
+        is_scalar = is_scalar or (len(val.shape) == 0)
     return is_scalar
+

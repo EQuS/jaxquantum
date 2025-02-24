@@ -17,6 +17,7 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 
 from jaxquantum.core.settings import SETTINGS
+from jaxquantum.utils.utils import robust_isscalar
 
 config.update("jax_enable_x64", True)
 
@@ -183,6 +184,9 @@ class Qarray:
     @classmethod
     def _convert_to_qarray(cls, other):
         if not isinstance(other, Qarray):
+            if isinstance(other, QarrayArray) or robust_isscalar(other):
+                return NotImplemented
+
             try:
                 other = Qarray.create(other)
             except TypeError:
@@ -230,44 +234,45 @@ class Qarray:
 
     # Elementary Math ----
     def __matmul__(self, other):
-        if isinstance(other, ARRAY_TYPES[:3]):
-            other = Qarray._convert_to_qarray(other)
-            _qdims_new = self._qdims @ other._qdims
-            return Qarray.create(
-                self.data @ other.data,
-                dims=_qdims_new.dims,
-            )
-        return NotImplemented
+        other = Qarray._convert_to_qarray(other)
+        if not isinstance(other, Qarray):
+            return NotImplemented
+        _qdims_new = self._qdims @ other._qdims
+        return Qarray.create(
+            self.data @ other.data,
+            dims=_qdims_new.dims,
+        )
     
     def __rmatmul__(self, other):
-        if isinstance(other, ARRAY_TYPES[:3]):
-            other = Qarray._convert_to_qarray(other)
-            _qdims_new = other._qdims @ self._qdims
-            return Qarray.create(
-                other.data @ self.data,
-                dims=_qdims_new.dims,
-            )
-        return NotImplemented
+        other = Qarray._convert_to_qarray(other)
+        
+        if not isinstance(other, Qarray):
+            return NotImplemented
+
+        _qdims_new = other._qdims @ self._qdims
+        return Qarray.create(
+            other.data @ self.data,
+            dims=_qdims_new.dims,
+        )
+        
     
     def __mul__(self, other):
         if isinstance(other, Qarray):
             return self.__matmul__(other)
 
         if isinstance(other, QarrayArray):
-            return other.__rmatmul__(self)
+            return other.__rmatmul__(self)    
 
-        if isinstance(other, ARRAY_TYPES[:2]):
-            if len(other.shape) > 0: # not a scalar
-                return self.__matmul__(other)
-
-        if jnp.isscalar(other):
+        if robust_isscalar(other):
             multiplier = other + 0.0j
             return Qarray.create(
                 self.data * multiplier,
                 dims=self._qdims.dims,
             )
+        else:
+            if len(other.shape) > 0: # not a scalar
+                return self.__matmul__(other)
         
-        return NotImplemented
 
     def __rmul__(self, other):
         if isinstance(other, Qarray):
@@ -275,15 +280,12 @@ class Qarray:
         
         if isinstance(other, QarrayArray):
             return other.__matmul__(self)
-        
-        if isinstance(other, ARRAY_TYPES[:2]):
+
+        if robust_isscalar(other):
+            return self.__mul__(other) # order doesn't matter
+        else:
             if len(other.shape) > 0: # not a scalar
                 return self.__rmatmul__(other)
-
-        if jnp.isscalar(other):
-            return self.__mul__(other) # order doesn't matter
-
-        return NotImplemented
 
     def __neg__(self):
         return self.__mul__(-1)
@@ -291,7 +293,7 @@ class Qarray:
     def __truediv__(self, other):
         """ For Qarray's, this only really makes sense in the context of division by a scalar. """
 
-        if jnp.isscalar(other):
+        if robust_isscalar(other):
             return self.__mul__(1/other) 
 
         return NotImplemented 
@@ -309,18 +311,17 @@ class Qarray:
         if isinstance(other, QarrayArray):
             return other.__radd__(self)
 
-        if isinstance(other, ARRAY_TYPES[:2]):
-            if len(other.shape) > 0:
-                other = Qarray._convert_to_qarray(other)
-                return self.__add__(other)
-
-        if jnp.isscalar(other):
+        if robust_isscalar(other):
             if other == 0:
                 return self.copy()
                 
             scalar = other + 0.0j
             if (self.data.shape[-2] == self.data.shape[-1]):
                 other = Qarray.create(jnp.eye(self.data.shape[-2], dtype=self.data.dtype) * scalar, dims=self.dims)
+                return self.__add__(other)
+        else:
+            if len(other.shape) > 0:
+                other = Qarray._convert_to_qarray(other)
                 return self.__add__(other)
 
         return NotImplemented
@@ -341,18 +342,17 @@ class Qarray:
         if isinstance(other, QarrayArray):
             return other.__rsub__(self)
 
-        if isinstance(other, ARRAY_TYPES[:2]):
-            if len(other.shape) > 0:
-                other = Qarray._convert_to_qarray(other)
-                return self.__sub__(other)
-
-        if jnp.isscalar(other):
+        if robust_isscalar(other):
             if other == 0:
                 return self.copy()
                 
             scalar = other + 0.0j
             if (self.data.shape[-2] == self.data.shape[-1]):
                 other = Qarray.create(jnp.eye(self.data.shape[-2], dtype=self.data.dtype) * scalar, dims=self.dims)
+                return self.__sub__(other)
+        else:
+            if len(other.shape) > 0:
+                other = Qarray._convert_to_qarray(other)
                 return self.__sub__(other)
 
         return NotImplemented
@@ -361,18 +361,16 @@ class Qarray:
         return self.__neg__().__add__(other)
     
     def __xor__(self, other):
-        if isinstance(other, ARRAY_TYPES[:3]):
-            other = Qarray._convert_to_qarray(other)
-            return tensor(self, other)
-
-        return NotImplemented
+        other = Qarray._convert_to_qarray(other)
+        if not isinstance(other, Qarray):
+            return NotImplemented
+        return tensor(self, other)
 
     def __rxor__(self, other):
-        if isinstance(other, ARRAY_TYPES[:3]):
-            other = Qarray._convert_to_qarray(other)
-            return tensor(other, self)
-
-        return NotImplemented
+        other = Qarray._convert_to_qarray(other)
+        if not isinstance(other, Qarray):
+            return NotImplemented
+        return tensor(other, self)
     
     def __pow__(self, other):
         if not isinstance(other, int):
@@ -689,17 +687,16 @@ class QarrayArray:
                 _qdims = _qdims_new
             )
 
-        # Case 2: QarrayArray @ Qarray
-        if isinstance(other, ARRAY_TYPES[:3]):
-            other = Qarray._convert_to_qarray(other)
-            _qdims_new = self._qdims @ other._qdims
-            _data_new = self._data @ other.data
-            return QarrayArray.init(
-                _data = _data_new,
-                _qdims = _qdims_new
-            )
-        
-        return NotImplemented
+        # Case 2: QarrayArray @ Qarray/Array
+        other = Qarray._convert_to_qarray(other)
+        if not isinstance(other, Qarray):
+            return NotImplemented
+        _qdims_new = self._qdims @ other._qdims
+        _data_new = self._data @ other.data
+        return QarrayArray.init(
+            _data = _data_new,
+            _qdims = _qdims_new
+        )
     
     def __rmatmul__(self, other):
         """ This will handle several cases of matrix multiplication with self on the right.
@@ -722,47 +719,40 @@ class QarrayArray:
                 _qdims = _qdims_new
             )
 
-        # Case 2: Qarray @ QarrayArray
-        if isinstance(other, ARRAY_TYPES[:3]):
-            other = Qarray._convert_to_qarray(other)
-            _qdims_new = other._qdims @ self._qdims
-            _data_new = other.data @ self._data
-            return QarrayArray.init(
-                _data = _data_new,
-                _qdims = _qdims_new
-            )
-        
-        return NotImplemented
+        # Case 2: Qarray @ QarrayArray/Array
+        other = Qarray._convert_to_qarray(other)
+        if not isinstance(other, Qarray):
+            return NotImplemented
+        _qdims_new = other._qdims @ self._qdims
+        _data_new = other.data @ self._data
+        return QarrayArray.init(
+            _data = _data_new,
+            _qdims = _qdims_new
+        )
 
     def __mul__(self, other):
         if isinstance(other, (Qarray, QarrayArray)):
             return self.__matmul__(other)
         
-        if isinstance(other, ARRAY_TYPES[:2]):
-            if len(other.shape) > 0:
-                return self.__matmul__(other)
-        
-        if jnp.isscalar(other):
+        if robust_isscalar(other):
             multiplier = other + 0.0j
             return QarrayArray.init(
                 _data = self._data * multiplier,
                 _qdims = self._qdims
             )
-
-        return NotImplemented
+        else:
+            if len(other.shape) > 0:
+                return self.__matmul__(other)
 
     def __rmul__(self, other):
         if isinstance(other, (Qarray, QarrayArray)):
             return self.__rmatmul__(other)
         
-        if isinstance(other, ARRAY_TYPES[:2]):
+        if robust_isscalar(other):
+            return self.__mul__(other)
+        else:
             if len(other.shape) > 0:
                 return self.__rmatmul__(other)
-        
-        if jnp.isscalar(other):
-            return self.__mul__(other)
-        
-        return NotImplemented
 
     def __neg__(self):
         return self.__mul__(-1)
@@ -770,7 +760,7 @@ class QarrayArray:
     def __truediv__(self, other):
         """ For QarrayArray's, this only really makes sense in the context of division by a scalar. """
 
-        if jnp.isscalar(other):
+        if robust_isscalar(other):
             return self.__mul__(1/other)
         
         return NotImplemented
@@ -792,13 +782,9 @@ class QarrayArray:
                 _data = self._data + other._data,
                 _qdims = self._qdims
             )
+                    
         
-        if isinstance(other, ARRAY_TYPES[:2]):
-            if len(other.shape) > 0:
-                other = Qarray._convert_to_qarray(other)
-                return self.__add__(other)
-        
-        if jnp.isscalar(other):
+        if robust_isscalar(other):
             if other == 0:
                 return self.copy()
 
@@ -806,8 +792,11 @@ class QarrayArray:
             if (self.data.shape[-2] == self.data.shape[-1]):
                 other = Qarray.create(jnp.eye(self.data.shape[-2], dtype=self.data.dtype) * scalar, dims=self.dims)
                 return self.__add__(other)
+        else:
+            if len(other.shape) > 0:
+                other = Qarray._convert_to_qarray(other)
+                return self.__add__(other)
 
-        return NotImplemented
             
     def __radd__(self, other):
         return self.__add__(other)
@@ -829,13 +818,9 @@ class QarrayArray:
                 _data = self._data - other._data,
                 _qdims = self._qdims
             )
+                
         
-        if isinstance(other, ARRAY_TYPES[:2]):
-            if len(other.shape) > 0:
-                other = Qarray._convert_to_qarray(other)
-                return self.__sub__(other)
-        
-        if jnp.isscalar(other):
+        if robust_isscalar(other):
             if other == 0:
                 return self.copy()
 
@@ -843,27 +828,31 @@ class QarrayArray:
             if (self.data.shape[-2] == self.data.shape[-1]):
                 other = Qarray.create(jnp.eye(self.data.shape[-2], dtype=self.data.dtype) * scalar, dims=self.dims)
                 return self.__sub__(other)
-
-        return NotImplemented
+        else:
+            if len(other.shape) > 0:
+                other = Qarray._convert_to_qarray(other)
+                return self.__sub__(other)
 
     def __rsub__(self, other):
         return self.__neg__().__add__(other)
 
     def __xor__(self, other):
-        if isinstance(other, ARRAY_TYPES):
-            if isinstance(other, ARRAY_TYPES[:3]):
-                other = Qarray._convert_to_qarray(other)
+        if isinstance(other, QarrayArray):
+            return tensor(self, other)
+        else:
+            other = Qarray._convert_to_qarray(other)
+            if not isinstance(other, Qarray):
+                return NotImplemented
             return tensor(self, other)
 
-        return NotImplemented
-
     def __rxor__(self, other):
-        if isinstance(other, ARRAY_TYPES):
-            if isinstance(other, ARRAY_TYPES[:3]):
-                other = Qarray._convert_to_qarray(other)
+        if isinstance(other, QarrayArray):
             return tensor(other, self)
-        
-        return NotImplemented
+        else:
+            other = Qarray._convert_to_qarray(other)
+            if not isinstance(other, Qarray):
+                return NotImplemented
+            return tensor(other, self)
 
     def __pow__(self, other: int):
         if not isinstance(other, int):
@@ -952,7 +941,7 @@ class QarrayArray:
     # ----
 
 
-ARRAY_TYPES = (Array, ndarray, Qarray, QarrayArray)
+# ARRAY_TYPES = (Array, ndarray, Qarray, QarrayArray)
 
 # Qarray/QarrayArray operations ---------------------------------------------------------------------
 
