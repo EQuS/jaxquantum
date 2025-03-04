@@ -1,7 +1,8 @@
 """ qubit gates. """
 
-from jaxquantum.core.operators import sigmax, sigmay, sigmaz, basis
+from jaxquantum.core.operators import sigmax, sigmay, sigmaz, basis, hadamard
 from jaxquantum.circuits.gates import Gate
+from jaxquantum.core.qarray import QarrayArray
 
 def X():
     return Gate.create(
@@ -24,6 +25,31 @@ def Z():
         2, 
         name="Z",
         gen_U = lambda params: sigmaz(),
+        num_modes=1
+    )
+
+def H():
+    return Gate.create(
+        2, 
+        name="H",
+        gen_U = lambda params: hadamard(),
+        num_modes=1
+    )
+
+def MZ():
+
+    g = basis(2,0)
+    e = basis(2,1)
+
+    gg = g @ g.dag()
+    ee = e @ e.dag()
+
+    kmap = QarrayArray.create([gg, ee])
+
+    return Gate.create(
+        2, 
+        name="MZ",
+        gen_KM = lambda params: kmap,
         num_modes=1
     )
 

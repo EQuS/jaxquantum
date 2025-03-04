@@ -38,9 +38,21 @@ class Gate:
         ts: Optional[Array] = None,
         gen_U: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
         gen_H: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
-        gen_kraus_map: Optional[Callable[[Dict[str, Any]], List[Qarray]]] = None,
+        gen_KM: Optional[Callable[[Dict[str, Any]], List[Qarray]]] = None,
         num_modes: int = 1,
     ):
+        """ Create a gate. 
+        
+        Args:
+            dims: Dimensions of the gate.
+            name: Name of the gate.
+            params: Parameters of the gate.
+            ts: Times of the gate.
+            gen_U: Function to generate the unitary of the gate.
+            gen_H: Function to generate the Hamiltonian of the gate.
+            gen_KM: Function to generate the Kraus map of the gate.
+            num_modes: Number of modes of the gate.
+        """
 
         # TODO: add params to device?
 
@@ -54,8 +66,8 @@ class Gate:
         _U = gen_U(params) if gen_U is not None else None 
         _H = gen_H(params) if gen_H is not None else None 
 
-        if gen_kraus_map is not None:
-            _KM = gen_kraus_map(params)
+        if gen_KM is not None:
+            _KM = gen_KM(params)
         elif _U is not None:
             _KM = QarrayArray.create([_U])
 
