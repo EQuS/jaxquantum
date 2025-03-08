@@ -10,7 +10,8 @@ import jax.numpy as jnp
 import numpy as np
 
 
-from jaxquantum.core.qarray import Qarray, DIMS_TYPE, Qtypes
+from jaxquantum.core.qarray import Qarray
+from jaxquantum.core.dims import DIMS_TYPE, Qtypes
 
 
 config.update("jax_enable_x64", True)

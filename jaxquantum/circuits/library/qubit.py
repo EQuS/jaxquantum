@@ -1,6 +1,6 @@
 """ qubit gates. """
 
-from jaxquantum.core.operators import sigmax, sigmay, sigmaz, basis, hadamard
+from jaxquantum.core.operators import sigmax, sigmay, sigmaz, basis, hadamard, qubit_rotation
 from jaxquantum.circuits.gates import Gate
 from jaxquantum.core.qarray import QarrayArray
 
@@ -33,6 +33,33 @@ def H():
         2, 
         name="H",
         gen_U = lambda params: hadamard(),
+        num_modes=1
+    )
+
+def Rx(theta):
+    return Gate.create(
+        2, 
+        name="Rx",
+        params={"theta": theta},
+        gen_U = lambda params: qubit_rotation(params["theta"], 1, 0, 0),
+        num_modes=1
+    )
+
+def Ry(theta):
+    return Gate.create(
+        2, 
+        name="Ry",
+        params={"theta": theta},
+        gen_U = lambda params: qubit_rotation(params["theta"], 0, 1, 0),
+        num_modes=1
+    )
+
+def Rz(theta):
+    return Gate.create(
+        2, 
+        name="Rz",
+        params={"theta": theta},
+        gen_U = lambda params: qubit_rotation(params["theta"], 0, 0, 1),
         num_modes=1
     )
 
