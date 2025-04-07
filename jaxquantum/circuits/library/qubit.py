@@ -80,6 +80,41 @@ def MZ():
         num_modes=1
     )
 
+def MX():
+
+    g = basis(2,0)
+    e = basis(2,1)
+
+    plus = (g + e).unit()
+    minus = (g - e).unit()
+
+    pp = plus @ plus.dag()
+    mm = minus @ minus.dag()
+
+    kmap = QarrayArray.create([pp, mm])
+
+    return Gate.create(
+        2, 
+        name="MX",
+        gen_KM = lambda params: kmap,
+        num_modes=1
+    )
+
+def Reset():
+    g = basis(2,0)
+    e = basis(2,1)
+
+    gg = g @ g.dag()
+    ge = g @ e.dag()
+
+    kmap = QarrayArray.create([gg, ge])
+    return Gate.create(
+        2, 
+        name="Reset",
+        gen_KM = lambda params: kmap,
+        num_modes=1
+    )
+
 def CX():
     g = basis(2,0)
     e = basis(2,1)
