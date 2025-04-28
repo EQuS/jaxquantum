@@ -6,7 +6,7 @@ from typing import Tuple
 
 
 from jaxquantum.utils.utils import comb
-from bosonic.codes import BosonicQubit
+from jaxquantum.codes.base import BosonicQubit
 import jaxquantum as jqt
 
 from jax import vmap

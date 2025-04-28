@@ -13,7 +13,7 @@ import jax.scipy as jsp
 
 
 from jaxquantum.core.settings import SETTINGS
-from jaxquantum.core.qarray import Qarray, QarrayArray
+from jaxquantum.core.qarray import Qarray, QarrayArray, ket2dm
 from jaxquantum.circuits.circuits import Circuit, Layer
 from jaxquantum.circuits.constants import SimulateMode
 
@@ -153,7 +153,7 @@ def simulate_layer(layer: Layer, initial_state: Qarray, mode: SimulateMode = Sim
     elif mode == SimulateMode.KRAUS:
         KM = layer.gen_KM()
         
-        
+        state = ket2dm(state)
         state = (KM @ state @ KM.dag()).collapse()
 
         # new_state = 0
