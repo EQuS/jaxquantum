@@ -15,7 +15,8 @@ REQUIREMENTS = [
     "jax[cpu]",
     "diffrax",
     "flax",
-    "tqdm"
+    "tqdm",
+    "pytest"
 ]
 
 EXTRA_REQUIREMENTS = {

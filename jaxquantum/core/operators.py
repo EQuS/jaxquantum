@@ -66,6 +66,20 @@ def sigmap() -> Qarray:
     return Qarray.create(jnp.array([[0.0, 1.0], [0.0, 0.0]]))
 
 
+def qubit_rotation(theta: float, nx, ny, nz) -> Qarray:
+    """Single qubit rotation.
+
+    Args:
+        theta: rotation angle.
+        nx: rotation axis x component.
+        ny: rotation axis y component.
+        nz: rotation axis z component.
+
+    Returns:
+        Single qubit rotation operator.
+    """
+    return jnp.cos(theta / 2) * identity(2) - 1j * jnp.sin(theta / 2) * (nx * sigmax() + ny * sigmay() + nz * sigmaz())
+
 def destroy(N) -> Qarray:
     """annihilation operator
 

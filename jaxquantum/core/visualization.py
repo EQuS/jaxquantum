@@ -12,7 +12,7 @@ WIGNER = "wigner"
 QFUNC = "qfunc"
 
 
-def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER):
+def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", plot_cbar=True):
     """Plot quasi-probability distribution.
 
     TODO: decouple this from qutip.
@@ -70,13 +70,20 @@ def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER):
     ax.axvline(0, linestyle="-", color="black", alpha=0.7)
     ax.grid()
     ax.set_aspect("equal", adjustable="box")
-    return im
+
+    if plot_cbar:
+        cbar = plt.colorbar(im, ax=ax, orientation="vertical")
+        cbar.ax.set_title(cbar_label)
+
+    fig = ax.get_figure()
+    fig.tight_layout()
+    return ax, im
 
 
 plot_wigner = lambda state, pts, ax=None, contour=True: plot_qp(
-    state, pts, ax=ax, contour=contour, qp_type=WIGNER
+    state, pts, ax=ax, contour=contour, qp_type=WIGNER, cbar_label=r"$\mathcal{W}(\alpha)$"
 )
 
 plot_qfunc = lambda state, pts, ax=None, contour=True: plot_qp(
-    state, pts, ax=ax, contour=contour, qp_type=QFUNC
+    state, pts, ax=ax, contour=contour, qp_type=QFUNC, cbar_label=r"$\mathcal{Q}(\alpha)$"
 )

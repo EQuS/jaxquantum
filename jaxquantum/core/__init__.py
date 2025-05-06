@@ -6,3 +6,5 @@ from .visualization import *
 from .solvers import *
 from .qarray import *
 from .settings import SETTINGS
+from .dims import *
+from .helpers import *
