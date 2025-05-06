@@ -42,12 +42,12 @@ def overlap(A: Qarray, B: Qarray) -> complex:
         return ((A.to_ket().dag() @ B.to_ket()).trace()).abs()**2
     elif isvec(A):
         A = A.to_ket()
-        return (A.dag() @ B @ A).abs()
+        return (A.dag() @ B @ A).data[0, 0]
     elif isvec(B):
         B = B.to_ket()
-        return (B.dag() @ A @ B).abs()
+        return (B.dag() @ A @ B).data[0, 0]
     else:
-        return (A.dag() @ B).trace().real
+        return (A.dag() @ B).trace()
 
 
 # def fidelity(A: Qarray, B: Qarray) -> float:

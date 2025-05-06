@@ -100,6 +100,34 @@ def MX():
         num_modes=1
     )
 
+def MX_plus():
+
+    g = basis(2,0)
+    e = basis(2,1)
+    plus = (g + e).unit()
+    pp = plus @ plus.dag()
+    kmap = QarrayArray.create([2*pp])
+
+    return Gate.create(
+        2, 
+        name="MXplus",
+        gen_KM = lambda params: kmap,
+        num_modes=1
+    )
+
+def MZ_plus():
+    g = basis(2,0)
+    plus = g
+    pp = plus @ plus.dag()
+    kmap = QarrayArray.create([2*pp])
+
+    return Gate.create(
+        2, 
+        name="MZplus",
+        gen_KM = lambda params: kmap,
+        num_modes=1
+    )
+
 def Reset():
     g = basis(2,0)
     e = basis(2,1)
