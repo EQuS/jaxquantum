@@ -46,7 +46,8 @@ def jqt2qt(jqt_obj):
     if isinstance(jqt_obj, Qobj) or jqt_obj is None:
         return jqt_obj
     
-    return Qobj(np.array(jqt_obj.data), dims=jqt_obj.dims)
+    dims = [list(jqt_obj.dims[0]), list(jqt_obj.dims[1])]
+    return Qobj(np.array(jqt_obj.data), dims=dims)
 
 
 def op2jqts(op: Qarray, cols=True):

@@ -31,6 +31,7 @@ def check_dims(dims: Tuple[Tuple[int]], bdims: Tuple[int], data_shape: Array) ->
 class Qdims:
     def __init__(self, dims):
         self._dims = deepcopy(dims)
+        self._dims = (tuple(self._dims[0]), tuple(self._dims[1]))
         self._qtype = Qtypes.from_dims(self._dims)
 
     @property

@@ -74,7 +74,7 @@ class Qarray:
             data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
 
         if dims is not None and bdims is not None:
-            if len(dims[0]) + len(bdims) == len(data.shape):
+            if len(data.shape) - len(bdims) == 1:
                 data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
         # ----
 
@@ -84,6 +84,8 @@ class Qarray:
 
         if dims is None:
             dims = ((data.shape[-2],), (data.shape[-1],))
+
+        dims = (tuple(dims[0]), tuple(dims[1]))
         
         check_dims(dims, bdims, data.shape)
 
@@ -152,7 +154,6 @@ class Qarray:
     def shape(self):
         return self.data.shape
 
-
     @property
     def is_batched(self):
         return len(self.bdims) > 0
@@ -165,6 +166,15 @@ class Qarray:
             )
         else:
             raise ValueError("Cannot index a non-batched Qarray.")
+
+    def reshape_bdims(self, *args):
+        """ Reshape the batch dimensions of the Qarray. """
+        new_bdims = tuple(args)
+        new_shape = new_bdims + self.dims[0] + self.dims[1]
+        return Qarray.create(
+            self.data.reshape(new_shape),
+            dims=self.dims
+        )
 
     # ----
 
