@@ -58,20 +58,34 @@ def tidy_up(data, atol):
 class Qarray:
     _data: Array
     _qdims: Qdims = struct.field(pytree_node=False)
+    _bdims: Tuple[int] = struct.field(pytree_node=False)
+
 
     # Initialization ----
     @classmethod
-    def create(cls, data, dims=None):
-        # Prepare data ----
+    def create(cls, data, dims=None, bdims=None):
+
+        # Step 1: Prepare data ----
         data = jnp.asarray(data)
         if len(data.shape) == 1:
             data = data.reshape(data.shape[0], 1)
 
-        # Prepare dimensions ----
+        if data.shape[-2] != data.shape[-1] and not (data.shape[-2] == 1 or data.shape[-1] == 1):
+            data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
+
+        if dims is not None and bdims is not None:
+            if len(dims[0]) + len(bdims) == len(data.shape):
+                data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
+        # ----
+
+        # Step 2: Prepare dimensions ----
+        if bdims is None:
+            bdims = tuple(data.shape[:-2])
+
         if dims is None:
-            dims = [[data.shape[0]], [data.shape[1]]]
+            dims = ((data.shape[-2],), (data.shape[-1],))
         
-        check_dims(dims, data.shape)
+        check_dims(dims, bdims, data.shape)
 
         qdims = Qdims(dims)
 
@@ -81,21 +95,20 @@ class Qarray:
         # We could instead use this tidy_up where we think we need it.
         data = tidy_up(data, SETTINGS["auto_tidyup_atol"])
 
-        return cls(data, qdims)
+        return cls(data, qdims, bdims)
+
+    # ----
 
     @classmethod
-    def _convert_to_qarray(cls, other):
-        if not isinstance(other, Qarray):
-            if isinstance(other, QarrayArray) or robust_isscalar(other):
-                return NotImplemented
+    def from_list(cls, qarr_list: List[Qarray]):
+        """ Create a Qarray from a list of Qarrays. """
+        if len(qarr_list) == 0:
+            raise ValueError("Cannot create Qarray from empty list.")
+        
+        bdims = (len(qarr_list),)
+        data = jnp.array([qarr.data for qarr in qarr_list])
+        return cls.create(data, dims=qarr_list[0].dims, bdims=bdims)
 
-            try:
-                other = Qarray.create(other)
-            except TypeError:
-                return NotImplemented
-        return other
-    
-    # ----
 
     # Properties ----
     @property
@@ -109,6 +122,10 @@ class Qarray:
     @property
     def dims(self):
         return self._qdims.dims
+
+    @property
+    def bdims(self):
+        return self._bdims
 
     @property
     def qdims(self):
@@ -129,14 +146,31 @@ class Qarray:
     
     @property
     def shaped_data(self):
-        return self._data.reshape(self.dims[0] + self.dims[1])
+        return self._data.reshape(self.bdims + self.dims[0] + self.dims[1])
+
+    @property 
+    def shape(self):
+        return self.data.shape
+
+
+    @property
+    def is_batched(self):
+        return len(self.bdims) > 0
+
+    def __getitem__(self, index):
+        if len(self.bdims) > 0:
+            return Qarray.create(
+                self.data[index],
+                dims=self.dims,
+            )
+        else:
+            raise ValueError("Cannot index a non-batched Qarray.")
 
     # ----
 
 
     # Elementary Math ----
     def __matmul__(self, other):
-        other = Qarray._convert_to_qarray(other)
         if not isinstance(other, Qarray):
             return NotImplemented
         _qdims_new = self._qdims @ other._qdims
@@ -145,9 +179,7 @@ class Qarray:
             dims=_qdims_new.dims,
         )
     
-    def __rmatmul__(self, other):
-        other = Qarray._convert_to_qarray(other)
-        
+    def __rmatmul__(self, other):        
         if not isinstance(other, Qarray):
             return NotImplemented
 
@@ -161,33 +193,22 @@ class Qarray:
     def __mul__(self, other):
         if isinstance(other, Qarray):
             return self.__matmul__(other)
+     
 
-        if isinstance(other, QarrayArray):
-            return other.__rmatmul__(self)    
-
-        if robust_isscalar(other):
-            multiplier = other + 0.0j
-            return Qarray.create(
-                self.data * multiplier,
-                dims=self._qdims.dims,
-            )
-        else:
-            if len(other.shape) > 0: # not a scalar
-                return self.__matmul__(other)
-        
+        other = other + 0.0j
+        if not robust_isscalar(other) and len(other.shape) > 0: # not a scalar
+            other = other.reshape(other.shape + (1,1))
+            
+        return Qarray.create(
+            other * self.data,
+            dims=self._qdims.dims,
+        )
 
     def __rmul__(self, other):
         if isinstance(other, Qarray):
             return self.__rmatmul__(other)
         
-        if isinstance(other, QarrayArray):
-            return other.__matmul__(self)
-
-        if robust_isscalar(other):
-            return self.__mul__(other) # order doesn't matter
-        else:
-            if len(other.shape) > 0: # not a scalar
-                return self.__rmatmul__(other)
+        return self.__mul__(other)
 
     def __neg__(self):
         return self.__mul__(-1)
@@ -195,10 +216,10 @@ class Qarray:
     def __truediv__(self, other):
         """ For Qarray's, this only really makes sense in the context of division by a scalar. """
 
-        if robust_isscalar(other):
-            return self.__mul__(1/other) 
+        if isinstance(other, Qarray):
+            return NotImplemented
 
-        return NotImplemented 
+        return self.__mul__(1/other)
     
     def __add__(self, other):
         if isinstance(other, Qarray):
@@ -210,22 +231,16 @@ class Qarray:
                 raise ValueError(msg)
             return Qarray.create(self.data + other.data, dims=self.dims)
 
-        if isinstance(other, QarrayArray):
-            return other.__radd__(self)
+        if robust_isscalar(other) and other == 0:
+            return self.copy()
 
-        if robust_isscalar(other):
-            if other == 0:
-                return self.copy()
-                
-            scalar = other + 0.0j
-            if (self.data.shape[-2] == self.data.shape[-1]):
-                other = Qarray.create(jnp.eye(self.data.shape[-2], dtype=self.data.dtype) * scalar, dims=self.dims)
-                return self.__add__(other)
-        else:
-            if len(other.shape) > 0:
-                other = Qarray._convert_to_qarray(other)
-                return self.__add__(other)
-
+        if self.data.shape[-2] == self.data.shape[-1]:
+            other = other + 0.0j
+            if not robust_isscalar(other) and len(other.shape) > 0: # not a scalar
+                other = other.reshape(other.shape + (1,1))
+            other = Qarray.create(other * jnp.eye(self.data.shape[-2], dtype=self.data.dtype), dims=self.dims)
+            return self.__add__(other)
+        
         return NotImplemented
     
     def __radd__(self, other):
@@ -241,35 +256,27 @@ class Qarray:
                 raise ValueError(msg)
             return Qarray.create(self.data - other.data, dims=self.dims)
 
-        if isinstance(other, QarrayArray):
-            return other.__rsub__(self)
+        if robust_isscalar(other) and other == 0:
+            return self.copy()
 
-        if robust_isscalar(other):
-            if other == 0:
-                return self.copy()
-                
-            scalar = other + 0.0j
-            if (self.data.shape[-2] == self.data.shape[-1]):
-                other = Qarray.create(jnp.eye(self.data.shape[-2], dtype=self.data.dtype) * scalar, dims=self.dims)
-                return self.__sub__(other)
-        else:
-            if len(other.shape) > 0:
-                other = Qarray._convert_to_qarray(other)
-                return self.__sub__(other)
-
+        if self.data.shape[-2] == self.data.shape[-1]:
+            other = other + 0.0j
+            if not robust_isscalar(other) and len(other.shape) > 0: # not a scalar
+                other = other.reshape(other.shape + (1,1))
+            other = Qarray.create(other * jnp.eye(self.data.shape[-2], dtype=self.data.dtype), dims=self.dims)
+            return self.__sub__(other)
+        
         return NotImplemented
         
     def __rsub__(self, other):
         return self.__neg__().__add__(other)
     
     def __xor__(self, other):
-        other = Qarray._convert_to_qarray(other)
         if not isinstance(other, Qarray):
             return NotImplemented
         return tensor(self, other)
 
     def __rxor__(self, other):
-        other = Qarray._convert_to_qarray(other)
         if not isinstance(other, Qarray):
             return NotImplemented
         return tensor(other, self)
@@ -286,6 +293,7 @@ class Qarray:
     def _str_header(self):
         out = ", ".join([
             "Quantum array: dims = " + str(self.dims),
+            "bdims = " + str(self.bdims),
             "shape = " + str(self._data.shape),
             "type = " + str(self.qtype),
         ])
@@ -309,7 +317,8 @@ class Qarray:
 
         return Qarray(
             _data = deepcopy(self._data, memo=memo),
-            _qdims = deepcopy(self._qdims, memo=memo)
+            _qdims = deepcopy(self._qdims, memo=memo),
+            _bdims = deepcopy(self._bdims, memo=memo)
         )
 
     def __getattr__(self, method_name):
@@ -391,479 +400,28 @@ class Qarray:
     
     # ----
 
-@struct.dataclass # this allows us to send in and return Qarray from jitted functions
-class QarrayArray:
-    """ This class provides a way to construct arrays of Qarrays for vectorized operations on Qarrays.
-    """ 
-    _data: Array
-    _qdims: Optional[Qdims] = struct.field(pytree_node=False)
+ARRAY_TYPES = (Array, ndarray, Qarray)
 
-    # Initialization ----
-    @classmethod
-    def create(cls, qarr_list: List[Qarray]):
-        if len(qarr_list) == 0:
-            return cls(_data=jnp.array([]), _qdims=None)
+# Qarray operations ---------------------------------------------------------------------
 
-        data = jnp.array([qarr._data for qarr in qarr_list])
-
-        qdims_list = [qarr._qdims for qarr in qarr_list]
-        if len(qdims_list) > 0:
-            assert qdims_list[:-1] == qdims_list[1:], "All qdims of Qarrays in the list must be the same." # equal dims
-        
-        # NOTE: Constantly tidying up on Qarray creation might be a bit overkill.
-        # It increases the compilation time, but only very slightly 
-        # increased the runtime of the jit compiled function.
-        # We could instead use this tidy_up where we think we need it.
-        data = tidy_up(data, SETTINGS["auto_tidyup_atol"])
-
-        return cls(_data=data, _qdims=deepcopy(qdims_list[0]))
-    
-    @classmethod
-    def init(cls, _data: Array, _qdims: Qdims):
-
-        # NOTE: Constantly tidying up on Qarray creation might be a bit overkill.
-        # It increases the compilation time, but only very slightly 
-        # increased the runtime of the jit compiled function.
-        # We could instead use this tidy_up where we think we need it.
-        _data = tidy_up(_data, SETTINGS["auto_tidyup_atol"])
-        check_dims(_qdims.dims, _data.shape)
-        return cls(_data=_data, _qdims=deepcopy(_qdims))
-
-    # ----
-
-    # List Methods ----
-    def append(self, qarr: Qarray):
-        if len(self._data) == 0:
-            data = jnp.array([qarr._data])
-            qdims = qarr._qdims
-        else:
-            assert qarr._qdims == self._qdims, "qdim of Qarray must match that of the current members of this QarrayArray" # equal dims
-            data = jnp.concatenate([self._data, jnp.array([qarr._data])])
-            qdims = qarr._qdims 
-        return QarrayArray.init(_data=data, _qdims=qdims)
-
-    def extend(self, other):
-        if not isinstance(other, QarrayArray):
-            return ValueError("Both objects must be of type QarrayArray.")
-        
-        if isinstance(other,QarrayArray):
-            if len(self._data) == 0:
-                return other 
-            elif len(other._data) == 0:
-                return self 
-            else: 
-                assert self._qdims == other._qdims, "qdims of each QarrayArray must match."
-                data = jnp.concatenate([self._data, other._data])
-                return QarrayArray.init(
-                    _data=data,
-                    _qdims=self._qdims
-                )
-
-    def __getitem__(self, index):
-        return Qarray.create(self.data[index], dims=self.dims)
-
-    # def set(self, index, value: Qarray):
-    #     if not isinstance(value, Qarray):
-    #         raise ValueError("Only Qarray objects can be set in a QarrayArray.")
-        
-    #     if value._qdims != self._qdims:
-    #         raise ValueError("Qarray must have the same qdims as the QarrayArray.")
-
-    #     return QarrayArray.init(
-    #         _data = self._data.at[index].set(value._data),
-    #         _qdims = self._qdims
-    #     )
-
-    def __len__(self):
-        return self._data.shape[0]
-
-    # ----
-
-    # Properties ----
-    @property
-    def qtype(self):
-        return self._qdims.qtype
-    
-    @property
-    def dtype(self):
-        return self._data.dtype
-
-    @property
-    def dims(self):
-        return self._qdims.dims
-    
-    @property
-    def qdims(self):
-        return self._qdims
-
-    @property
-    def space_dims(self):
-        if self.qtype in [Qtypes.oper, Qtypes.ket]:
-            return self.dims[0]
-        elif self.qtype == Qtypes.bra:
-            return self.dims[1]
-        else:
-            raise ValueError("Unsupported qtype.")
-
-    @property
-    def data(self):
-        return self._data
-
-    @property
-    def shaped_data(self):
-        return self._data.reshape([-1] + self.dims[0] + self.dims[1])
-
-    # ----
-
-    # Elementary Math ----
-    def arrayprod(self, other):
-        """ This will take each possible matrix product combination of two QarrayArrays.
-
-        E.g. 
-        [A,B,C].matprod([X,Y]) = [AX, AY, BX, BY, CX, CY]
-
-        Args:
-            other (QarrayArray): other QarrayArray
-        """ 
-
-        if not isinstance(other, QarrayArray):    
-            raise ValueError("This method is only implemented for two QarrayArrays. For other matrix multiplication, please use @.")
-        
-        _qdims_new = self._qdims @ other._qdims 
-        
-        _data_self = self._data
-        _data_other = other._data
-
-        _data_self_reshaped = _data_self.reshape(
-            _data_self.shape[0], 1, _data_self.shape[1], _data_self.shape[2]
-        )
-        _data_other_reshaped = _data_other.reshape(
-            1, _data_other.shape[0], _data_other.shape[1], _data_other.shape[2]
-        )
-        _data_new = _data_self_reshaped @ _data_other_reshaped
-        _data_new = _data_new.reshape(
-            -1, _data_new.shape[2], _data_new.shape[3]
-        )
-
-        return QarrayArray.init(
-            _data = _data_new,
-            _qdims = _qdims_new
-        )
-
-    def arraytensor(self, other):
-
-        if not isinstance(other, QarrayArray):    
-            raise ValueError("This method is only implemented for two QarrayArrays. For other tensor products, please use ^.")
-        
-
-        new_data = jnp.kron(self._data, other._data)
-
-        new_dims = deepcopy(self.dims)
-        new_dims[0] += other.dims[0]
-        new_dims[1] += other.dims[1]
-
-        return QarrayArray.init(
-            _data = new_data,
-            _qdims = Qdims(new_dims)
-        )
-
-
-    def __matmul__(self, other):
-        """ This will handle several cases of matrix multiplication.
-
-        Args:
-            other (Array, Qarray, QarrayArray): other object to right multiply with
-
-        Returns:
-            QarrayArray
-        """
-
-        # Case 1: QarrayArray @ QarrayArray
-        if isinstance(other, QarrayArray):
-            if len(self) != len(other):
-                raise ValueError("Both QarrayArrays must have the same length. For an array product of these two lists, please use the arrayprod method.")
-            _qdims_new = self._qdims @ other._qdims
-            _data_new = self._data @ other._data
-            return QarrayArray.init(
-                _data = _data_new,
-                _qdims = _qdims_new
-            )
-
-        # Case 2: QarrayArray @ Qarray/Array
-        other = Qarray._convert_to_qarray(other)
-        if not isinstance(other, Qarray):
-            return NotImplemented
-        _qdims_new = self._qdims @ other._qdims
-        _data_new = self._data @ other.data
-        return QarrayArray.init(
-            _data = _data_new,
-            _qdims = _qdims_new
-        )
-    
-    def __rmatmul__(self, other):
-        """ This will handle several cases of matrix multiplication with self on the right.
-
-        Args:
-            other (Array, Qarray, QarrayArray): other object to left multiply with
-
-        Returns:
-            QarrayArray
-        """
-        
-        # Case 1: QarrayArray @ QarrayArray
-        if isinstance(other, QarrayArray):
-            if len(self) != len(other):
-                raise ValueError("Both QarrayArrays must have the same length. For an array product of these two lists, please use the arrayprod method.")
-            _qdims_new = other._qdims @ self._qdims
-            _data_new = other._data @ self._data
-            return QarrayArray.init(
-                _data = _data_new,
-                _qdims = _qdims_new
-            )
-
-        # Case 2: Qarray @ QarrayArray/Array
-        other = Qarray._convert_to_qarray(other)
-        if not isinstance(other, Qarray):
-            return NotImplemented
-        _qdims_new = other._qdims @ self._qdims
-        _data_new = other.data @ self._data
-        return QarrayArray.init(
-            _data = _data_new,
-            _qdims = _qdims_new
-        )
-
-    def __mul__(self, other):
-        if isinstance(other, (Qarray, QarrayArray)):
-            return self.__matmul__(other)
-        
-        if robust_isscalar(other):
-            multiplier = other + 0.0j
-            return QarrayArray.init(
-                _data = self._data * multiplier,
-                _qdims = self._qdims
-            )
-        else:
-            if len(other.shape) > 0:
-                return self.__matmul__(other)
-
-    def __rmul__(self, other):
-        if isinstance(other, (Qarray, QarrayArray)):
-            return self.__rmatmul__(other)
-        
-        if robust_isscalar(other):
-            return self.__mul__(other)
-        else:
-            if len(other.shape) > 0:
-                return self.__rmatmul__(other)
-
-    def __neg__(self):
-        return self.__mul__(-1)
-
-    def __truediv__(self, other):
-        """ For QarrayArray's, this only really makes sense in the context of division by a scalar. """
-
-        if robust_isscalar(other):
-            return self.__mul__(1/other)
-        
-        return NotImplemented
-
-    def __add__(self, other):
-        if isinstance(other, (QarrayArray,Qarray)):
-            if isinstance(other, QarrayArray):
-                if len(self) != len(other):
-                    raise ValueError("Both QarrayArrays must have the same length. If you are looking to combine the two lists, please use the extend method.")
-            
-            if self.dims != other.dims:
-                msg = (
-                    "Dimensions are incompatible: "
-                    + repr(self.dims) + " and " + repr(other.dims)
-                )
-                raise ValueError(msg)
-
-            return QarrayArray.init(
-                _data = self._data + other._data,
-                _qdims = self._qdims
-            )
-                    
-        
-        if robust_isscalar(other):
-            if other == 0:
-                return self.copy()
-
-            scalar = other + 0.0j
-            if (self.data.shape[-2] == self.data.shape[-1]):
-                other = Qarray.create(jnp.eye(self.data.shape[-2], dtype=self.data.dtype) * scalar, dims=self.dims)
-                return self.__add__(other)
-        else:
-            if len(other.shape) > 0:
-                other = Qarray._convert_to_qarray(other)
-                return self.__add__(other)
-
-            
-    def __radd__(self, other):
-        return self.__add__(other)
-
-    def __sub__(self, other):
-        if isinstance(other, (QarrayArray,Qarray)):
-            if isinstance(other, QarrayArray):
-                if len(self) != len(other):
-                    raise ValueError("Both QarrayArrays must have the same length. If you are looking to combine the two lists, please use the extend method.")
-            
-            if self.dims != other.dims:
-                msg = (
-                    "Dimensions are incompatible: "
-                    + repr(self.dims) + " and " + repr(other.dims)
-                )
-                raise ValueError(msg)
-
-            return QarrayArray.init(
-                _data = self._data - other._data,
-                _qdims = self._qdims
-            )
-                
-        
-        if robust_isscalar(other):
-            if other == 0:
-                return self.copy()
-
-            scalar = other + 0.0j
-            if (self.data.shape[-2] == self.data.shape[-1]):
-                other = Qarray.create(jnp.eye(self.data.shape[-2], dtype=self.data.dtype) * scalar, dims=self.dims)
-                return self.__sub__(other)
-        else:
-            if len(other.shape) > 0:
-                other = Qarray._convert_to_qarray(other)
-                return self.__sub__(other)
-
-    def __rsub__(self, other):
-        return self.__neg__().__add__(other)
-
-    def __xor__(self, other):
-        if isinstance(other, QarrayArray):
-            return tensor(self, other)
-        else:
-            other = Qarray._convert_to_qarray(other)
-            if not isinstance(other, Qarray):
-                return NotImplemented
-            return tensor(self, other)
-
-    def __rxor__(self, other):
-        if isinstance(other, QarrayArray):
-            return tensor(other, self)
-        else:
-            other = Qarray._convert_to_qarray(other)
-            if not isinstance(other, Qarray):
-                return NotImplemented
-            return tensor(other, self)
-
-    def __pow__(self, other: int):
-        if not isinstance(other, int):
-            return NotImplemented
-        
-        return powm(self, other)
-
-    # ----
-    
-    # String Representation ----
-    def _str_header(self):
-        out = ", ".join([
-            "Array of quantum arrays with: dims = " + str(self.dims),
-            "shape = " + str(self._data.shape),
-            "type = " + str(self.qtype),
-        ])
-        return out
-
-    def __str__(self):
-        if len(self._data) == 0:
-            return "QarrayArray is empty."
-
-        return self._str_header() + "\nQarrayArray data =\n" + str(self.data)
-    
-    def __repr__(self):
-        return self.__str__()
-    
-    # ----
-
-    # Utilities ----
-    def copy(self, memo=None):
-        return self.__deepcopy__(memo)
-
-    def __deepcopy__(self, memo):
-        """ Need to override this when defininig __getattr__. """
-
-        return QarrayArray.init(
-            _data = deepcopy(self._data, memo=memo),
-            _qdims = deepcopy(self._qdims, memo=memo)
-        )
-
-    def __getattr__(self, method_name):
-
-        if "__" == method_name[:2]:
-            # NOTE: we return NotImplemented for binary special methods logic in python, plus things like __jax_array__
-            return lambda *args, **kwargs: NotImplemented
-
-        modules = [jnp, jnp.linalg, jsp, jsp.linalg]
-
-        method_f = None 
-        for mod in modules:
-            method_f = getattr(mod, method_name, None)
-            if method_f is not None:
-                break
-
-        if method_f is None:
-            raise NotImplementedError(f"Method {method_name} does not exist. No backup method found in {modules}.")
-
-        def func(*args, **kwargs): 
-            res = vmap(method_f)(self.data, *args, **kwargs)
-
-            if getattr(res, "shape", None) is None or res.shape != self.data.shape:
-                return res
-            else:
-                return QarrayArray.init(
-                    _data=res,
-                    _qdims=self._qdims
-                )
-        return func
-    
-    # ----
-
-    # Conversions / Reshaping ----
-    def dag(self):
-        return dag(self)
-
-    def transpose(self, *args):
-        return transpose(self, *args)
-    # ----
-
-
-    # Math Functions ----
-
-    def collapse(self, mode="sum"):
-        return collapse(self, mode)
-    # ----
-
-
-# ARRAY_TYPES = (Array, ndarray, Qarray, QarrayArray)
-
-# Qarray/QarrayArray operations ---------------------------------------------------------------------
-
-def collapse(qarrarr: QarrayArray, mode="sum") -> Qarray:
-    """Collapse the QarrayArray.
+def collapse(qarr: Qarray, mode="sum") -> Qarray:
+    """Collapse the Qarray.
 
     Args:
-        qarrarr (QarrayArray): quantum array array
+        qarr (Qarray): quantum array array
     
     Returns:
         Collapsed quantum array
     """
     if mode == "sum":
+        batch_axes = list(range(len(qarr.bdims)))
         return Qarray.create(
-            jnp.sum(qarrarr.data, axis=0),
-            dims=qarrarr.dims
+            jnp.sum(qarr.data, axis=batch_axes),
+            dims=qarr.dims
         )
     
 
-def transpose(qarr: Union[Qarray,QarrayArray], indices: List[int]) -> Qarray:
+def transpose(qarr: Qarray, indices: List[int]) -> Qarray:
     """ Transpose the quantum array.
 
     Args:
@@ -873,27 +431,23 @@ def transpose(qarr: Union[Qarray,QarrayArray], indices: List[int]) -> Qarray:
     Returns:
         tranposed Qarray
     """
-    is_qarryarray = isinstance(qarr, QarrayArray)
+
+    indices = list(indices)
 
     shaped_data = qarr.shaped_data
     dims = qarr.dims
+    bdims_indxs = list(range(len(qarr.bdims)))
 
     reshape_indices = indices + [j + len(dims[0]) for j in indices]
 
-    if is_qarryarray:
-        reshape_indices = [0] + [j + 1 for j in reshape_indices]
+    reshape_indices = bdims_indxs + [j + len(bdims_indxs) for j in reshape_indices]
 
     shaped_data = shaped_data.transpose(reshape_indices)
-    new_dims = [[dims[0][j] for j in indices] , [dims[1][j] for j in indices]]
+    new_dims = (tuple([dims[0][j] for j in indices]), tuple([dims[1][j] for j in indices]))
 
     full_dims = prod(dims[0])
-
-    if is_qarryarray:
-        full_data = shaped_data.reshape(len(qarr), full_dims, -1)
-        return QarrayArray.init(full_data, Qdims(new_dims))
-    else:
-        full_data = shaped_data.reshape(full_dims, -1)
-        return Qarray.create(full_data, dims = new_dims)
+    full_data = shaped_data.reshape(*qarr.bdims, full_dims, -1)
+    return Qarray.create(full_data, dims = new_dims)
 
 def unit(qarr: Qarray) -> Qarray:
     """Normalize the quantum array.
@@ -905,9 +459,10 @@ def unit(qarr: Qarray) -> Qarray:
         Normalized quantum array
     """
     data = qarr.data
+    data_dag = qarr.dag().data
 
     if qarr.qtype == Qtypes.oper:
-        evals, _ = jnp.linalg.eigh(data @ jnp.conj(data).T)
+        evals, _ = jnp.linalg.eigh(data @ data_dag)
         rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)))
         data = data / rho_norm
     elif qarr.qtype in [Qtypes.ket, Qtypes.bra]:
@@ -920,39 +475,45 @@ def tensor(*args, **kwargs) -> Qarray:
 
     Args:
         *args (Qarray): tensors to take the product of
+        parallel (bool): if True, use parallel einsum for tensor product 
+            true: [A,B] ^ [C,D] = [A^C, B^D]
+            false: [A,B] ^ [C,D] = [A^C, A^D, B^C, B^D]
 
     Returns:
         Tensor product of given tensors
 
     """
+
+    parallel = kwargs.pop("parallel", False)
     
-    is_qarrarr = isinstance(args[0], QarrayArray)
     data = args[0].data
     dims = deepcopy(args[0].dims)
+    dims_0 = dims[0]
+    dims_1 = dims[1]
     for arg in args[1:]:
-        arg_is_qarrarr = isinstance(arg, QarrayArray)
 
-        if is_qarrarr and arg_is_qarrarr:
-            # NOTE: This only works for QarrayArrays of the same length. 
-            if data.shape[0] != arg.data.shape[0]:
-                raise ValueError("QarrayArrays must have the same length.")
+        if parallel:
+            a = data 
+            b = arg.data
 
-            data = jnp.einsum("nij,nkl->nijkl", data, arg.data).reshape(
-                data.shape[0],
-                data.shape[1] * arg.data.shape[1],
-                -1
-            )
+            if len(a.shape) > len(b.shape):
+                batch_dim = a.shape[:-2]
+            elif len(a.shape) == len(b.shape):
+                if prod(a.shape[:-2]) > prod(b.shape[:-2]):
+                    batch_dim = a.shape[:-2]
+                else:
+                    batch_dim = b.shape[:-2]
+            else:
+                batch_dim = b.shape[:-2]
+
+            data = jnp.einsum("...ij,...kl->...ikjl", a, b).reshape(*batch_dim, a.shape[-2] * b.shape[-2], -1)
         else:
             data = jnp.kron(data, arg.data, **kwargs)
-        dims[0] += arg.dims[0]
-        dims[1] += arg.dims[1]
 
-        is_qarrarr = is_qarrarr or arg_is_qarrarr
+        dims_0 = dims_0 + arg.dims[0]
+        dims_1 = dims_1 + arg.dims[1]
 
-    if is_qarrarr:
-        return QarrayArray.init(data, Qdims(dims))
-    else:
-        return Qarray.create(data, dims)
+    return Qarray.create(data, dims=(dims_0, dims_1))
 
 def tr(qarr: Qarray, **kwargs) -> jnp.complex128:
     """Full trace.
@@ -963,7 +524,9 @@ def tr(qarr: Qarray, **kwargs) -> jnp.complex128:
     Returns:
         Full trace.
     """
-    return trace(qarr, **kwargs)
+    axis1 = kwargs.get("axis1", -2)
+    axis2 = kwargs.get("axis2", -1)
+    return jnp.trace(qarr.data, axis1=axis1, axis2=axis2, **kwargs)
 
 
 def expm_data(data: Array, **kwargs) -> Array:
@@ -984,7 +547,7 @@ def expm(qarr: Qarray, **kwargs) -> Qarray:
     data = expm_data(qarr.data, **kwargs)
     return Qarray.create(data, dims=dims)
 
-def powm(qarr: Union[Qarray,QarrayArray], n: int) -> Qarray:
+def powm(qarr: Qarray, n: int) -> Qarray:
     """Matrix power.
 
     Args:
@@ -994,13 +557,10 @@ def powm(qarr: Union[Qarray,QarrayArray], n: int) -> Qarray:
     Returns:
         matrix power
     """
-    if isinstance(qarr, Qarray):
-        data = jnp.linalg.matrix_power(qarr.data, n)
-        return Qarray.create(data, dims=qarr.dims)
-    elif isinstance(qarr, QarrayArray):
-        data = jnp.linalg.matrix_power(qarr.data, n)
-        return QarrayArray.init(data, qarr.qdims)
-
+    
+    data = jnp.linalg.matrix_power(qarr.data, n)
+    return Qarray.create(data, dims=qarr.dims)
+    
 def cosm_data(data: Array, **kwargs) -> Array:
     """Matrix cosine wrapper.
 
@@ -1039,6 +599,9 @@ def sinm(qarr: Qarray) -> Qarray:
     return Qarray.create(data, dims=dims)
 
 def keep_only_diag_elements(qarr: Qarray) -> Qarray:
+    if len(qarr.bdims) > 0:
+        raise ValueError("Cannot keep only diagonal elements of a batched Qarray.")
+
     dims = qarr.dims
     data = jnp.diag(jnp.diag(qarr.data))
     return Qarray.create(data, dims=dims)
@@ -1062,13 +625,18 @@ def eigenstates(qarr: Qarray) -> Qarray:
     """
 
     evals, evecs = jnp.linalg.eigh(qarr.data)
-    idxs_sorted = jnp.argsort(evals)
-    
+    idxs_sorted = jnp.argsort(evals, axis=-1)
+
     dims = ket_from_op_dims(qarr.dims)
 
-    evals =  evals[idxs_sorted]
-    evecs = evecs[:, idxs_sorted]
-    evecs = [Qarray.create(arr, dims=dims) for arr in evecs]
+    evals = jnp.take_along_axis(evals, idxs_sorted, axis=-1)
+    evecs = jnp.take_along_axis(evecs, idxs_sorted[...,None,:], axis=-1)
+
+    evecs = Qarray.create(
+        evecs,
+        dims=dims,
+        bdims=evecs.shape[:-1],
+    )
 
     return evals, evecs
 
@@ -1112,17 +680,22 @@ def ptrace(qarr: Qarray, indx) -> Qarray:
             continue
         indxs.append(j)
         indxs.append(j + Nq)
+
+    bdims = qarr.bdims
+    len_bdims = len(bdims)
+    bdims_indxs = list(range(len_bdims))
+    indxs = bdims_indxs + [j + len_bdims for j in indxs]
     rho = rho.transpose(indxs)
 
     for j in range(Nq - 1):
-        rho = jnp.trace(rho, axis1=2, axis2=3)
+        rho = jnp.trace(rho, axis1=2+len_bdims, axis2=3+len_bdims)
 
     return Qarray.create(rho)
 
 def trace(qarr: Qarray, **kwargs) -> Qarray:
     return jnp.trace(qarr.data, **kwargs)
 
-def dag(qarr: Union[Qarray,QarrayArray]) -> Qarray:
+def dag(qarr: Qarray) -> Qarray:
     """Conjugate transpose.
 
     Args:
@@ -1131,15 +704,16 @@ def dag(qarr: Union[Qarray,QarrayArray]) -> Qarray:
     Returns:
         conjugate transpose of qarr
     """
-    is_qarrayarray = isinstance(qarr, QarrayArray)
     dims = qarr.dims[::-1]
 
-    if is_qarrayarray:
-        data = jnp.conj(qarr.data).transpose(0,2,1)
-        return QarrayArray.init(data, Qdims(dims))
-    else:
-        data = jnp.conj(qarr.data).T
-        return Qarray.create(data, dims=dims)
+    shape_len = len(qarr.data.shape)
+    shape = list(range(shape_len))
+    shape[-1] = shape_len - 2
+    shape[-2] = shape_len - 1
+
+    data = jnp.conj(qarr.data).transpose(shape)
+    
+    return Qarray.create(data, dims=dims)
 
 def ket2dm(qarr: Qarray) -> Qarray:
     """Turns ket into density matrix.

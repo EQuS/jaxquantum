@@ -13,7 +13,7 @@ import jax.scipy as jsp
 
 
 from jaxquantum.core.settings import SETTINGS
-from jaxquantum.core.qarray import Qarray, QarrayArray, ket2dm
+from jaxquantum.core.qarray import Qarray, ket2dm
 from jaxquantum.circuits.circuits import Circuit, Layer
 from jaxquantum.circuits.constants import SimulateMode
 
@@ -21,15 +21,15 @@ config.update("jax_enable_x64", True)
 
 @struct.dataclass
 class Result:
-    states: QarrayArray
+    states: Qarray
 
     @classmethod
     def create(
         cls,
-        states: Union[QarrayArray, List[Qarray]]
+        states: Qarray
     ):
         if isinstance(states, List):
-            states = QarrayArray.create(states)
+            states = Qarray.from_list(states)
 
         return Result(
             states = states
