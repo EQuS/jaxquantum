@@ -2,6 +2,7 @@
 
 from jaxquantum.core.operators import sigmax, sigmay, sigmaz, basis, hadamard, qubit_rotation
 from jaxquantum.circuits.gates import Gate
+from jaxquantum.core.qarray import Qarray
 
 def X():
     return Gate.create(

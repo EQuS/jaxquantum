@@ -19,48 +19,15 @@ from jaxquantum.circuits.constants import SimulateMode
 
 config.update("jax_enable_x64", True)
 
-@struct.dataclass
-class Result:
-    states: Qarray
-
-    @classmethod
-    def create(
-        cls,
-        states: Qarray
-    ):
-        if isinstance(states, List):
-            states = Qarray.from_list(states)
-
-        return Result(
-            states = states
-        )
-
-    def __getitem__(self, j: int):
-        return self.states[j]
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return str(self.states)
-
-    def append(self, state: Qarray):
-        self.states.append(state) 
-
-    def __getitem__(self, j: int):
-        return self.states[j]
-
-    def __len__(self):
-        return len(self.states)
 
 @struct.dataclass
 class Results:
-    results: List[Result] = struct.field(pytree_node=False)
+    results: List[Qarray] = struct.field(pytree_node=False)
 
     @classmethod
     def create(
         cls,
-        results: List[Result]
+        results: List[Qarray]
     ):
         return Results(
             results = results
@@ -75,7 +42,7 @@ class Results:
     def __repr__(self):
         return str(self.results)
 
-    def append(self, result: Result):
+    def append(self, result: Qarray):
         self.results.append(result)
 
     def __getitem__(self, j: int):
@@ -108,7 +75,7 @@ def simulate(
 
     results = Results.create([])
     state = initial_state
-    results.append(Result.create([state]))
+    results.append(Qarray.from_list([state]))
 
     for layer in circuit.layers:
         result = simulate_layer(layer, state, mode=mode)
@@ -117,7 +84,7 @@ def simulate(
 
     return results
 
-def simulate_layer(layer: Layer, initial_state: Qarray, mode: SimulateMode = SimulateMode.UNITARY) -> Result:
+def simulate_layer(layer: Layer, initial_state: Qarray, mode: SimulateMode = SimulateMode.UNITARY) -> Qarray:
     """
     Simulates the evolution of a quantum state through a given layer.
 
@@ -133,7 +100,7 @@ def simulate_layer(layer: Layer, initial_state: Qarray, mode: SimulateMode = Sim
                                        or SimulateMode.DEFAULT to use the default simulate mode in the layer.
                                        Defaults to SimulateMode.UNITARY.
     Returns:
-        Result: The result of the simulation containing the evolved quantum state.
+        Qarray: The result of the simulation containing the evolved quantum state.
     """
 
     state = initial_state 
@@ -148,7 +115,7 @@ def simulate_layer(layer: Layer, initial_state: Qarray, mode: SimulateMode = Sim
         else:
             state = U @ state 
         
-        result = Result.create([state])
+        result = Qarray.from_list([state])
 
     elif mode == SimulateMode.KRAUS:
         KM = layer.gen_KM()
@@ -162,7 +129,7 @@ def simulate_layer(layer: Layer, initial_state: Qarray, mode: SimulateMode = Sim
         #     new_state += op @ state @ op.dag()
         # state = new_state
 
-        result = Result.create([state])
+        result = Qarray.from_list([state])
     
     return result
 

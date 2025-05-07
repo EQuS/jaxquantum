@@ -408,6 +408,8 @@ class Qarray:
     def eigenenergies(self):
         return eigenenergies(self)
     
+    def collapse(self, mode="sum"):
+        return collapse(self, mode=mode)    
     # ----
 
 ARRAY_TYPES = (Array, ndarray, Qarray)
@@ -424,6 +426,9 @@ def collapse(qarr: Qarray, mode="sum") -> Qarray:
         Collapsed quantum array
     """
     if mode == "sum":
+        if len(qarr.bdims) == 0:
+            return self
+
         batch_axes = list(range(len(qarr.bdims)))
         return Qarray.create(
             jnp.sum(qarr.data, axis=batch_axes),
