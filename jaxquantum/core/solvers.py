@@ -15,10 +15,11 @@ import logging
 
 
 
-from jaxquantum.core.qarray import Qarray, Qtypes
-from jaxquantum.core.conversions import jnps2jqts, jqts2jnps, jnp2jqt
+from jaxquantum.core.qarray import Qarray, Qtypes, is_dm_data, dag_data
+from jaxquantum.core.conversions import jnp2jqt
 from jaxquantum.utils.utils import robust_isscalar
 from jaxquantum.core.operators import identity_like
+from jaxquantum.core.helpers import overlap
 
 # ----
 
@@ -34,31 +35,33 @@ class SolverOptions:
         return cls(progress_meter, solver, max_steps)
 
 
-def calc_expect(op: Qarray, states: List[Qarray]) -> Array:
-    """Calculate expectation value of an operator given a list of states.
+# def calc_expect(op: Qarray, states: Qarray) -> Array:
+#     """Calculate expectation value of an operator given a list of states.
 
-    Args:
-        op: operator
-        states: list of states
+#     Args:
+#         op: operator
+#         states: list of states
 
-    Returns:
-        list of expectation values
-    """
+#     Returns:
+#         list of expectation values
+#     """
 
-    op = op.data
-    is_dm = states[0].is_dm()
-    states = jqts2jnps(states)
+#     op = op.data
+#     is_dm = states[0].is_dm()
+#     states = jqts2jnps(states)
 
-    def calc_expect_ket_single(state: Array):
-        return (jnp.conj(state).T @ op @ state)[0][0]
+#     # def calc_expect_ket_single(state: Array):
+#     #     return (jnp.conj(state).T @ op @ state)[0][0]
 
-    def calc_expect_dm_single(state: Array):
-        return jnp.trace(op @ state)
+#     # def calc_expect_dm_single(state: Array):
+#     #     return jnp.trace(op @ state)
 
-    if is_dm:
-        return vmap(calc_expect_dm_single)(states)
-    else:
-        return vmap(calc_expect_ket_single)(states)
+#     # if is_dm:
+#     #     return vmap(calc_expect_dm_single)(states)
+#     # else:
+#     #     return vmap(calc_expect_ket_single)(states)
+
+#     return overlap(op, states)
         
 
 # ----
@@ -86,7 +89,7 @@ class CustomProgressMeter(TqdmProgressMeter):
         bar_format = "{desc}: {percentage:3.0f}% |{bar}| [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
         return tqdm.tqdm(total=100, bar_format=bar_format, unit='%', colour="MAGENTA", ascii="░▒█")
     
-def solve(ρ0, f, t_list, args, solver_options: Optional[SolverOptions] = None):
+def solve(f, ρ0, tlist, args, solver_options: Optional[SolverOptions] = None):
     """ Gets teh desired solver from diffrax.
 
     Args:
@@ -98,7 +101,7 @@ def solve(ρ0, f, t_list, args, solver_options: Optional[SolverOptions] = None):
 
     # f and ts
     term = ODETerm(f)
-    saveat = SaveAt(ts=t_list)
+    saveat = SaveAt(ts=tlist)
 
     # solver 
     solver_options = solver_options or SolverOptions.create()
@@ -113,9 +116,9 @@ def solve(ρ0, f, t_list, args, solver_options: Optional[SolverOptions] = None):
         sol = diffeqsolve(
             term,
             solver,
-            t0=t_list[0],
-            t1=t_list[-1],
-            dt0=t_list[1] - t_list[0],
+            t0=tlist[0],
+            t1=tlist[-1],
+            dt0=tlist[1] - tlist[0],
             y0=ρ0,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
@@ -127,53 +130,56 @@ def solve(ρ0, f, t_list, args, solver_options: Optional[SolverOptions] = None):
     return sol
 
 def mesolve(
-    ρ0: Qarray,
-    t_list: Array,
-    c_ops: Optional[List[Qarray]] = None,
-    H0: Optional[Qarray] = None,
-    Ht: Optional[Callable[[float], Qarray]] = None,
+    H: Union[Qarray, Callable[[float], Qarray]],
+    rho0: Qarray,
+    tlist: Array,
+    c_ops: Optional[Qarray] = None,
     solver_options: Optional[SolverOptions] = None
 ):
     """Quantum Master Equation solver.
 
     Args:
-        ρ0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
-        t_list: time list
-        c_ops: list of collapse operators
-        H0: time independent Hamiltonian. If H0 is not None, it will override Ht.
-        Ht: time dependent Hamiltonian function.
+        Ht: time dependent Hamiltonian function or time-independent Qarray.
+        rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
+        tlist: time list
+        c_ops: qarray list of collapse operators
         solver_options: SolverOptions with solver options
 
     Returns:
         list of states
     """
     
-    c_ops = c_ops or []
+    c_ops = c_ops if c_ops is not None else jqt.Qarray.from_list([])
+
+    # if isinstance(H, Qarray):
+        
 
     if len(c_ops) == 0 and ρ0.qtype != Qtypes.oper:
         logging.warning(
             "Consider using `jqt.sesolve()` instead, as `c_ops` is an empty list and the initial state is not a density matrix."
         )
 
-    ρ0 = ρ0.to_dm()
+    ρ0 = rho0.to_dm()
     dims = ρ0.dims
     ρ0 = ρ0.data
 
-    c_ops = [c_op.data for c_op in c_ops]
-    H0 = jnp.asarray(H0.data) if H0 is not None else None
-    Ht_data = lambda t: Ht(t).data if Ht is not None else None
-    
-    ys = mesolve_data(ρ0, t_list, c_ops, H0, Ht_data, solver_options)
+    c_ops = c_ops.data
 
-    return jnps2jqts(ys, dims=dims)
+    if isinstance(H, Qarray):
+        Ht_data = lambda t: H.data
+    else:
+        Ht_data = lambda t: H(t).data if H is not None else None
+    
+    ys = mesolve_data(Ht_data, ρ0, tlist, c_ops, solver_options)
+
+    return jnp2jqt(ys, dims=dims)
 
 
 def mesolve_data(
-    ρ0: Array,
-    t_list: Array,
-    c_ops: Optional[List[Array]] = None,
-    H0: Optional[Array] = None,
-    Ht: Optional[Callable[[float], Array]] = None,
+    H: Callable[[float], Array],
+    rho0: Array,
+    tlist: Array,
+    c_ops: Optional[Qarray] = None,
     solver_options: Optional[SolverOptions] = None
 ):
     """Quantum Master Equation solver.
@@ -190,41 +196,45 @@ def mesolve_data(
         list of states
     """
     
-    c_ops = c_ops or []
+    c_ops = c_ops if c_ops is not None else jnp.array([])
 
-    if len(c_ops) == 0:
+    if len(c_ops) == 0 and not is_dm_data(rho0):
         logging.warning(
             "Consider using `jqt.sesolve()` instead, as `c_ops` is an empty list and the initial state is not a density matrix."
         )
 
-    ρ0 = ρ0 + 0.0j
+    ρ0 = rho0 + 0.0j
 
-    c_ops = jnp.asarray([c_op for c_op in c_ops]) + 0.0j
-    H0 = H0 + 0.0j if H0 is not None else None
+    padded_dim = [1 for _ in range(len(ρ0.shape) - 2)]
+    c_ops = c_ops.reshape(len(c_ops), *padded_dim, c_ops.shape[-2], c_ops.shape[-1])
 
     def f(
         t: float,
         rho: Array,
-        args: Array,
+        c_ops_val: Array,
     ):
-        H0_val = args[0]
-        c_ops_val = args[1]
 
-        if H0_val is not None:
-            H = H0_val  # use H0 if given
-        else:
-            H = Ht(t)  # type: ignore
-            H = H + 0.0j
+        H_val = H(t)  # type: ignore
+        H_val = H_val + 0.0j
 
-        rho_dot = -1j * (H @ rho - rho @ H)
+        rho_dot = -1j * (H_val @ rho - rho @ H_val)
 
-        for op in c_ops_val:
-            rho_dot += spre(op)(rho)
+        c_ops_val_dag = dag_data(c_ops_val)
 
+        rho_dot_delta = (0.5 * (
+            2 * c_ops_val @ rho @ c_ops_val_dag
+            - rho @ c_ops_val_dag @ c_ops_val
+            - c_ops_val_dag @ c_ops_val @ rho
+        ))
+
+        rho_dot_delta = jnp.sum(rho_dot_delta, axis=0)
+
+        rho_dot += rho_dot_delta
+        
         return rho_dot
 
     
-    sol = solve(ρ0, f, t_list, [H0, c_ops], solver_options=solver_options)
+    sol = solve(f, ρ0, tlist, c_ops, solver_options=solver_options)
 
     return sol.ys
 
@@ -263,7 +273,7 @@ def sesolve(
     
     ys = sesolve_data(ψ, t_list, H0, Ht_data, solver_options)
 
-    return jnps2jqts(ys, dims=dims)
+    return jnp2jqt(ys, dims=dims)
 
 def sesolve_data(
     ψ: Array,
@@ -350,7 +360,7 @@ def propagator(
             return jnp2jqt(propagator_0_data(H.data,t), dims=dims)
         else:
             f = lambda t: propagator_0_data(H.data,t)
-            return jnps2jqts(vmap(f)(t), dims)
+            return jnp2jqt(vmap(f)(t), dims)
     else:
         dims = H(0.0).dims
         H_data = lambda t: H(t).data
@@ -366,7 +376,7 @@ def propagator(
         else:
             ts = t 
             U_props = propagator_t_data(H_data, ts, solver_options=solver_options)
-            return jnps2jqts(U_props, dims)
+            return jnp2jqt(U_props, dims)
 
 def propagator_0_data(
     H0: Array,

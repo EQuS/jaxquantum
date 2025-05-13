@@ -24,6 +24,13 @@ def ket_from_op_dims(dims: DIMS_TYPE) -> DIMS_TYPE:
 
 
 def check_dims(dims: Tuple[Tuple[int]], bdims: Tuple[int], data_shape: Array) -> bool:
+    
+    if len(data_shape) == 1 and data_shape[0] == 0:
+        # E.g. empty list of operators
+        assert bdims == (0,)
+        assert dims == ((),())
+        return 
+
     assert bdims == data_shape[:-2], "Data shape should be consistent with dimensions."
     assert data_shape[-2] == prod(dims[0]), "Data shape should be consistent with dimensions."
     assert data_shape[-1] == prod(dims[1]), "Data shape should be consistent with dimensions."

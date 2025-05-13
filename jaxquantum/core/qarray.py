@@ -67,11 +67,13 @@ class Qarray:
 
         # Step 1: Prepare data ----
         data = jnp.asarray(data)
-        if len(data.shape) == 1:
+
+        if len(data.shape) == 1 and data.shape[0] > 0:
             data = data.reshape(data.shape[0], 1)
 
-        if data.shape[-2] != data.shape[-1] and not (data.shape[-2] == 1 or data.shape[-1] == 1):
-            data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
+        if len(data.shape) >= 2:
+            if data.shape[-2] != data.shape[-1] and not (data.shape[-2] == 1 or data.shape[-1] == 1):
+                data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
 
         if dims is not None and bdims is not None:
             if len(data.shape) - len(bdims) == 1:
@@ -104,12 +106,17 @@ class Qarray:
     @classmethod
     def from_list(cls, qarr_list: List[Qarray]):
         """ Create a Qarray from a list of Qarrays. """
-        if len(qarr_list) == 0:
-            raise ValueError("Cannot create Qarray from empty list.")
         
-        bdims = (len(qarr_list),)
         data = jnp.array([qarr.data for qarr in qarr_list])
-        return cls.create(data, dims=qarr_list[0].dims, bdims=bdims)
+        
+        if len(qarr_list) == 0:
+            dims = ((),())
+        else:
+            dims = qarr_list[0].dims
+            
+        bdims = (len(qarr_list),)
+
+        return cls.create(data, dims=dims, bdims=bdims)
 
 
     # Properties ----
@@ -175,6 +182,13 @@ class Qarray:
             self.data.reshape(new_shape),
             dims=self.dims
         )
+
+    def __len__(self):
+        """ Length of the Qarray. """
+        if len(self.bdims) > 0:
+            return self.data.shape[0]
+        else:
+            raise ValueError("Cannot get length of a non-batched Qarray.")
 
     # ----
 
@@ -399,6 +413,9 @@ class Qarray:
     def tr(self, **kwargs):
         return tr(self, **kwargs)
 
+    def trace(self, **kwargs):
+        return tr(self, **kwargs)
+
     def ptrace(self, indx):
         return ptrace(self, indx)
         
@@ -530,7 +547,7 @@ def tensor(*args, **kwargs) -> Qarray:
 
     return Qarray.create(data, dims=(dims_0, dims_1))
 
-def tr(qarr: Qarray, **kwargs) -> jnp.complex128:
+def tr(qarr: Qarray, **kwargs) -> Array:
     """Full trace.
 
     Args:
@@ -542,6 +559,18 @@ def tr(qarr: Qarray, **kwargs) -> jnp.complex128:
     axis1 = kwargs.get("axis1", -2)
     axis2 = kwargs.get("axis2", -1)
     return jnp.trace(qarr.data, axis1=axis1, axis2=axis2, **kwargs)
+
+def trace(qarr: Qarray, **kwargs) -> Array:
+    """Full trace.
+
+    Args:
+        qarr (Qarray): quantum array    
+
+    Returns:
+        Full trace.
+    """
+    return tr(qarr, **kwargs)
+    
 
 
 def expm_data(data: Array, **kwargs) -> Array:
@@ -707,9 +736,6 @@ def ptrace(qarr: Qarray, indx) -> Qarray:
 
     return Qarray.create(rho)
 
-def trace(qarr: Qarray, **kwargs) -> Qarray:
-    return jnp.trace(qarr.data, **kwargs)
-
 def dag(qarr: Qarray) -> Qarray:
     """Conjugate transpose.
 
@@ -721,14 +747,22 @@ def dag(qarr: Qarray) -> Qarray:
     """
     dims = qarr.dims[::-1]
 
-    shape_len = len(qarr.data.shape)
-    shape = list(range(shape_len))
-    shape[-1] = shape_len - 2
-    shape[-2] = shape_len - 1
-
-    data = jnp.conj(qarr.data).transpose(shape)
+    data = dag_data(qarr.data)
     
     return Qarray.create(data, dims=dims)
+
+def dag_data(arr: Array) -> Array:
+    """Conjugate transpose.
+
+    Args:
+        arr: operator
+
+    Returns:
+        conjugate of op, and transposes last two axes
+    """
+    return jnp.moveaxis(
+        jnp.conj(arr), -1, -2
+    )  # transposes last two axes, good for batching
 
 def ket2dm(qarr: Qarray) -> Qarray:
     """Turns ket into density matrix.
@@ -752,6 +786,15 @@ def ket2dm(qarr: Qarray) -> Qarray:
 
 # Data level operations ----
 
+def is_dm_data(data: Array) -> bool:
+    """Check if data is a density matrix.
+
+    Args:
+        data: matrix
+    Returns:
+        True if data is a density matrix
+    """
+    return data.shape[-2] == data.shape[-1]
 
 def powm_data(data: Array, n: int) -> Array:
     """Matrix power.
@@ -764,28 +807,3 @@ def powm_data(data: Array, n: int) -> Array:
         matrix power
     """
     return jnp.linalg.matrix_power(data, n)
-
-
-def batch_dag_data(op: Array) -> Array:
-    """Conjugate transpose.
-
-    Args:
-        op: operator
-
-    Returns:
-        conjugate of op, and transposes last two axes
-    """
-    return jnp.moveaxis(
-        jnp.conj(op), -1, -2
-    )  # transposes last two axes, good for batching
-
-def dag_data(op: Array) -> Array:
-    """Conjugate transpose.
-
-    Args:
-        op: operator
-
-    Returns:
-        conjugate of op, and transposes last two axes
-    """
-    return jnp.conj(op.T) 

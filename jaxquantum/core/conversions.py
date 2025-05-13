@@ -50,25 +50,25 @@ def jqt2qt(jqt_obj):
     return Qobj(np.array(jqt_obj.data), dims=dims)
 
 
-def op2jqts(op: Qarray, cols=True):
-    """QuTiP operator -> JAX array.
+# def op2jqts(op: Qarray, cols=True):
+#     """QuTiP operator -> JAX array.
 
-    Args:
-        op: QuTiP operator.
+#     Args:
+#         op: QuTiP operator.
 
-    Returns:
-        JAX array.
-    """
-    if op.qtype != Qtypes.oper:
-        raise ValueError("Input must be a QuTiP operator.")
+#     Returns:
+#         JAX array.
+#     """
+#     if op.qtype != Qtypes.oper:
+#         raise ValueError("Input must be a QuTiP operator.")
 
-    space_dims = op.space_dims
-    ones = [1] * len(space_dims)
+#     space_dims = op.space_dims
+#     ones = [1] * len(space_dims)
 
-    if cols:
-        return [Qarray.create(op.data[i,:], dims=[space_dims, ones]) for i in range(op.data.shape[0])]
-    else:
-        return [Qarray.create(op.data[:,i][jnp.newaxis,...], dims=[ones, space_dims]) for i in range(op.data.shape[1])]
+#     if cols:
+#         return [Qarray.create(op.data[i,:], dims=[space_dims, ones]) for i in range(op.data.shape[0])]
+#     else:
+#         return [Qarray.create(op.data[:,i][jnp.newaxis,...], dims=[ones, space_dims]) for i in range(op.data.shape[1])]
 
 def extract_dims(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None):
     """Extract dims from a JAX array or Qarray.
@@ -81,7 +81,7 @@ def extract_dims(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None)
         Qarray dims.
     """
     if isinstance(dims[0], Number):
-        is_op = len(arr.shape) == 2 and arr.shape[0] == arr.shape[1]
+        is_op = arr.shape[-2] == arr.shape[-1]
         if is_op:
             dims = [dims, dims]
         else:
@@ -103,26 +103,26 @@ def jnp2jqt(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None):
     return Qarray.create(arr, dims=dims)
 
 
-def jnps2jqts(arrs: Array, dims: Optional[DIMS_TYPE] = None):
-    """JAX array -> QuTiP state.
+# def jnps2jqts(arrs: Array, dims: Optional[DIMS_TYPE] = None):
+#     """JAX array -> QuTiP state.
 
-    Args:
-        jnp_obj: JAX array.
+#     Args:
+#         jnp_obj: JAX array.
 
-    Returns:
-        QuTiP state.
-    """
+#     Returns:
+#         QuTiP state.
+#     """
 
-    dims = extract_dims(arrs[0], dims) if dims is not None else None
-    return [Qarray.create(arr, dims=dims) for arr in arrs]
+#     dims = extract_dims(arrs[0], dims) if dims is not None else None
+#     return [Qarray.create(arr, dims=dims) for arr in arrs]
 
-def jqts2jnps(qarrs: Qarray):
-    """QuTiP state -> JAX array.
+# def jqts2jnps(qarrs: Qarray):
+#     """QuTiP state -> JAX array.
 
-    Args:
-        qt_obj: QuTiP state.
+#     Args:
+#         qt_obj: QuTiP state.
 
-    Returns:
-        JAX array.
-    """
-    return jnp.array([qarr.data for qarr in qarrs])
+#     Returns:
+#         JAX array.
+#     """
+#     return jnp.array([qarr.data for qarr in qarrs])
