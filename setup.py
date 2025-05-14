@@ -24,7 +24,9 @@ EXTRA_REQUIREMENTS = {
         "jupyterlab>=3.1.0",
         "mypy",
         "pylint",
-        "black"
+        "black",
+        "coverage",
+        "pytest"
     ],
     "docs": [
         "mkdocs",
