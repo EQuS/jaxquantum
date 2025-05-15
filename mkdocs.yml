@@ -45,6 +45,7 @@ extra:
       link: https://github.com/EQuS/jaxquantum
 plugins:
   - search
+  - mkdocs-jupyter
   - gen-files:
       scripts:
       - docs/gen_ref_pages.py
@@ -61,7 +62,8 @@ nav:
   - Getting started:
     - getting_started/index.md
     - Installation: getting_started/installation.md
-    - Examples: getting_started/examples.md
+    - Qarray: getting_started/qarray.md
+    # - Examples: getting_started/examples.md
     - The Sharp Bits 🔪: getting_started/sharp_bits.md
     - Tests: getting_started/tests.md
   - Tutorials:
