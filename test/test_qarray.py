@@ -25,6 +25,68 @@ def test_version():
     assert high_enough
 # ========================================
 
+# Initialization
+# ========================================
+def test_qarray_creation():
+    a = jqt.Qarray.create(jnp.array([1,2,3]))
+    assert a.shape == (3,1)
+
+    a = jqt.Qarray.create(jnp.array([[1,2,3],[4,5,6]]))
+    assert a.shape == (2,3,1)
+
+    a = jqt.Qarray.create(jnp.array([[1,2,],[4,5]]), bdims=(2,))
+    assert a.shape == (2,2,1)
+
+    a = jqt.Qarray.from_list([])
+    assert a.dims == ((),()) and a.shape == jnp.array([]).shape
+
+# =========================================
+
+# Properties
+# ========================================
+def test_qarray_properties():
+    a = jqt.Qarray.create(jnp.array([[1+1.0j,2,3],[4,5,6]]))
+    assert a.qtype == jqt.Qtypes.ket
+    assert a.dtype == jnp.array([1+1.0j]).dtype
+    assert a.bdims == (2,)
+    assert a.qdims == jqt.basis(3,1).qdims
+
+    a_dag = a.dag()
+    assert a.space_dims == a.dims[0]
+    assert a_dag.space_dims == a_dag.dims[1]
+    
+    # a_bad = a.copy()
+    # a_bad._qdims._qtype = None
+    # with pytest.raises(ValueError): # Doesn't give expected error for some reason...
+    #     print(a_bad.space_dims) 
+    
+    assert jnp.all(a.shaped_data == a.data.reshape(2,3,1))
+
+    assert a.is_batched == True
+    assert a[0] == jqt.Qarray.create(jnp.array([1+1.0j,2,3]))
+    
+    with pytest.raises(ValueError):
+        print(a[0][0])
+
+    a_reshaped = a.reshape_bdims(2,1)
+    assert a_reshaped.shape == (2,1,3,1)
+
+    assert len(a) == 2
+    with pytest.raises(ValueError):
+        print(len(a[0]))
+    
+    with pytest.raises(ValueError):
+        print(a == a.data)
+
+    assert a != a[0]
+    assert a != jqt.Qarray.create(jnp.array([1,2]))
+
+    with pytest.raises(ValueError):
+        print(a/a_dag)
+
+    assert a/3 == 1/3*a
+    
+
 # Basic Math
 # ========================================
 def test_qarray_basic_math_add():
@@ -40,16 +102,16 @@ def test_qarray_basic_math_add():
     arr = jqt.Qarray.from_list([a,b])
 
     # Scalar + Qarray 
-    assert jnp.max(jnp.abs(((scalar+a)._data) - (scalar_id_data + a._data))) < 1e-10
+    assert jnp.max(jnp.abs(((scalar+a).data) - (scalar_id_data + a.data))) < 1e-10
 
     # Qarray + Scalar
-    assert jnp.max(jnp.abs(((a+scalar)._data) - (a._data + scalar_id_data))) < 1e-10
+    assert jnp.max(jnp.abs(((a+scalar).data) - (a.data + scalar_id_data))) < 1e-10
 
     # Scalar + QarrayArray
-    assert jnp.max(jnp.abs(((scalar + arr)._data - (scalar_id_data + arr._data)))) < 1e-10
+    assert jnp.max(jnp.abs(((scalar + arr).data - (scalar_id_data + arr.data)))) < 1e-10
 
     # QarrayArray + Scalar
-    assert jnp.max(jnp.abs(((arr + scalar)._data - (arr._data + scalar_id_data))) < 1e-10)
+    assert jnp.max(jnp.abs(((arr + scalar).data - (arr.data + scalar_id_data))) < 1e-10)
 
 
     tarr = jnp.array([[1,2,3,4],[4,5,6,7.2]])
@@ -57,28 +119,28 @@ def test_qarray_basic_math_add():
     tqarr = jqt.displace(N,tarr)
 
     # Array + Qarray
-    assert jnp.max(jnp.abs((tarr+b)._data - (tarr_id + b._data))) < 1e-10
+    assert jnp.max(jnp.abs((tarr+b).data - (tarr_id + b.data))) < 1e-10
 
     # Qarray + Array
-    assert jnp.max(jnp.abs((a+tarr)._data - (a._data + tarr_id)) < 1e-10)
+    assert jnp.max(jnp.abs((a+tarr).data - (a.data + tarr_id)) < 1e-10)
 
     # QarrayArray + Array 
-    assert jnp.max(jnp.abs((tqarr + tarr)._data - (tqarr._data + tarr_id))) < 1e-10
+    assert jnp.max(jnp.abs((tqarr + tarr).data - (tqarr.data + tarr_id))) < 1e-10
 
     # Array + QarrayArray
-    assert jnp.max(jnp.abs((tarr + tqarr)._data - (tarr_id + tqarr._data))) < 1e-10
+    assert jnp.max(jnp.abs((tarr + tqarr).data - (tarr_id + tqarr.data))) < 1e-10
 
     # QarrayArray + Qarray
-    assert jnp.max(jnp.abs((arr + c)._data - (arr._data + c._data))) < 1e-10
+    assert jnp.max(jnp.abs((arr + c).data - (arr.data + c.data))) < 1e-10
     
     # Qarray + QarrayArray
-    assert jnp.max(jnp.abs((c + arr)._data - (c._data + arr._data))) < 1e-10
+    assert jnp.max(jnp.abs((c + arr).data - (c.data + arr.data))) < 1e-10
 
     # Qarray + Qarray
-    assert jnp.max(jnp.abs((a+b)._data - (a._data + b._data))) < 1e-10
+    assert jnp.max(jnp.abs((a+b).data - (a.data + b.data))) < 1e-10
     
     # QarrayArray + QarrayArray
-    assert jnp.max(jnp.abs((arr + arr)._data - (arr._data + arr._data))) < 1e-10
+    assert jnp.max(jnp.abs((arr + arr).data - (arr.data + arr.data))) < 1e-10
 
     # QarrayArray + QarrayArray (of different size)
     with pytest.raises(TypeError):
@@ -97,16 +159,16 @@ def test_qarray_basic_math_sub():
     arr = jqt.Qarray.from_list([a,b])
 
     # Scalar - Qarray 
-    assert jnp.max(jnp.abs(((scalar-a)._data) - (scalar_id_data - a._data))) < 1e-10
+    assert jnp.max(jnp.abs(((scalar-a).data) - (scalar_id_data - a.data))) < 1e-10
 
     # Qarray - Scalar
-    assert jnp.max(jnp.abs(((a-scalar)._data) - (a._data - scalar_id_data))) < 1e-10
+    assert jnp.max(jnp.abs(((a-scalar).data) - (a.data - scalar_id_data))) < 1e-10
 
     # Scalar - QarrayArray
-    assert jnp.max(jnp.abs((scalar - arr)._data - (scalar_id_data - arr._data))) < 1e-10
+    assert jnp.max(jnp.abs((scalar - arr).data - (scalar_id_data - arr.data))) < 1e-10
 
     # QarrayArray - Scalar
-    assert jnp.max(jnp.abs((arr - scalar)._data - (arr._data - scalar_id_data))) < 1e-10
+    assert jnp.max(jnp.abs((arr - scalar).data - (arr.data - scalar_id_data))) < 1e-10
 
 
     tarr = jnp.array([[1,2,3,4],[4,5,6,7.2]])
@@ -114,28 +176,28 @@ def test_qarray_basic_math_sub():
     tqarr = jqt.displace(N,tarr)
 
     # Array - Qarray
-    assert jnp.max(jnp.abs((tarr - b)._data - (tarr_id - b._data))) < 1e-10
+    assert jnp.max(jnp.abs((tarr - b).data - (tarr_id - b.data))) < 1e-10
 
     # Qarray - Array
-    assert jnp.max(jnp.abs((a-tarr)._data - (a._data - tarr_id))) < 1e-10
+    assert jnp.max(jnp.abs((a-tarr).data - (a.data - tarr_id))) < 1e-10
 
     # QarrayArray - Array 
-    assert jnp.max(jnp.abs((tqarr - tarr)._data - (tqarr._data - tarr_id))) < 1e-10
+    assert jnp.max(jnp.abs((tqarr - tarr).data - (tqarr.data - tarr_id))) < 1e-10
 
     # Array - QarrayArray
-    assert jnp.max(jnp.abs((tarr - tqarr)._data - (tarr_id - tqarr._data))) < 1e-10
+    assert jnp.max(jnp.abs((tarr - tqarr).data - (tarr_id - tqarr.data))) < 1e-10
 
     # QarrayArray - Qarray
-    assert jnp.max(jnp.abs((arr - c)._data - (arr._data - c._data))) < 1e-10
+    assert jnp.max(jnp.abs((arr - c).data - (arr.data - c.data))) < 1e-10
     
     # Qarray - QarrayArray
-    assert jnp.max(jnp.abs((c - arr)._data - (c._data - arr._data))) < 1e-10
+    assert jnp.max(jnp.abs((c - arr).data - (c.data - arr.data))) < 1e-10
 
     # Qarray - Qarray
-    assert jnp.max(jnp.abs((a-b)._data - (a._data - b._data))) < 1e-10
+    assert jnp.max(jnp.abs((a-b).data - (a.data - b.data))) < 1e-10
 
     # QarrayArray - QarrayArray
-    assert jnp.max(jnp.abs((arr - arr)._data - (arr._data - arr._data))) < 1e-10
+    assert jnp.max(jnp.abs((arr - arr).data - (arr.data - arr.data))) < 1e-10
 
     # QarrayArray - QarrayArray (of different size)
     with pytest.raises(TypeError):
@@ -154,16 +216,16 @@ def test_qarray_basic_math_mul():
     arr = jqt.Qarray.from_list([a,b])
 
     # Scalar * Qarray 
-    assert jnp.max(jnp.abs(((scalar*a)._data) - (scalar * a._data))) < 1e-10
+    assert jnp.max(jnp.abs(((scalar*a).data) - (scalar * a.data))) < 1e-10
 
     # Qarray * Scalar
-    assert jnp.max(jnp.abs(((a*scalar)._data) - (a._data * scalar))) < 1e-10
+    assert jnp.max(jnp.abs(((a*scalar).data) - (a.data * scalar))) < 1e-10
 
     # Scalar * QarrayArray
-    assert jnp.max(jnp.abs((scalar * arr)._data - (scalar * arr._data))) < 1e-10
+    assert jnp.max(jnp.abs((scalar * arr).data - (scalar * arr.data))) < 1e-10
 
     # QarrayArray * Scalar
-    assert jnp.max(jnp.abs((arr * scalar)._data - (arr._data * scalar))) < 1e-10
+    assert jnp.max(jnp.abs((arr * scalar).data - (arr.data * scalar))) < 1e-10
 
     # ----
 
@@ -172,30 +234,30 @@ def test_qarray_basic_math_mul():
     tqarr = jqt.displace(N,tarr)
 
     # Array * Qarray
-    assert jnp.max(jnp.abs((tarr * b)._data - (tarr_expanded * b._data))) < 1e-10
+    assert jnp.max(jnp.abs((tarr * b).data - (tarr_expanded * b.data))) < 1e-10
 
     # Qarray * Array
-    assert jnp.max(jnp.abs((a * tarr)._data - (a._data * tarr_expanded))) < 1e-10
+    assert jnp.max(jnp.abs((a * tarr).data - (a.data * tarr_expanded))) < 1e-10
 
     # QarrayArray * Array 
-    assert jnp.max(jnp.abs((tqarr * tarr)._data - (tqarr._data * tarr_expanded))) < 1e-10
+    assert jnp.max(jnp.abs((tqarr * tarr).data - (tqarr.data * tarr_expanded))) < 1e-10
 
     # Array * QarrayArray
-    assert jnp.max(jnp.abs((tarr * tqarr)._data - (tarr_expanded * tqarr._data))) < 1e-10
+    assert jnp.max(jnp.abs((tarr * tqarr).data - (tarr_expanded * tqarr.data))) < 1e-10
 
     # ----
 
     # QarrayArray * Qarray
-    assert jnp.max(jnp.abs((arr * c)._data - (arr._data @ c._data))) < 1e-10
+    assert jnp.max(jnp.abs((arr * c).data - (arr.data @ c.data))) < 1e-10
     
     # Qarray * QarrayArray
-    assert jnp.max(jnp.abs((c * arr)._data - (c._data @ arr._data))) < 1e-10
+    assert jnp.max(jnp.abs((c * arr).data - (c.data @ arr.data))) < 1e-10
 
     # Qarray * Qarray
-    assert jnp.max(jnp.abs((a * b)._data - (a._data @ b._data))) < 1e-10
+    assert jnp.max(jnp.abs((a * b).data - (a.data @ b.data))) < 1e-10
 
     # QarrayArray * QarrayArray
-    assert jnp.max(jnp.abs((arr * arr)._data - jnp.einsum('nij,njk->nik', arr._data, arr._data))) < 1e-10
+    assert jnp.max(jnp.abs((arr * arr).data - jnp.einsum('nij,njk->nik', arr.data, arr.data))) < 1e-10
 
     # QarrayArray * QarrayArray (of different size)
     with pytest.raises(ValueError):
@@ -222,31 +284,31 @@ def test_qarray_basic_math_matmul():
     # Qarray @ Array
     with pytest.raises(TypeError):
         a @ tarr
-    # assert jnp.max(jnp.abs((a @ b._data)._data - (a._data @ b._data))) < 1e-10
+    # assert jnp.max(jnp.abs((a @ b.data).data - (a.data @ b.data))) < 1e-10
 
     # QarrayArray @ Array 
     with pytest.raises(TypeError):
         tqarr @ tarr
-    # assert jnp.max(jnp.abs((tqarr @ tarr)._data - (tqarr._data @ c._data))) < 1e-10
+    # assert jnp.max(jnp.abs((tqarr @ tarr).data - (tqarr.data @ c.data))) < 1e-10
 
     # Array @ QarrayArray
     with pytest.raises(TypeError):
         tarr @ tqarr
-    # assert jnp.max(jnp.abs((tarr @ tqarr)._data - (c._data @ tqarr._data))) < 1e-10
+    # assert jnp.max(jnp.abs((tarr @ tqarr).data - (c.data @ tqarr.data))) < 1e-10
 
     # ----
 
     # QarrayArray @ Qarray
-    assert jnp.max(jnp.abs((arr @ c)._data - (arr._data @ c._data))) < 1e-10
+    assert jnp.max(jnp.abs((arr @ c).data - (arr.data @ c.data))) < 1e-10
     
     # Qarray @ QarrayArray
-    assert jnp.max(jnp.abs((c @ arr)._data - (c._data @ arr._data))) < 1e-10
+    assert jnp.max(jnp.abs((c @ arr).data - (c.data @ arr.data))) < 1e-10
 
     # Qarray @ Qarray
-    assert jnp.max(jnp.abs((a @ b)._data - (a._data @ b._data))) < 1e-10
+    assert jnp.max(jnp.abs((a @ b).data - (a.data @ b.data))) < 1e-10
 
     # QarrayArray @ QarrayArray
-    assert jnp.max(jnp.abs((arr @ arr)._data - jnp.einsum('nij,njk->nik', arr._data, arr._data))) < 1e-10
+    assert jnp.max(jnp.abs((arr @ arr).data - jnp.einsum('nij,njk->nik', arr.data, arr.data))) < 1e-10
 
     # QarrayArray @ QarrayArray (of different size)
     with pytest.raises(ValueError):
@@ -267,52 +329,51 @@ def test_qarray_basic_math_tensor():
     # Array ^ Qarray
     with pytest.raises(TypeError):
         tarr ^ b
-    # assert jnp.max(jnp.abs((a._data ^ b)._data - (jnp.kron(a._data,b._data)))) < 1e-10
+    # assert jnp.max(jnp.abs((a.data ^ b).data - (jnp.kron(a.data,b.data)))) < 1e-10
 
     # Qarray ^ Array
     with pytest.raises(TypeError):
         a ^ tarr
-    # assert jnp.max(jnp.abs((a ^ b._data)._data - (jnp.kron(a._data,b._data))) < 1e-10)
+    # assert jnp.max(jnp.abs((a ^ b.data).data - (jnp.kron(a.data,b.data))) < 1e-10)
 
     # Array ^ QarrayArray
     with pytest.raises(TypeError):
         tarr ^ tqarr
-    # assert jnp.max(jnp.abs((a._data ^ arr)._data - (jnp.kron(a._data,arr._data))) < 1e-10)
+    # assert jnp.max(jnp.abs((a.data ^ arr).data - (jnp.kron(a.data,arr.data))) < 1e-10)
         
     # QarrayArray ^ Array
     with pytest.raises(TypeError):
         tqarr ^ tarr
-    # assert jnp.max(jnp.abs((arr ^ b._data)._data - (jnp.kron(arr._data,b._data))) < 1e-10)
+    # assert jnp.max(jnp.abs((arr ^ b.data).data - (jnp.kron(arr.data,b.data))) < 1e-10)
 
     # ----
 
     # QarrayArray ^ Qarray
-    assert jnp.max(jnp.abs((arr ^ b)._data - (jnp.kron(arr._data,b._data))) < 1e-10)
+    assert jnp.max(jnp.abs((arr ^ b).data - (jnp.kron(arr.data,b.data))) < 1e-10)
 
     # Qarray ^ QarrayArray
-    assert jnp.max(jnp.abs((a ^ arr)._data - (jnp.kron(a._data,arr._data))) < 1e-10)
+    assert jnp.max(jnp.abs((a ^ arr).data - (jnp.kron(a.data,arr.data))) < 1e-10)
 
     # Qarray ^ Qarray
-    assert jnp.max(jnp.abs((a ^ b)._data - (jnp.kron(a._data,b._data))) < 1e-10)
+    assert jnp.max(jnp.abs((a ^ b).data - (jnp.kron(a.data,b.data))) < 1e-10)
 
     # QarrayArray ^ QarrayArray
-    assert jnp.max(jnp.abs((jqt.tensor(arr,arr,parallel=True))._data - jnp.einsum("nij,nkl->nijkl", arr._data, arr._data).reshape(
-                arr._data.shape[0],
-                arr._data.shape[1] * arr._data.shape[1],
+    assert jnp.max(jnp.abs((jqt.tensor(arr,arr,parallel=True)).data - jnp.einsum("nij,nkl->nijkl", arr.data, arr.data).reshape(
+                arr.data.shape[0],
+                arr.data.shape[1] * arr.data.shape[1],
                 -1
             )) < 1e-10)
 
     # QarrayArray ^ QarrayArray (of different size)
-    assert  jnp.max(jnp.abs((jqt.Qarray.from_list([a,b]) ^ jqt.Qarray.from_list([a,b,b]))._data - 
-        jqt.Qarray.from_list([a^a, a^b, a^b, b^a, b^b, b^b])._data)) < 1e-10
+    assert  jnp.max(jnp.abs((jqt.Qarray.from_list([a,b]) ^ jqt.Qarray.from_list([a,b,b])).data - 
+        jqt.Qarray.from_list([a^a, a^b, a^b, b^a, b^b, b^b]).data)) < 1e-10
 
     # QarrayArray ^ QarrayArray (of different size)
     arr1 = jqt.Qarray.from_list([a,b])
     arr2 = jqt.Qarray.from_list([a,b,b])
-    assert jnp.max(jnp.abs((arr1^arr2)._data - (
-        jnp.kron(arr1._data, arr2._data)
+    assert jnp.max(jnp.abs((arr1^arr2).data - (
+        jnp.kron(arr1.data, arr2.data)
     ))) < 1e-10
-
 
 def test_qarray_basic_math_pow():
     a = jqt.displace(3,1.0)
@@ -326,10 +387,12 @@ def test_qarray_basic_math_pow():
     # ----
     # Qarray ** scalar
 
-    assert jnp.max(jnp.abs((a ** scalar)._data - jnp.linalg.matrix_power(a._data, scalar))) < 1e-10
+    assert jnp.max(jnp.abs((a ** scalar).data - jnp.linalg.matrix_power(a.data, scalar))) < 1e-10
 
     # QarrayArray ** scalar
-    assert jnp.max(jnp.abs((arr ** scalar)._data - jnp.linalg.matrix_power(arr._data, scalar))) < 1e-10
-    assert jnp.max(jnp.abs((arr ** scalar)._data - jqt.Qarray.from_list([a**scalar, b**scalar])._data)) < 1e-10
+    assert jnp.max(jnp.abs((arr ** scalar).data - jnp.linalg.matrix_power(arr.data, scalar))) < 1e-10
+    assert jnp.max(jnp.abs((arr ** scalar).data - jqt.Qarray.from_list([a**scalar, b**scalar]).data)) < 1e-10
 
 # ========================================
+
+# Properties

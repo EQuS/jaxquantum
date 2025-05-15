@@ -22,29 +22,6 @@ from jaxquantum.core.dims import Qtypes, Qdims, check_dims, isket_dims, isbra_di
 
 config.update("jax_enable_x64", True)
 
-# def _ensure_equal_type(method):
-#     """
-#     Function decorator for Qarray method to ensure both operands are Qarray and
-#     of the same type and dimensions. Promotes numeric scalar a to a*I, where I 
-#     is the identity matrix of the same type and dims.
-#     """
-#     @functools.wraps(method)
-#     def out(self, other):
-#         if isinstance(other, Qarray):
-#             if self.dims != other.dims:
-#                 msg = (
-#                     "Dimensions are incompatible: "
-#                     + repr(self.dims) + " and " + repr(other.dims)
-#                 )
-#                 raise ValueError(msg)
-#             return method(self, other)
-#         if (self.data.shape[0] == self.data.shape[1]):
-#             scalar = other + 0.0j
-#             other = Qarray.create(jnp.eye(self.data.shape[0], dtype=self.data.dtype) * scalar, dims=self.dims)
-#             return method(self, other)
-#         return NotImplemented
-#     return out
-
 def tidy_up(data, atol):
     data_re = jnp.real(data)
     data_im = jnp.imag(data)
@@ -75,7 +52,7 @@ class Qarray:
             if data.shape[-2] != data.shape[-1] and not (data.shape[-2] == 1 or data.shape[-1] == 1):
                 data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
 
-        if dims is not None and bdims is not None:
+        if bdims is not None:
             if len(data.shape) - len(bdims) == 1:
                 data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
         # ----
@@ -147,6 +124,7 @@ class Qarray:
         elif self.qtype == Qtypes.bra:
             return self.dims[1]
         else:
+            # TODO: not reached for some reason
             raise ValueError("Unsupported qtype.")
         
     @property
@@ -190,6 +168,21 @@ class Qarray:
         else:
             raise ValueError("Cannot get length of a non-batched Qarray.")
 
+
+    def __eq__(self, other):
+        if not isinstance(other, Qarray):
+            raise ValueError("Cannot calculate equality of a Qarray with a non-Qarray.")
+
+        if self.dims != other.dims:
+            return False
+
+        if self.bdims != other.bdims:
+            return False
+
+        return jnp.all(self.data == other.data)
+    
+    def __ne__(self, other):
+        return not self.__eq__(other)
     # ----
 
 
@@ -203,15 +196,16 @@ class Qarray:
             dims=_qdims_new.dims,
         )
     
-    def __rmatmul__(self, other):        
-        if not isinstance(other, Qarray):
-            return NotImplemented
+    # NOTE: not possible to reach this.
+    # def __rmatmul__(self, other):        
+    #     if not isinstance(other, Qarray):
+    #         return NotImplemented
 
-        _qdims_new = other._qdims @ self._qdims
-        return Qarray.create(
-            other.data @ self.data,
-            dims=_qdims_new.dims,
-        )
+    #     _qdims_new = other._qdims @ self._qdims
+    #     return Qarray.create(
+    #         other.data @ self.data,
+    #         dims=_qdims_new.dims,
+    #     )
         
     
     def __mul__(self, other):
@@ -229,8 +223,10 @@ class Qarray:
         )
 
     def __rmul__(self, other):
-        if isinstance(other, Qarray):
-            return self.__rmatmul__(other)
+        
+        # NOTE: not possible to reach this.
+        # if isinstance(other, Qarray):
+        #     return self.__rmatmul__(other)
         
         return self.__mul__(other)
 
@@ -241,7 +237,7 @@ class Qarray:
         """ For Qarray's, this only really makes sense in the context of division by a scalar. """
 
         if isinstance(other, Qarray):
-            return NotImplemented
+            raise ValueError("Cannot divide a Qarray by another Qarray.")
 
         return self.__mul__(1/other)
     
@@ -760,6 +756,10 @@ def dag_data(arr: Array) -> Array:
     Returns:
         conjugate of op, and transposes last two axes
     """
+    # TODO: revisit this case...
+    if len(arr.shape) == 1:
+        return jnp.conj(arr)
+        
     return jnp.moveaxis(
         jnp.conj(arr), -1, -2
     )  # transposes last two axes, good for batching

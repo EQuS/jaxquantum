@@ -64,10 +64,10 @@ class Qdims:
         return self.__str__()
 
     def __eq__(self, other):
-        return self.dims == other.dims
+        return (self.dims == other.dims) and (self.qtype == other.qtype)
 
     def __ne__(self, other):
-        return self.dims != other.dims
+        return (self.dims != other.dims) or (self.qtype != other.qtype)
 
     def __hash__(self):
         return hash(self.dims)

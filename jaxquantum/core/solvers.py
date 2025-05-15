@@ -35,40 +35,11 @@ class SolverOptions:
         return cls(progress_meter, solver, max_steps)
 
 
-# def calc_expect(op: Qarray, states: Qarray) -> Array:
-#     """Calculate expectation value of an operator given a list of states.
+# Vestigial Functions ----
+def calc_expect(op: Qarray, states: Qarray) -> Array:
+    return overlap(op, states)
 
-#     Args:
-#         op: operator
-#         states: list of states
-
-#     Returns:
-#         list of expectation values
-#     """
-
-#     op = op.data
-#     is_dm = states[0].is_dm()
-#     states = jqts2jnps(states)
-
-#     # def calc_expect_ket_single(state: Array):
-#     #     return (jnp.conj(state).T @ op @ state)[0][0]
-
-#     # def calc_expect_dm_single(state: Array):
-#     #     return jnp.trace(op @ state)
-
-#     # if is_dm:
-#     #     return vmap(calc_expect_dm_single)(states)
-#     # else:
-#     #     return vmap(calc_expect_ket_single)(states)
-
-#     return overlap(op, states)
-        
-
-# ----
-
-# ----
-
-def spre(op: Array) -> Callable[[Array], Array]:
+def spre(op: Qarray) -> Callable[[Qarray], Qarray]:
     """Superoperator generator.
 
     Args:
@@ -77,10 +48,11 @@ def spre(op: Array) -> Callable[[Array], Array]:
     Returns:
         superoperator function
     """
-    op_dag = op.conj().T
+    op_dag = op.dag()
     return lambda rho: 0.5 * (
         2 * op @ rho @ op_dag - rho @ op_dag @ op - op_dag @ op @ rho
     )
+# ---
 
 
 class CustomProgressMeter(TqdmProgressMeter):
@@ -135,11 +107,11 @@ def mesolve(
     tlist: Array,
     c_ops: Optional[Qarray] = None,
     solver_options: Optional[SolverOptions] = None
-):
+) -> Qarray:
     """Quantum Master Equation solver.
 
     Args:
-        Ht: time dependent Hamiltonian function or time-independent Qarray.
+        H: time dependent Hamiltonian function or time-independent Qarray.
         rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
         tlist: time list
         c_ops: qarray list of collapse operators
@@ -170,7 +142,7 @@ def mesolve(
     else:
         Ht_data = lambda t: H(t).data if H is not None else None
     
-    ys = mesolve_data(Ht_data, ρ0, tlist, c_ops, solver_options)
+    ys = mesolve_data(Ht_data, ρ0, tlist, c_ops, solver_options=solver_options)
 
     return jnp2jqt(ys, dims=dims)
 
@@ -181,15 +153,14 @@ def mesolve_data(
     tlist: Array,
     c_ops: Optional[Qarray] = None,
     solver_options: Optional[SolverOptions] = None
-):
+) -> Array:
     """Quantum Master Equation solver.
 
     Args:
-        ρ0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
-        t_list: time list
-        c_ops: list of collapse operators
-        H0: time independent Hamiltonian. If H0 is not None, it will override Ht.
-        Ht: time dependent Hamiltonian function.
+        H: time dependent Hamiltonian function or time-independent Array.
+        rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
+        tlist: time list
+        c_ops: qarray list of collapse operators
         solver_options: SolverOptions with solver options
 
     Returns:
@@ -239,24 +210,24 @@ def mesolve_data(
     return sol.ys
 
 def sesolve(
-    ψ: Qarray,
-    t_list: Array,
-    H0: Optional[Qarray] = None,
-    Ht: Optional[Callable[[float], Qarray]] = None,
-    solver_options: Optional[SolverOptions] = None,
-):
+    H: Union[Qarray, Callable[[float], Qarray]],
+    rho0: Qarray,
+    tlist: Array,
+    solver_options: Optional[SolverOptions] = None
+) -> Qarray:
     """Schrödinger Equation solver.
 
     Args:
-        ψ: initial statevector
-        t_list: time list
-        H0: time independent Hamiltonian. If H0 is not None, it will override Ht.
-        Ht: time dependent Hamiltonian function.
+        H: time dependent Hamiltonian function or time-independent Qarray.
+        rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
+        tlist: time list
         solver_options: SolverOptions with solver options
 
     Returns:
         list of states
     """
+
+    ψ = rho0
 
     if ψ.qtype == Qtypes.oper:
         raise ValueError(
@@ -264,60 +235,54 @@ def sesolve(
         )
     
     ψ = ψ.to_ket()
-
     dims = ψ.dims
-
     ψ = ψ.data 
-    H0 = H0.data if H0 is not None else None
-    Ht_data = lambda t: Ht(t).data if Ht is not None else None
+
+    if isinstance(H, Qarray):
+        Ht_data = lambda t: H.data
+    else:
+        Ht_data = lambda t: H(t).data if H is not None else None
     
-    ys = sesolve_data(ψ, t_list, H0, Ht_data, solver_options)
+    ys = sesolve_data(Ht_data, ψ, tlist, solver_options=solver_options)
 
     return jnp2jqt(ys, dims=dims)
 
 def sesolve_data(
-    ψ: Array,
-    t_list: Array,
-    H0: Optional[Array] = None,
-    Ht: Optional[Callable[[float], Array]] = None,
-    solver_options: Optional[SolverOptions] = None,
+    H: Callable[[float], Array],
+    rho0: Array,
+    tlist: Array,
+    solver_options: Optional[SolverOptions] = None
 ):
     """Schrödinger Equation solver.
 
     Args:
-        ψ: initial statevector
-        t_list: time list
-        H0: time independent Hamiltonian. If H0 is not None, it will override Ht.
-        Ht: time dependent Hamiltonian function.
+        H: time dependent Hamiltonian function or time-independent Array.
+        rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
+        tlist: time list
         solver_options: SolverOptions with solver options
 
     Returns:
         list of states
     """
     
+    ψ = rho0
     ψ = ψ + 0.0j
-    H0 = H0 + 0.0j if H0 is not None else None
-    solver_options = solver_options or {}
 
     def f(
         t: float,
         ψₜ: Array,
-        args: Array,
+        _
     ):
-        H0_val = args[0]
 
-        if H0_val is not None:
-            H = H0_val  # use H0 if given
-        else:
-            H = Ht(t)  # type: ignore
-        # print("H", H.shape)
-        # print("psit", ψₜ.shape)
-        ψₜ_dot = -1j * (H @ ψₜ)
+        H_val = H(t)  # type: ignore
+        H_val = H_val + 0.0j
+        
+        ψₜ_dot = -1j * (H_val @ ψₜ)
 
         return ψₜ_dot
 
 
-    sol = solve(ψ, f, t_list, [H0], solver_options=solver_options)
+    sol = solve(f, ψ, tlist, None, solver_options=solver_options)
     return sol.ys
 
 # ----
