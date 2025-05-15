@@ -81,7 +81,7 @@ class Qarray:
     # ----
 
     @classmethod
-    def from_list(cls, qarr_list: List[Qarray]):
+    def from_list(cls, qarr_list: List[Qarray]) -> Qarray:
         """ Create a Qarray from a list of Qarrays. """
         
         data = jnp.array([qarr.data for qarr in qarr_list])
@@ -94,6 +94,47 @@ class Qarray:
         bdims = (len(qarr_list),)
 
         return cls.create(data, dims=dims, bdims=bdims)
+
+    @classmethod
+    def from_array(cls, qarr_arr) -> Qarray:
+        """ Create a Qarray from a nested list of Qarrays. 
+        
+        Args:
+            qarr_arr (list): nested list of Qarrays
+        
+        Returns:
+            Qarray: Qarray object
+        """
+        if isinstance(qarr_arr, Qarray):
+            return qarr_arr
+
+        bdims = ()
+        lvl = qarr_arr
+        while not isinstance(lvl, Qarray):
+            bdims = bdims + (len(lvl),)
+            if len(lvl) > 0:
+                lvl = lvl[0]
+            else:
+                break
+        
+        depth = len(bdims)
+
+        def flat(lis):
+            flatList = []
+            # Iterate with outer list
+            for element in lis:
+                if type(element) is list:
+                    # Check if type is list than iterate through the sublist
+                    for item in element:
+                        flatList.append(item)
+                else:
+                    flatList.append(element)
+            return flatList
+
+        qarr_list = flat(qarr_arr)
+        qarr = cls.from_list(qarr_list)
+        qarr = qarr.reshape_bdims(*bdims)
+        return qarr
 
 
     # Properties ----
@@ -155,10 +196,15 @@ class Qarray:
     def reshape_bdims(self, *args):
         """ Reshape the batch dimensions of the Qarray. """
         new_bdims = tuple(args)
-        new_shape = new_bdims + self.dims[0] + self.dims[1]
+
+        if prod(new_bdims) == 0:
+            new_shape = new_bdims 
+        else:
+            new_shape = new_bdims + self.dims[0] + self.dims[1]
         return Qarray.create(
             self.data.reshape(new_shape),
-            dims=self.dims
+            dims=self.dims,
+            bdims=new_bdims,
         )
 
     def __len__(self):
@@ -321,7 +367,12 @@ class Qarray:
 
     def __str__(self):
         return self._str_header() + "\nQarray data =\n" + str(self.data)
-    
+        
+    @property
+    def header(self):
+        """ Print the header of the Qarray. """
+        return self._str_header()
+
     def __repr__(self):
         return self.__str__()
     
