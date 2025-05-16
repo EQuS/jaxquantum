@@ -292,76 +292,76 @@ def sesolve_data(
 # ----
 
 
-def propagator(
-    H: Union[Qarray, Callable[[float], Qarray]],
-    t: Union[float, Array],
-    solver_options=None
-):
-    """ Generate the propagator for a time dependent Hamiltonian. 
+# def propagator(
+#     H: Union[Qarray, Callable[[float], Qarray]],
+#     t: Union[float, Array],
+#     solver_options=None
+# ):
+#     """ Generate the propagator for a time dependent Hamiltonian. 
 
-    Args:
-        H (Qarray or callable): 
-            A Qarray static Hamiltonian OR
-            a function that takes a time argument and returns a Hamiltonian. 
-        ts (float or Array): 
-            A single time point or
-            an Array of time points.
+#     Args:
+#         H (Qarray or callable): 
+#             A Qarray static Hamiltonian OR
+#             a function that takes a time argument and returns a Hamiltonian. 
+#         ts (float or Array): 
+#             A single time point or
+#             an Array of time points.
         
-    Returns:
-        Qarray or List[Qarray]: 
-            The propagator for the Hamiltonian at time t.
-            OR a list of propagators for the Hamiltonian at each time in t.
+#     Returns:
+#         Qarray or List[Qarray]: 
+#             The propagator for the Hamiltonian at time t.
+#             OR a list of propagators for the Hamiltonian at each time in t.
 
-    """
+#     """
 
-    t_is_scalar = robust_isscalar(t)
+#     t_is_scalar = robust_isscalar(t)
 
-    if isinstance(H, Qarray):
-        dims = H.dims 
-        if t_is_scalar:
-            if t == 0:
-                return identity_like(H)
+#     if isinstance(H, Qarray):
+#         dims = H.dims 
+#         if t_is_scalar:
+#             if t == 0:
+#                 return identity_like(H)
 
-            return jnp2jqt(propagator_0_data(H.data,t), dims=dims)
-        else:
-            f = lambda t: propagator_0_data(H.data,t)
-            return jnp2jqt(vmap(f)(t), dims)
-    else:
-        dims = H(0.0).dims
-        H_data = lambda t: H(t).data
-        if t_is_scalar:
-            if t == 0:
-                return identity_like(H(0.0))
+#             return jnp2jqt(propagator_0_data(H.data,t), dims=dims)
+#         else:
+#             f = lambda t: propagator_0_data(H.data,t)
+#             return jnp2jqt(vmap(f)(t), dims)
+#     else:
+#         dims = H(0.0).dims
+#         H_data = lambda t: H(t).data
+#         if t_is_scalar:
+#             if t == 0:
+#                 return identity_like(H(0.0))
 
-            ts = jnp.linspace(0,t,2)
-            return jnp2jqt(
-                propagator_t_data(H_data, ts, solver_options=solver_options)[1],
-                dims=dims
-            )
-        else:
-            ts = t 
-            U_props = propagator_t_data(H_data, ts, solver_options=solver_options)
-            return jnp2jqt(U_props, dims)
+#             ts = jnp.linspace(0,t,2)
+#             return jnp2jqt(
+#                 propagator_t_data(H_data, ts, solver_options=solver_options)[1],
+#                 dims=dims
+#             )
+#         else:
+#             ts = t 
+#             U_props = propagator_t_data(H_data, ts, solver_options=solver_options)
+#             return jnp2jqt(U_props, dims)
 
-def propagator_0_data(
-    H0: Array,
-    t: float
-):
-    """ Generate the propagator for a time independent Hamiltonian. 
+# def propagator_0_data(
+#     H0: Array,
+#     t: float
+# ):
+#     """ Generate the propagator for a time independent Hamiltonian. 
 
-    Args:
-        H0 (Qarray): The Hamiltonian.
+#     Args:
+#         H0 (Qarray): The Hamiltonian.
 
-    Returns:
-        Qarray: The propagator for the time independent Hamiltonian.
-    """
-    return jsp.linalg.expm(-1j * H0 * t)
+#     Returns:
+#         Qarray: The propagator for the time independent Hamiltonian.
+#     """
+#     return jsp.linalg.expm(-1j * H0 * t)
 
-def propagator_t_data(
-    Ht: Callable[[float], Array],
-    ts: Array, 
-    solver_options=None
-):
+# def propagator_t_data(
+#     Ht: Callable[[float], Array],
+#     ts: Array, 
+#     solver_options=None
+# ):
     """ Generate the propagator for a time dependent Hamiltonian. 
 
     Args:

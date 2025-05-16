@@ -1,4 +1,4 @@
-# /Users/phionx/Github/qc/EQuS/bosonic/jax/jaxquantum/test_example.py
+#%%
 
 import pytest
 
@@ -12,6 +12,8 @@ import jaxquantum as jqt
 import jax.numpy as jnp
 
 minimum_version_for_tests = "0.2.0"
+
+#%%
 
 # Version
 # ========================================
@@ -395,4 +397,46 @@ def test_qarray_basic_math_pow():
 
 # ========================================
 
-# Properties
+
+# Advanced Math
+# ========================================
+def test_eigh():
+    a = jqt.create(4)
+    a_dag = a.dag()
+
+    omega = jnp.array([[1.2, 3.4,5.6],[7.8, 9.10, 11.12]])
+
+    H = omega * a_dag @ a
+
+    evals, evecs = jqt.eigenstates(H)
+
+    assert evecs.shape == (2,3,4,4,1)
+    assert evals[0,1,1] == 3.4
+
+
+
+# =========================================
+
+
+
+# Dims
+# ========================================
+def test_dims():
+    a = jqt.displace(3,1.0)
+
+    assert str(a.qdims) == str(a.qdims.dims)
+    assert a.qdims.__repr__() == str(a.qdims)
+
+    b = jqt.displace(4,1.0)
+    assert a.qdims != b.qdims
+
+    c = {}
+    c[a.qdims] = "test"
+
+    with pytest.raises(TypeError):
+        a @ b
+
+
+# def test_qtypes():
+
+# =========================================

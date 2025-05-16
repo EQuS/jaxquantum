@@ -30,7 +30,7 @@ def qt2jqt(qt_obj, dtype=jnp.complex128):
     """
     if isinstance(qt_obj, Qarray) or qt_obj is None:
         return qt_obj
-    return Qarray.create(jnp.array(qt_obj, dtype=dtype), dims=qt_obj.dims)
+    return Qarray.create(jnp.array(qt_obj.full(), dtype=dtype), dims=qt_obj.dims)
 
 
 def jqt2qt(jqt_obj):
@@ -46,8 +46,12 @@ def jqt2qt(jqt_obj):
     if isinstance(jqt_obj, Qobj) or jqt_obj is None:
         return jqt_obj
     
+    
     if jqt_obj.is_batched:
-        raise NotImplementedError("Batched Qarray to QuTiP conversion not implemented.")
+        res = []
+        for i in range(len(jqt_obj)):
+            res.append(jqt2qt(jqt_obj[i]))
+        return res
     
     dims = [list(jqt_obj.dims[0]), list(jqt_obj.dims[1])]
     return Qobj(np.array(jqt_obj.data), dims=dims)
