@@ -45,6 +45,8 @@ extra:
       link: https://github.com/EQuS/jaxquantum
 plugins:
   - search
+  - mkdocs-jupyter:
+      execute: true
   - gen-files:
       scripts:
       - docs/gen_ref_pages.py
@@ -55,18 +57,23 @@ plugins:
       watch:
       - docs
       - jaxquantum
-
+markdown_extensions:
+  - toc
 nav:
-  - About: index.md
-  - Getting started:
-    - getting_started/index.md
-    - Installation: getting_started/installation.md
-    - Examples: getting_started/examples.md
-    - The Sharp Bits 🔪: getting_started/sharp_bits.md
-    - Tests: getting_started/tests.md
-  - Tutorials:
-    - tutorials/index.md
-  - Advanced Concepts:
-    - advanced/index.md
-    - Excitation Number Restricted Basis: advanced/enr.md
+  - About: 
+    - index.md
+    - Community: about/community.md
+    - Contributors: about/contributors.md
+    - Citation: about/citation.md
+  - Documentation:
+    - documentation/index.md
+    - Getting started:
+      - Installation: documentation/getting_started/installation.md
+      - Qarray: documentation/getting_started/qarray.ipynb
+      # - Examples: getting_started/examples.md
+      - The Sharp Bits 🔪: documentation/getting_started/sharp_bits.md
+    - Tutorials:
+      - Bosonic Codes: documentation/tutorials/bosonic_codes.md
+    - Advanced Concepts:
+      - Excitation Number Restricted Basis: documentation/advanced/enr.md
   - Code Reference: reference/

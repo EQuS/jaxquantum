@@ -75,6 +75,9 @@ def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", pl
         cbar = plt.colorbar(im, ax=ax, orientation="vertical")
         cbar.ax.set_title(cbar_label)
 
+    ax.set_xlabel(r"Re[$\alpha$]")
+    ax.set_ylabel(r"Im[$\alpha$]")
+
     fig = ax.get_figure()
     fig.tight_layout()
     return ax, im

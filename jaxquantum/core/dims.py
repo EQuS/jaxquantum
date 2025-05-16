@@ -1,6 +1,6 @@
 """ dims. """
 
-from typing import List
+from typing import List, Tuple
 from copy import deepcopy
 from math import prod
 from jax import Array
@@ -20,16 +20,25 @@ def isop_dims(dims: DIMS_TYPE) -> bool:
     return prod(dims[1]) == prod(dims[0])
 
 def ket_from_op_dims(dims: DIMS_TYPE) -> DIMS_TYPE:
-    return [dims[0], [1 for _ in dims[1]]]
+    return (dims[0], tuple([1 for _ in dims[1]]))
 
 
-def check_dims(dims: Array, data_shape: Array) -> bool:
+def check_dims(dims: Tuple[Tuple[int]], bdims: Tuple[int], data_shape: Array) -> bool:
+    
+    if len(data_shape) == 1 and data_shape[0] == 0:
+        # E.g. empty list of operators
+        assert bdims == (0,)
+        assert dims == ((),())
+        return 
+
+    assert bdims == data_shape[:-2], "Data shape should be consistent with dimensions."
     assert data_shape[-2] == prod(dims[0]), "Data shape should be consistent with dimensions."
     assert data_shape[-1] == prod(dims[1]), "Data shape should be consistent with dimensions."
 
 class Qdims:
     def __init__(self, dims):
         self._dims = deepcopy(dims)
+        self._dims = (tuple(self._dims[0]), tuple(self._dims[1]))
         self._qtype = Qtypes.from_dims(self._dims)
 
     @property
@@ -55,10 +64,10 @@ class Qdims:
         return self.__str__()
 
     def __eq__(self, other):
-        return self.dims == other.dims
+        return (self.dims == other.dims) and (self.qtype == other.qtype)
 
     def __ne__(self, other):
-        return self.dims != other.dims
+        return (self.dims != other.dims) or (self.qtype != other.qtype)
 
     def __hash__(self):
         return hash(self.dims)

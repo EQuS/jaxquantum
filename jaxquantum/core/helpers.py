@@ -39,13 +39,13 @@ def overlap(A: Qarray, B: Qarray) -> complex:
     # A.qtype
 
     if isvec(A) and isvec(B):
-        return ((A.to_ket().dag() @ B.to_ket()).trace()).abs()**2
+        return jnp.abs(((A.to_ket().dag() @ B.to_ket()).trace()))**2
     elif isvec(A):
         A = A.to_ket()
-        return (A.dag() @ B @ A).data[0, 0]
+        res = (A.dag() @ B @ A).data
+        return res.squeeze(-1).squeeze(-1)
     elif isvec(B):
-        B = B.to_ket()
-        return (B.dag() @ A @ B).data[0, 0]
+        return overlap(B, A)
     else:
         return (A.dag() @ B).trace()
 

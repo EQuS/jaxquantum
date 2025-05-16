@@ -2,7 +2,7 @@
 
 from jaxquantum.core.operators import sigmax, sigmay, sigmaz, basis, hadamard, qubit_rotation
 from jaxquantum.circuits.gates import Gate
-from jaxquantum.core.qarray import QarrayArray
+from jaxquantum.core.qarray import Qarray
 
 def X():
     return Gate.create(
@@ -71,7 +71,7 @@ def MZ():
     gg = g @ g.dag()
     ee = e @ e.dag()
 
-    kmap = QarrayArray.create([gg, ee])
+    kmap = Qarray.from_list([gg, ee])
 
     return Gate.create(
         2, 
@@ -91,7 +91,7 @@ def MX():
     pp = plus @ plus.dag()
     mm = minus @ minus.dag()
 
-    kmap = QarrayArray.create([pp, mm])
+    kmap = Qarray.from_list([pp, mm])
 
     return Gate.create(
         2, 
@@ -106,7 +106,7 @@ def MX_plus():
     e = basis(2,1)
     plus = (g + e).unit()
     pp = plus @ plus.dag()
-    kmap = QarrayArray.create([2*pp])
+    kmap = Qarray.from_list([2*pp])
 
     return Gate.create(
         2, 
@@ -119,7 +119,7 @@ def MZ_plus():
     g = basis(2,0)
     plus = g
     pp = plus @ plus.dag()
-    kmap = QarrayArray.create([2*pp])
+    kmap = Qarray.from_list([2*pp])
 
     return Gate.create(
         2, 
@@ -135,7 +135,7 @@ def Reset():
     gg = g @ g.dag()
     ge = g @ e.dag()
 
-    kmap = QarrayArray.create([gg, ge])
+    kmap = Qarray.from_list([gg, ge])
     return Gate.create(
         2, 
         name="Reset",
