@@ -15,7 +15,8 @@ REQUIREMENTS = [
     "jax[cpu]",
     "diffrax",
     "flax",
-    "tqdm"
+    "tqdm",
+    "pytest"
 ]
 
 EXTRA_REQUIREMENTS = {
@@ -23,7 +24,9 @@ EXTRA_REQUIREMENTS = {
         "jupyterlab>=3.1.0",
         "mypy",
         "pylint",
-        "black"
+        "black",
+        "coverage",
+        "pytest"
     ],
     "docs": [
         "mkdocs",
@@ -32,6 +35,7 @@ EXTRA_REQUIREMENTS = {
         "mkdocs-section-index",
         "mkdocs-gen-files",
         "mkdocstrings-python",
+        "mkdocs-jupyter"
     ]
 }
 
@@ -57,7 +61,7 @@ setup(
     author="Shantanu Jha, Shoumik Chowdhury, Max Hays",
     author_email="shantanu.rajesh.jha@gmail.com",
     license="Apache 2.0",
-    packages=find_namespace_packages(exclude=["tutorials*"]),
+    packages=find_namespace_packages(exclude=["experiments*"]),
     install_requires=REQUIREMENTS,
     extras_require=EXTRA_REQUIREMENTS,
     classifiers=[
