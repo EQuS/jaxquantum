@@ -48,19 +48,19 @@ class TestOperator:
         for i, test in enumerate(test_operators):
             expected = jqt.tensor(*(iden[:i] + [a[i]] + iden[i+1:]))
             assert (test.data == expected.data).all
-            assert test.dims == [np.prod(dimensions), np.prod(dimensions)]
+            assert test.dims == ((int(np.prod(dimensions)),), (int(np.prod(dimensions)),))
 
     def test_space_size_reduction(self, dimensions, n_excitations):
         test_operators = jqt.enr_destroy(dimensions, n_excitations)
         expected_size = _n_enr_states(dimensions, n_excitations)
-        expected_shape = [[expected_size], [expected_size]]
+        expected_shape = ((expected_size,), (expected_size,))
         for test in test_operators:
             assert test.dims == expected_shape
 
     def test_identity(self, dimensions, n_excitations):
         iden = jqt.enr_identity(dimensions, n_excitations)
         expected_size = _n_enr_states(dimensions, n_excitations)
-        expected_shape = [[expected_size], [expected_size]]
+        expected_shape = ((expected_size,), (expected_size,))
         assert (jnp.diag(iden.data) == 1).all()
         assert (iden.data - jnp.diag(jnp.diag(iden.data)) == 0).all()
         assert iden.dims == expected_shape
@@ -105,12 +105,9 @@ def test_mesolve_ENR():
     H_JC = (0.5 * eps * sz + omega_c * a.dag()*a +
             g * (a * sm.dag() + a.dag() * sm))
     psi0 = jqt.basis(2, 0) ^ jqt.basis(N_cut, 0)
-    c_ops = [np.sqrt(gam) * a]
+    c_ops = jqt.Qarray.from_list([jnp.sqrt(gam) * a])
 
-    result_psi = jqt.mesolve(psi0*psi0.dag(),
-                            tlist,
-                            c_ops,
-                            H_JC)
+    result_psi = jqt.mesolve(H_JC, psi0*psi0.dag(), tlist, c_ops)
     result_JC = jqt.calc_expect(sz, result_psi)
 
     N_exc = 1
@@ -122,12 +119,9 @@ def test_mesolve_ENR():
     psi0 = jqt.enr_fock(dims, N_exc, [1, 0])
     H_enr = (eps * b.dag()*b + omega_c * a.dag() * a +
              g * (b.dag() * a + a.dag() * b))
-    c_ops = [np.sqrt(gam) * a]
+    c_ops = jqt.Qarray.from_list([jnp.sqrt(gam) * a])
 
-    result_enr_psi = jqt.mesolve(psi0*psi0.dag(),
-                                 tlist,
-                                 c_ops,
-                                 H_enr)
+    result_enr_psi = jqt.mesolve(H_enr, psi0*psi0.dag(), tlist, c_ops)
     result_enr = jqt.calc_expect(sz, result_enr_psi)
 
     assert jnp.allclose(result_JC, result_enr, atol=1e-5)
