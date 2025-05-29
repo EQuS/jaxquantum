@@ -42,6 +42,12 @@ def test_qarray_creation():
     a = jqt.Qarray.from_list([])
     assert a.dims == ((),()) and a.shape == jnp.array([]).shape
 
+    a = jqt.displace(3,1.0)
+    b = jqt.displace(3,2.0)
+    assert jqt.Qarray.from_array(a) == a
+    assert jqt.Qarray.from_array([[[a,a]],[[b,b]]])[1][0][0] == b
+    # assert jqt.Qarray.from_array([[],[]])
+
 # =========================================
 
 # Properties
