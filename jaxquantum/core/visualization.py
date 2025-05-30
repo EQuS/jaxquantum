@@ -12,7 +12,7 @@ WIGNER = "wigner"
 QFUNC = "qfunc"
 
 
-def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", plot_cbar=True):
+def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", axis_scale_factor=1, plot_cbar=True):
     """Plot quasi-probability distribution.
 
     TODO: decouple this from qutip.
@@ -46,6 +46,8 @@ def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", pl
         cmap = "jet"
 
     QP = scale * getattr(qt, qp_type)(state, pts, pts, g=2)
+
+    pts = pts * axis_scale_factor
 
     if contour:
         im = ax.contourf(
@@ -83,10 +85,10 @@ def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", pl
     return ax, im
 
 
-plot_wigner = lambda state, pts, ax=None, contour=True: plot_qp(
-    state, pts, ax=ax, contour=contour, qp_type=WIGNER, cbar_label=r"$\mathcal{W}(\alpha)$"
+plot_wigner = lambda state, pts, ax=None, contour=True, **kwargs: plot_qp(
+    state, pts, ax=ax, contour=contour, qp_type=WIGNER, cbar_label=r"$\mathcal{W}(\alpha)$", **kwargs
 )
 
 plot_qfunc = lambda state, pts, ax=None, contour=True: plot_qp(
-    state, pts, ax=ax, contour=contour, qp_type=QFUNC, cbar_label=r"$\mathcal{Q}(\alpha)$"
+    state, pts, ax=ax, contour=contour, qp_type=QFUNC, cbar_label=r"$\mathcal{Q}(\alpha)$", **kwargs
 )
