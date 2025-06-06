@@ -121,12 +121,9 @@ class Qarray:
 
         def flat(lis):
             flatList = []
-            # Iterate with outer list
             for element in lis:
                 if type(element) is list:
-                    # Check if type is list than iterate through the sublist
-                    for item in element:
-                        flatList.append(item)
+                    flatList += flat(element)
                 else:
                     flatList.append(element)
             return flatList
@@ -448,6 +445,9 @@ class Qarray:
     def unit(self):
         return unit(self)
 
+    def norm(self):
+        return norm(self)
+
     def expm(self):
         return expm(self)
 
@@ -541,17 +541,20 @@ def unit(qarr: Qarray) -> Qarray:
         Normalized quantum array
     """
     data = qarr.data
+    data = data / qarr.norm()
+    return Qarray.create(data, dims=qarr.dims)
+
+def norm(qarr: Qarray) -> float:
+    data = qarr.data
     data_dag = qarr.dag().data
 
     if qarr.qtype == Qtypes.oper:
         evals, _ = jnp.linalg.eigh(data @ data_dag)
         rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)))
-        data = data / rho_norm
+        return rho_norm
     elif qarr.qtype in [Qtypes.ket, Qtypes.bra]:
-        data = data / jnp.linalg.norm(data)
-    
-    return Qarray.create(data, dims=qarr.dims)
-    
+        return jnp.linalg.norm(data)
+
 def tensor(*args, **kwargs) -> Qarray:
     """Tensor product.
 
