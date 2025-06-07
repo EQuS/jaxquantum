@@ -468,6 +468,9 @@ class Qarray:
 
     def expm(self):
         return expm(self)
+
+    def powm(self, n):
+        return powm(self, n)
     
     def cosm(self):
         return cosm(self)
