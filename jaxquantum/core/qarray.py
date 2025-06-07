@@ -86,12 +86,18 @@ class Qarray:
         
         data = jnp.array([qarr.data for qarr in qarr_list])
         
+
         if len(qarr_list) == 0:
             dims = ((),())
+            bdims = ()
         else:
             dims = qarr_list[0].dims
+            bdims = qarr_list[0].bdims
+        
+        if not all(qarr.dims == dims and qarr.bdims == bdims for qarr in qarr_list):
+            raise ValueError("All Qarrays in the list must have the same dimensions.")
             
-        bdims = (len(qarr_list),)
+        bdims = (len(qarr_list),) + bdims
 
         return cls.create(data, dims=dims, bdims=bdims)
 
@@ -202,6 +208,18 @@ class Qarray:
             self.data.reshape(new_shape),
             dims=self.dims,
             bdims=new_bdims,
+        )
+
+    def resize(self, new_shape):
+        """ Resize the Qarray to a new shape. 
+        
+        This is useful for 
+        """
+        dims = self.dims
+        data = jnp.resize(self.data, new_shape)
+        return Qarray.create(
+            data,
+            dims=dims,
         )
 
     def __len__(self):

@@ -176,8 +176,16 @@ def mesolve_data(
 
     ρ0 = rho0 + 0.0j
 
+    if len(c_ops) == 0:
+        test_data = H(0.0) @ ρ0
+    else:
+        test_data = c_ops[0] @ H(0.0) @ ρ0
+    
+    ρ0 = jnp.resize(ρ0, test_data.shape)  # ensure correct shape
+
     padded_dim = [1 for _ in range(len(ρ0.shape) - 2)]
-    c_ops = c_ops.reshape(len(c_ops), *padded_dim, c_ops.shape[-2], c_ops.shape[-1])
+    c_ops_bdims = c_ops.shape[:-2]
+    c_ops = c_ops.reshape(*c_ops_bdims, *padded_dim, c_ops.shape[-2], c_ops.shape[-1])
 
     def f(
         t: float,
@@ -204,7 +212,6 @@ def mesolve_data(
         
         return rho_dot
 
-    
     sol = solve(f, ρ0, tlist, c_ops, solver_options=solver_options)
 
     return sol.ys
@@ -281,6 +288,9 @@ def sesolve_data(
 
         return ψₜ_dot
 
+    
+    ψ_test = f(0, ψ, None)
+    ψ = jnp.resize(ψ, ψ_test.shape)  # ensure correct shape
 
     sol = solve(f, ψ, tlist, None, solver_options=solver_options)
     return sol.ys
