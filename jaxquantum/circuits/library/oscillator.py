@@ -30,14 +30,14 @@ def CD(N, beta):
         num_modes=2
     )
 
-def _K(N, err_prob, l):
+def _Kraus_Op(N, err_prob, l):
     """" Returns the Kraus Operators for l-photon loss with probability
     err_prob in a Hilbert Space of size N """
     return jnp.sqrt(jnp.power(err_prob, l)/factorial(l)) * (num(N) * jnp.log(jnp.sqrt(1-err_prob))).expm() * destroy(N).powm(l)
 
 
 def Amp_Damp(N, err_prob, max_l):
-    kmap = lambda params: Qarray.from_list([_K(N, err_prob, l) for l in
+    kmap = lambda params: Qarray.from_list([_Kraus_Op(N, err_prob, l) for l in
                                             range(max_l+1)])
     return Gate.create(
         N,
