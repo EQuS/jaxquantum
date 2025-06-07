@@ -60,6 +60,9 @@ class GKPQubit(BosonicQubit):
         X_0 = jqt.expm(1.0j * self.params["l"] / 2.0 * z_axis)
         Z_0 = jqt.expm(1.0j * self.params["l"] / 2.0 * x_axis)
         Y_0 = 1.0j * X_0 @ Z_0
+        self.common_gates["X_0"] = X_0
+        self.common_gates["Z_0"] = Z_0
+        self.common_gates["Y_0"] = Y_0
         self.common_gates["X"] = self._make_op_finite_energy(X_0)
         self.common_gates["Z"] = self._make_op_finite_energy(Z_0)
         self.common_gates["Y"] = self._make_op_finite_energy(Y_0)
