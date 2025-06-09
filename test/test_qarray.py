@@ -1,5 +1,3 @@
-#%%
-
 import pytest
 
 import sys
@@ -13,7 +11,6 @@ import jax.numpy as jnp
 
 minimum_version_for_tests = "0.2.0"
 
-#%%
 
 # Version
 # ========================================
@@ -441,6 +438,27 @@ def test_dims():
 
     with pytest.raises(TypeError):
         a @ b
+
+
+def test_qtype():
+    a = jqt.Qtypes.ket
+    b = jqt.Qtypes.bra
+
+
+    assert a == jqt.Qtypes.from_str("ket")
+    assert a != b
+
+    assert str(a) == "ket"
+    assert str(a) == a.__repr__()
+
+    # Hash
+    test = {}
+    test[a] = 1
+
+    with pytest.raises(ValueError):
+        jqt.Qtypes.from_dims([[1,2],[3,4]])
+
+ 
 
 
 # def test_qtypes():

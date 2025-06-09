@@ -37,3 +37,51 @@ def test_conversions():
 
 
 # ========================================
+
+# Helpers
+# ========================================
+def test_helpers_misc():
+    a = jqt.basis(3,0)
+    assert jqt.isvec(a)
+    assert not jqt.isvec(a.to_dm())
+
+def test_overlap():
+    a = jqt.basis(3,0)
+    b = jqt.basis(3,1)
+    n = jqt.num(3)
+
+    assert jqt.overlap(a,b) == 0
+    assert jqt.overlap(a,n) == 0
+    assert jqt.overlap(n,b) == 1
+    assert jqt.overlap(n,a.to_dm()) == 0
+    assert jqt.overlap(b.to_dm(), n) == 1
+
+
+# ========================================
+
+# Utils
+# ========================================
+def test_device():
+    a = {"test1": 1.0, "test2": jnp.array([1,2]), "test3": "wow"}
+    jqt.device_put_params(a, non_device_params=["test3"])
+
+def test_comb():
+    assert jnp.abs(jqt.comb(5,2) - 10) < 1e-7
+
+def test_iso_transforms():
+    a = jqt.displace(3,1)
+    assert jnp.all(jqt.real_to_complex_iso_matrix(jqt.complex_to_real_iso_matrix(a.data)) == a.data)
+    
+    b = jqt.coherent(3,1)
+    assert jnp.all(jqt.real_to_complex_iso_vector(jqt.complex_to_real_iso_vector(a.data)) == a.data)
+
+    a_iso = jqt.complex_to_real_iso_matrix(a.data)
+    assert jnp.all(jqt.imag_times_iso_matrix(a_iso) == jqt.complex_to_real_iso_matrix((1j*a).data))
+    assert jnp.all(jqt.conj_transpose_iso_matrix(a_iso) == jqt.complex_to_real_iso_matrix((a.dag()).data))
+
+    b_iso = jqt.complex_to_real_iso_vector(b.data)
+    assert jnp.all(jqt.imag_times_iso_vector(b_iso) == jqt.complex_to_real_iso_vector((1j*b).data))
+
+# ========================================
+
+# Operators
