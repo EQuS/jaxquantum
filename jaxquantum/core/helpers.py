@@ -6,6 +6,7 @@ from math import prod
 
 import jax.numpy as jnp
 from jax.nn import one_hot
+from tqdm import tqdm
 
 from jaxquantum.core.qarray import Qarray, Qtypes, tensor, powm
 from jaxquantum.core.dims import Qtypes
@@ -82,11 +83,11 @@ def quantum_state_tomography(A: Qarray, meas_basis: List, logical_basis: List) -
         Returns:
             Logical density matrix of state A.
         """
-    dm = jnp.zeros_like(meas_basis[0])
+    dm = jnp.zeros_like(logical_basis[0].todm().data)
 
-    for meas_op, logical_op in zip(meas_basis, logical_basis):
+    for meas_op, logical_op in tqdm(zip(meas_basis, logical_basis)):
         p_i = (A @ meas_op).trace()
-        dm += p_i * logical_op
+        dm += p_i * logical_op.todm().data
 
     return Qarray.create(dm)
 
