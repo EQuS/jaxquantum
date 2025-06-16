@@ -84,10 +84,10 @@ def quantum_state_tomography(A: Qarray, meas_basis: List, logical_basis: List) -
         Returns:
             Logical density matrix of state A.
         """
-    dm = jnp.zeros_like(logical_basis[0].todm().data)
-    A = A.todm()
+    dm = jnp.zeros_like(logical_basis[0].data)
+    A = A.to_dm()
 
-    for meas_op, logical_op in tqdm(zip(meas_basis, logical_basis)):
+    for meas_op, logical_op in tqdm(zip(meas_basis, logical_basis), total=len(meas_basis)):
         p_i = (A @ meas_op).trace()
         dm += p_i * logical_op.data
 
@@ -95,14 +95,15 @@ def quantum_state_tomography(A: Qarray, meas_basis: List, logical_basis: List) -
 
 
 def get_physical_basis(qubits: List) -> List:
-    if len(qubits)==0:
-        return [Qarray.create(jnp.array([1]))]
 
     qubit = qubits[0]
     qubits = qubits[1:]
 
     ops = [identity(qubit.params["N"]), qubit.common_gates["X"],
            qubit.common_gates["Y"], qubit.common_gates["Z"]]
+
+    if len(qubits)==0:
+        return ops
 
     sub_basis = get_physical_basis(qubits)
     basis = []
@@ -114,12 +115,13 @@ def get_physical_basis(qubits: List) -> List:
     return basis
 
 def get_logical_basis(n_qubits: int) -> List:
-    if n_qubits == 0:
-        return [Qarray.create(jnp.array([1]))]
 
     n_qubits -= 1
 
     ops = [identity(2)/2, sigmax()/2, sigmay()/2, sigmaz()/2]
+
+    if n_qubits == 0:
+        return ops
 
     sub_basis = get_logical_basis(n_qubits)
     basis = []
