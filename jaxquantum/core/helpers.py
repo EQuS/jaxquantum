@@ -2,134 +2,159 @@
 
 from typing import List
 from jax import config
-from math import prod
 
 import jax.numpy as jnp
-from jax.nn import one_hot
 from tqdm import tqdm
 
-from jaxquantum.core.qarray import Qarray, Qtypes, tensor, powm
+from jaxquantum.core.qarray import Qarray, powm
 from jaxquantum.core.dims import Qtypes
 from jaxquantum.core.operators import identity, sigmax, sigmay, sigmaz
 
 config.update("jax_enable_x64", True)
 
 
-def isvec(A: Qarray) -> bool:
+def isvec(rho: Qarray) -> bool:
     """Check if A is a ket or bra.
 
     Args:
-        A: state.
+        rho: state.
 
     Returns:
-        True if A is a ket or bra, False otherwise.
+        True if rho is a ket or bra, False otherwise.
     """
-    return A.qtype == Qtypes.ket or A.qtype == Qtypes.bra
+    return rho.qtype == Qtypes.ket or rho.qtype == Qtypes.bra
+
 
 # Calculations ----------------------------------------------------------------
 
-def overlap(A: Qarray, B: Qarray) -> complex:
+def overlap(rho: Qarray, sigma: Qarray) -> complex:
     """Overlap between two states.
 
     Args:
-        A: state.
-        B: state.
+        rho: state.
+        sigma: state.
 
     Returns:
-        Overlap between A and B.
+        Overlap between rho and sigma.
     """
     # A.qtype
 
-    if isvec(A) and isvec(B):
-        return jnp.abs(((A.to_ket().dag() @ B.to_ket()).trace()))**2
-    elif isvec(A):
-        A = A.to_ket()
-        res = (A.dag() @ B @ A).data
+    if isvec(rho) and isvec(sigma):
+        return jnp.abs(((rho.to_ket().dag() @ sigma.to_ket()).trace())) ** 2
+    elif isvec(rho):
+        rho = rho.to_ket()
+        res = (rho.dag() @ sigma @ rho).data
         return res.squeeze(-1).squeeze(-1)
-    elif isvec(B):
-        return overlap(B, A)
+    elif isvec(sigma):
+        return overlap(sigma, rho)
     else:
-        return (A.dag() @ B).trace()
+        return (rho.dag() @ sigma).trace()
 
 
-def fidelity(A: Qarray, B: Qarray) -> float:
+def fidelity(rho: Qarray, sigma: Qarray) -> float:
     """Fidelity between two states.
 
     Args:
-        A: state.
-        B: state.
+        rho: state.
+        sigma: state.
 
     Returns:
-        Fidelity between A and B.
+        Fidelity between rho and sigma.
     """
-    A = A.to_dm()
-    B = B.to_dm()
+    rho = rho.to_dm()
+    sigma = sigma.to_dm()
 
-    sqrtA = powm(A, 0.5)
+    sqrt_rho = powm(rho, 0.5)
 
-    return ((powm(sqrtA @ B @ sqrtA, 0.5)).tr())**2
+    return ((powm(sqrt_rho @ sigma @ sqrt_rho, 0.5)).tr()) ** 2
 
 
-def quantum_state_tomography(A: Qarray, meas_basis: List, logical_basis: List) -> Qarray:
-    """Perform quantum state tomography of a logical encoding on a physical
-    qubit.
+def quantum_state_tomography(rho: Qarray, physical_basis: List, logical_basis:
+List) -> Qarray: #TODO use batch dimensions instead of lists
+    """Perform quantum state tomography to retrieve the density matrix in 
+    the logical basis. 
 
         Args:
-            A: state.
-            meas_basis: list of physical operators forming a complete basis
-            in the physical Hilbert space.
-            logical_basis: list of logical operators forming a complete
-            basis in the logical Hilbert space.
+            rho: state expressed in the physical Hilbert space basis.
+            physical_basis: list of logical operators expressed in the physical
+            Hilbert space basis forming a complete logical operator basis.
+            logical_basis: list of logical operators expressed in the 
+            logical Hilbert space basis forming a complete operator basis.
+
 
         Returns:
-            Logical density matrix of state A.
+            Density matrix of state rho expressed in the logical basis.
         """
     dm = jnp.zeros_like(logical_basis[0].data)
-    A = A.to_dm()
+    rho = rho.to_dm()
 
-    for meas_op, logical_op in tqdm(zip(meas_basis, logical_basis), total=len(meas_basis)):
-        p_i = (A @ meas_op).trace()
+    for meas_op, logical_op in tqdm(zip(physical_basis, logical_basis),
+                                    total=len(physical_basis)):
+        p_i = (rho @ meas_op).trace()
         dm += p_i * logical_op.data
 
     return Qarray.create(dm)
 
 
 def get_physical_basis(qubits: List) -> List:
+    """Compute a complete operator basis of a QEC code on a
+    physical system specified by a number of qubits.
 
+            Args:
+                qubits: list of qubit codes, must have
+                common_gates and params attributes.
+
+            Returns:
+                List containing the complete operator basis.
+            """
     qubit = qubits[0]
     qubits = qubits[1:]
+    try:
+        operators = [identity(qubit.params["N"]), qubit.common_gates["X"],
+                     qubit.common_gates["Y"], qubit.common_gates["Z"]]
+    except KeyError:
+        print("QEC code must have common_gates for all three axes.")
+    except AttributeError:
+        print("QEC code must have common_gates and params attribute.")
 
-    ops = [identity(qubit.params["N"]), qubit.common_gates["X"],
-           qubit.common_gates["Y"], qubit.common_gates["Z"]]
-
-    if len(qubits)==0:
-        return ops
+    if len(qubits) == 0:
+        return operators
 
     sub_basis = get_physical_basis(qubits)
     basis = []
 
-    for op in ops:
+    for op in operators:
         for sub_op in sub_basis:
             basis.append(op ^ sub_op)
 
     return basis
 
+
 def get_logical_basis(n_qubits: int) -> List:
+    """Compute a complete operator basis of a system composed of logical
+    qubits.
+
+                Args:
+                    n_qubits: number of qubits
+
+                Returns:
+                    List containing the complete operator basis.
+                """
+    if n_qubits < 1:
+        raise ValueError("n_qubits must be at least 1.")
 
     n_qubits -= 1
 
-    ops = [identity(2)/2, sigmax()/2, sigmay()/2, sigmaz()/2]
+    operators = [identity(2) / 2, sigmax() / 2, sigmay() / 2, sigmaz() / 2]
 
     if n_qubits == 0:
-        return ops
+        return operators
 
     sub_basis = get_logical_basis(n_qubits)
     basis = []
 
-    for op in ops:
+    for op in operators:
         for sub_op in sub_basis:
             basis.append(op ^ sub_op)
 
     return basis
-
-
