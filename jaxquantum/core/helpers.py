@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from jaxquantum.core.qarray import Qarray, Qtypes, tensor, powm
 from jaxquantum.core.dims import Qtypes
+from jaxquantum.core.operators import identity, sigmax, sigmay, sigmaz
 
 config.update("jax_enable_x64", True)
 
@@ -84,10 +85,49 @@ def quantum_state_tomography(A: Qarray, meas_basis: List, logical_basis: List) -
             Logical density matrix of state A.
         """
     dm = jnp.zeros_like(logical_basis[0].todm().data)
+    A = A.todm()
 
     for meas_op, logical_op in tqdm(zip(meas_basis, logical_basis)):
         p_i = (A @ meas_op).trace()
-        dm += p_i * logical_op.todm().data
+        dm += p_i * logical_op.data
 
     return Qarray.create(dm)
+
+
+def get_physical_basis(qubits: List) -> List:
+    if len(qubits)==0:
+        return [Qarray.create(jnp.array([1]))]
+
+    qubit = qubits[0]
+    qubits = qubits[1:]
+
+    ops = [identity(qubit.params["N"]), qubit.common_gates["X"],
+           qubit.common_gates["Y"], qubit.common_gates["Z"]]
+
+    sub_basis = get_physical_basis(qubits)
+    basis = []
+
+    for op in ops:
+        for sub_op in sub_basis:
+            basis.append(op ^ sub_op)
+
+    return basis
+
+def get_logical_basis(n_qubits: int) -> List:
+    if n_qubits == 0:
+        return [Qarray.create(jnp.array([1]))]
+
+    n_qubits -= 1
+
+    ops = [identity(2)/2, sigmax()/2, sigmay()/2, sigmaz()/2]
+
+    sub_basis = get_logical_basis(n_qubits)
+    basis = []
+
+    for op in ops:
+        for sub_op in sub_basis:
+            basis.append(op ^ sub_op)
+
+    return basis
+
 
