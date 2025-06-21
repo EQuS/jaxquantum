@@ -210,10 +210,48 @@ class Qarray:
             bdims=new_bdims,
         )
 
+    def space_to_qdims(self, space_dims: List[int]):
+        
+        if isinstance(space_dims[0], (list, tuple)):
+            return space_dims
+
+        if self.qtype in [Qtypes.oper, Qtypes.ket]:
+            return (tuple(space_dims), tuple([1 for _ in range(len(space_dims))]))
+        elif self.qtype == Qtypes.bra:
+            return (tuple([1 for _ in range(len(space_dims))]), tuple(space_dims))
+        else:
+            raise ValueError("Unsupported qtype for space_to_qdims conversion.")
+
+    def reshape_qdims(self, *args):
+        """ Reshape the quantum dimensions of the Qarray. 
+        
+        Note that this does not take in qdims but rather the new Hilbert space dimensions.
+
+        Args:
+            *args: new Hilbert dimensions for the Qarray.
+        
+        Returns:
+            Qarray: reshaped Qarray.
+        """
+
+        new_space_dims = tuple(args)
+        current_space_dims = self.space_dims
+        assert prod(new_space_dims) == prod(current_space_dims)
+
+
+        new_qdims = self.space_to_qdims(new_space_dims)
+        new_bdims = self.bdims
+
+        return Qarray.create(
+            self.data,
+            dims=new_qdims,
+            bdims=new_bdims
+        )
+        
     def resize(self, new_shape):
         """ Resize the Qarray to a new shape. 
         
-        This is useful for 
+        TODO: review and maybe deprecate this method.
         """
         dims = self.dims
         data = jnp.resize(self.data, new_shape)
