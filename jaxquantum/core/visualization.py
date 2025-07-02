@@ -12,7 +12,9 @@ WIGNER = "wigner"
 QFUNC = "qfunc"
 
 
-def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", axis_scale_factor=1, plot_cbar=True):
+def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER,
+            cbar_label="", axis_scale_factor=1, plot_cbar=True,
+            transform=None,):
     """Plot quasi-probability distribution.
 
     TODO: decouple this from qutip.
@@ -34,6 +36,11 @@ def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", ax
         _, ax = plt.subplots(1, figsize=(4, 3), dpi=200)
     # fig = ax.get_figure()
 
+    if transform is not None:
+        pts_x, pts_y = transform(pts, pts)
+    else:
+        pts_x, pts_y = pts, pts
+
     if qp_type == WIGNER:
         vmin = -1
         vmax = 1
@@ -45,7 +52,7 @@ def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", ax
         scale = np.pi
         cmap = "jet"
 
-    QP = scale * getattr(qt, qp_type)(state, pts, pts, g=2)
+    QP = scale * getattr(qt, qp_type)(state, pts_x, pts_y, g=2)
 
     pts = pts * axis_scale_factor
 
