@@ -116,7 +116,7 @@ class GKPQubit(BosonicQubit):
 
         N = self.params["N"]
         plus_z = jqt.unit(gstate)
-        minus_z = self.common_gates["X"] @ plus_z
+        minus_z = jqt.unit(self.common_gates["X"] @ plus_z)
         return plus_z, minus_z
 
     # utils
