@@ -1,7 +1,7 @@
 """ Helpers. """
 
 from typing import List
-from jax import config
+from jax import config, Array
 
 import jax.numpy as jnp
 from tqdm import tqdm
@@ -13,40 +13,29 @@ from jaxquantum.core.operators import identity, sigmax, sigmay, sigmaz
 config.update("jax_enable_x64", True)
 
 
-def isvec(rho: Qarray) -> bool:
-    """Check if A is a ket or bra.
-
-    Args:
-        rho: state.
-
-    Returns:
-        True if rho is a ket or bra, False otherwise.
-    """
-    return rho.qtype == Qtypes.ket or rho.qtype == Qtypes.bra
-
-
 # Calculations ----------------------------------------------------------------
 
-def overlap(rho: Qarray, sigma: Qarray) -> complex:
-    """Overlap between two states.
+def overlap(rho: Qarray, sigma: Qarray) -> Array:
+    """Overlap between two states or operators.
 
     Args:
-        rho: state.
-        sigma: state.
+        rho: state/operator.
+        sigma: state/operator.
 
     Returns:
         Overlap between rho and sigma.
     """
-    # A.qtype
 
-    if isvec(rho) and isvec(sigma):
+    if rho.isvec() and sigma.isvec():
         return jnp.abs(((rho.to_ket().dag() @ sigma.to_ket()).trace())) ** 2
-    elif isvec(rho):
+    elif rho.isvec():
         rho = rho.to_ket()
         res = (rho.dag() @ sigma @ rho).data
         return res.squeeze(-1).squeeze(-1)
-    elif isvec(sigma):
-        return overlap(sigma, rho)
+    elif sigma.isvec():
+        sigma = sigma.to_ket()
+        res = (sigma.dag() @ rho @ sigma).data
+        return res.squeeze(-1).squeeze(-1)
     else:
         return (rho.dag() @ sigma).trace()
 

@@ -447,6 +447,9 @@ class Qarray:
     
     def is_dm(self):
         return self.qtype == Qtypes.oper
+
+    def is_vec(self):
+        return self.qtype == Qtypes.ket or self.qtype == Qtypes.bra
     
     def to_ket(self):
         return to_ket(self)

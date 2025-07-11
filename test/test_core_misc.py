@@ -40,10 +40,6 @@ def test_conversions():
 
 # Helpers
 # ========================================
-def test_helpers_misc():
-    a = jqt.basis(3,0)
-    assert jqt.isvec(a)
-    assert not jqt.isvec(a.to_dm())
 
 def test_overlap():
     a = jqt.basis(3,0)

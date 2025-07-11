@@ -19,7 +19,7 @@ from jaxquantum.core.qarray import Qarray, Qtypes, is_dm_data, dag_data
 from jaxquantum.core.conversions import jnp2jqt
 from jaxquantum.utils.utils import robust_isscalar
 from jaxquantum.core.operators import identity_like
-from jaxquantum.core.helpers import overlap
+from jaxquantum.core.measurements import overlap
 
 # ----
 
