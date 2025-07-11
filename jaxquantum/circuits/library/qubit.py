@@ -3,6 +3,7 @@
 from jaxquantum.core.operators import sigmax, sigmay, sigmaz, basis, hadamard, qubit_rotation
 from jaxquantum.circuits.gates import Gate
 from jaxquantum.core.qarray import Qarray
+import jax.numpy as jnp
 
 def X():
     return Gate.create(
@@ -137,9 +138,31 @@ def Reset():
 
     kmap = Qarray.from_list([gg, ge])
     return Gate.create(
-        2, 
+        2,
         name="Reset",
         gen_KM = lambda params: kmap,
+        num_modes=1
+    )
+
+def IP_Reset(p_eg, p_ee):
+    g = basis(2, 0)
+    e = basis(2, 1)
+
+    gg = g @ g.dag()
+    ge = g @ e.dag()
+    eg = e @ g.dag()
+    ee = e @ e.dag()
+
+    k_0 = jnp.sqrt(1-p_eg) * gg + jnp.sqrt(p_eg) * eg
+    k_1 = jnp.sqrt(p_ee) * ee + jnp.sqrt(1-p_ee) * ge
+
+    kmap = Qarray.from_list([k_0, k_1])
+
+    return Gate.create(
+        2,
+        name="IP_Reset",
+        params={"p_eg": p_eg, "p_ge": p_ee},
+        gen_KM=lambda params: kmap,
         num_modes=1
     )
 
