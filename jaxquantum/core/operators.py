@@ -189,6 +189,8 @@ def thermal(N: int, beta: float) -> Qarray:
     Return:
         Thermal state.
     """
+    if beta == jnp.inf:
+        return basis(N, 0)
 
     return Qarray.create(jnp.diag(jnp.exp(-beta*jnp.linspace(0, N-1, N)))).unit()
 
