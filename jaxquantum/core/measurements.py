@@ -87,11 +87,10 @@ def quantum_state_tomography(rho: Qarray, physical_basis: Qarray,
     space_size = physical_basis.bdims[-1]
 
     for i in tqdm(range(space_size), total=space_size):
-        p_i = (rho @ physical_basis[..., i]).trace()
-        dm += p_i * logical_basis[..., i].data
+        p_i = (rho @ physical_basis[i]).trace()
+        dm += p_i * logical_basis[i].data
 
-    return Qarray.create(dm, dims=physical_basis.dims, bdims=physical_basis[
-        ..., 0].bdims)
+    return Qarray.create(dm, dims=logical_basis.dims, bdims=physical_basis[0].bdims)
 
 
 def get_physical_basis(qubits: List) -> Qarray:
@@ -105,6 +104,7 @@ def get_physical_basis(qubits: List) -> Qarray:
             Returns:
                 List containing the complete operator basis.
             """
+    
     qubit = qubits[0]
     qubits = qubits[1:]
     try:
@@ -123,9 +123,11 @@ def get_physical_basis(qubits: List) -> Qarray:
     sub_basis = get_physical_basis(qubits)
     basis = []
 
-    for op in operators:
-        for sub_op in sub_basis:
-            basis.append(op ^ sub_op)
+    sub_basis_size = sub_basis.bdims[-1]
+
+    for i in range(4):
+        for j in range(sub_basis_size):
+            basis.append(operators[i] ^ sub_basis[j])
 
     return Qarray.from_list(basis)
 
@@ -154,8 +156,10 @@ def get_logical_basis(n_qubits: int) -> Qarray:
     sub_basis = get_logical_basis(n_qubits)
     basis = []
 
-    for op in operators:
-        for sub_op in sub_basis:
-            basis.append(op ^ sub_op)
+    sub_basis_size = sub_basis.bdims[-1]
+
+    for i in range(4):
+        for j in range(sub_basis_size):
+            basis.append(operators[i] ^ sub_basis[j])
 
     return Qarray.from_list(basis)
