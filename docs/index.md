@@ -1,9 +1,8 @@
 # Welcome to jaxquantum
 
-
 [![License](https://img.shields.io/github/license/EQuS/jaxquantum.svg?style=popout-square)](https://opensource.org/license/apache-2-0) [![](https://img.shields.io/github/release/EQuS/jaxquantum.svg?style=popout-square)](https://github.com/EQuS/jaxquantum/releases) [![](https://img.shields.io/pypi/dm/jaxquantum.svg?style=popout-square)](https://pypi.org/project/jaxquantum/)
 
-[S. R. Jha](https://github.com/Phionx), [S. Chowdhury](https://github.com/shoumikdc), [M. Hays](https://scholar.google.com/citations?user=06z0MjwAAAAJ), [J. A. Grover](https://scholar.google.com/citations?user=igewch8AAAAJ), [W. D. Oliver](https://scholar.google.com/citations?user=4vNbnqcAAAAJ&hl=en)
+[S. R. Jha](https://github.com/Phionx), [S. Chowdhury](https://github.com/shoumikdc), [G. Rolleri](https://github.com/GabrieleRolleri), [M. Hays](https://scholar.google.com/citations?user=06z0MjwAAAAJ), [J. A. Grover](https://scholar.google.com/citations?user=igewch8AAAAJ), [W. D. Oliver](https://scholar.google.com/citations?user=4vNbnqcAAAAJ&hl=en)
 
 **Docs:** [equs.github.io/jaxquantum](https://equs.github.io/jaxquantum)
 
@@ -11,7 +10,7 @@
 
 `jaxquantum` leverages [JAX](https://github.com/google/jax) to enable the auto differentiable and (CPU, GPU, TPU) accelerated simulation of quantum dynamical systems, including tooling such as operator construction, unitary evolution and master equation solving. As such, `jaxquantum` serves as a QuTiP drop-in replacement written entirely in JAX.
 
-This package also serves as an essential dependency for [`bosonic`](https://github.com/EQuS/bosonic) and [`qcsys`](https://github.com/EQuS/qcsys). Together, these packages form an end-to-end toolkit for quantum circuit design, simulation and control. 
+Moreover, `jaxquantum` has recently absorbed [`bosonic`](https://github.com/EQuS/bosonic) and [`qcsys`](https://github.com/EQuS/qcsys). As such, it is now a unified toolkit for quantum circuit design, simulation and control. 
 
 
 ## Installation
@@ -48,41 +47,58 @@ Here's an example of how to set up a simulation in jaxquantum.
 
 ```python
 from jax import jit
-import jaxquantum as jqt
+import jaxquantum as jqt 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-omega_q = 5.0 #GHz
-Omega = .1
-g_state = jqt.basis(2,0) ^ jqt.basis(2,0)
-g_state_dm = g_state.to_dm()
+N = 100
 
-ts = jnp.linspace(0,5*jnp.pi/Omega,101)
-c_ops = [0.1*jqt.sigmam()^jqt.identity(N=2)]
+omega_a = 2.0*jnp.pi*5.0
+kappa = 2*jnp.pi*jnp.array([1,2]) # Batching to explore two different kappa values!
+initial_state = jqt.displace(N, 0.1) @ jqt.basis(N,0)
+initial_state_dm = initial_state.to_dm()
+ts = jnp.linspace(0, 4*2*jnp.pi/omega_a, 101)
 
-sz0 = jqt.sigmaz() ^ jqt.identity(N=2)
+a = jqt.destroy(N)
+n = a.dag() @ a
+
+c_ops = jqt.Qarray.from_list([jnp.sqrt(kappa)*a])
 
 @jit
 def Ht(t):
-    H0 = omega_q/2.0*((jqt.sigmaz()^jqt.identity(N=2)) + (jqt.identity(N=2)^jqt.sigmaz()))
-    H1 = Omega*jnp.cos((omega_q)*t)*((jqt.sigmax()^jqt.identity(N=2)) + (jqt.identity(N=2)^jqt.sigmax()))
-    return H0 + H1
+    H0 = omega_a*n
+    return H0
 
+solver_options = jqt.SolverOptions.create(progress_meter=True)
+states = jqt.mesolve(Ht, initial_state_dm, ts, c_ops=c_ops, solver_options=solver_options) 
+nt = jnp.real(jqt.calc_expect(n, states))
+a_real = jnp.real(jqt.calc_expect(a, states))
+a_imag = jnp.imag(jqt.calc_expect(a, states))
 
-states = jqt.mesolve(g_state_dm, ts, c_ops=c_ops, Ht=Ht) 
-szt = jnp.real(jqt.calc_expect(sz0, states))
-
-
-fig, ax = plt.subplots(1, dpi=200, figsize=(4,3))
-ax.plot(ts, szt)
+fig, axs = plt.subplots(2,1, dpi=200, figsize=(6,5))
+ax = axs[0]
+ax.plot(ts, a_real[:,0], label=r"$Re[\langle a(t)\rangle]$", color="blue") # Batch kappa value 0
+ax.plot(ts, a_real[:,1], "--", label=r"$Re[\langle a(t)\rangle]$", color="blue") # Batch kappa value 1
+ax.plot(ts, a_imag[:,0], label=r"$Re[\langle a(t)\rangle]$", color="red") # Batch kappa value 0
+ax.plot(ts, a_imag[:,1], "--", label=r"$Re[\langle a(t)\rangle]$", color="red") # Batch kappa value 1
 ax.set_xlabel("Time (ns)")
-ax.set_ylabel("<σz(t)>")
+ax.set_ylabel("Expectations")
+ax.legend()
+
+ax = axs[1]
+ax.plot(ts, nt[:,0], label=r"$Re[\langle n(t)\rangle]$", color="green") # Batch kappa value 0
+ax.plot(ts, nt[:,1], "--", label=r"$Re[\langle n(t)\rangle]$", color="green") # Batch kappa value 1
+ax.set_xlabel("Time (ns)")
+ax.set_ylabel("Expectations")
+ax.legend()
 fig.tight_layout()
 ```
+![Output of above code.](../assets/readme_demo.png)
+
 
 ## Acknowledgements & History
 
-**Core Devs:** [Shantanu A. Jha](https://github.com/Phionx), [Shoumik Chowdhury](https://github.com/shoumikdc)
+**Core Devs:** [Shantanu A. Jha](https://github.com/Phionx), [Shoumik Chowdhury](https://github.com/shoumikdc), [Gabriele Rolleri](https://github.com/GabrieleRolleri)
 
 
 This package was initially a small part of [`bosonic`](https://github.com/EQuS/bosonic). In early 2022, `jaxquantum` was extracted and made into its own package. This package was briefly announced to the world at APS March Meeting 2023 and released to a select few academic groups shortly after. Since then, this package has been open sourced and developed while conducting research in the Engineering Quantum Systems Group at MIT with invaluable advice from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/). 
