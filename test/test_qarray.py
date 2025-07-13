@@ -451,10 +451,10 @@ def test_qtype():
     c = jqt.basis(3, 0)
     d = jqt.basis(3, 0).dag()
 
-    assert c.isvec()
-    assert d.isvec()
-    assert not c.to_dm().isvec()
-    assert not b.to_dm().isvec()
+    assert c.is_vec()
+    assert d.is_vec()
+    assert not c.to_dm().is_vec()
+    assert not d.to_dm().is_vec()
 
     assert str(a) == "ket"
     assert str(a) == a.__repr__()

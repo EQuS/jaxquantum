@@ -26,13 +26,13 @@ def overlap(rho: Qarray, sigma: Qarray) -> Array:
         Overlap between rho and sigma.
     """
 
-    if rho.isvec() and sigma.isvec():
+    if rho.is_vec() and sigma.is_vec():
         return jnp.abs(((rho.to_ket().dag() @ sigma.to_ket()).trace())) ** 2
-    elif rho.isvec():
+    elif rho.is_vec():
         rho = rho.to_ket()
         res = (rho.dag() @ sigma @ rho).data
         return res.squeeze(-1).squeeze(-1)
-    elif sigma.isvec():
+    elif sigma.is_vec():
         sigma = sigma.to_ket()
         res = (sigma.dag() @ rho @ sigma).data
         return res.squeeze(-1).squeeze(-1)
@@ -58,8 +58,9 @@ def fidelity(rho: Qarray, sigma: Qarray) -> float:
     return ((powm(sqrt_rho @ sigma @ sqrt_rho, 0.5)).tr()) ** 2
 
 
-def quantum_state_tomography(rho: Qarray, physical_basis: List, logical_basis:
-List) -> Qarray: #TODO use batch dimensions instead of lists
+def quantum_state_tomography(rho: Qarray, physical_basis: Qarray,
+                             logical_basis: Qarray) -> Qarray:
+
     """Perform quantum state tomography to retrieve the density matrix in 
     the logical basis. 
 
@@ -77,15 +78,23 @@ List) -> Qarray: #TODO use batch dimensions instead of lists
     dm = jnp.zeros_like(logical_basis[0].data)
     rho = rho.to_dm()
 
-    for meas_op, logical_op in tqdm(zip(physical_basis, logical_basis),
-                                    total=len(physical_basis)):
-        p_i = (rho @ meas_op).trace()
-        dm += p_i * logical_op.data
+    if physical_basis.bdims[-1]!=logical_basis.bdims[-1]:
+        raise ValueError(f"The two bases should have the same size for the "
+                         f"last batch dimension. Received "
+                         f"{physical_basis.bdims} and {logical_basis.bdims} "
+                         f"instead.")
 
-    return Qarray.create(dm)
+    space_size = physical_basis.bdims[-1]
+
+    for i in tqdm(range(space_size), total=space_size):
+        p_i = (rho @ physical_basis[..., i]).trace()
+        dm += p_i * logical_basis[..., i].data
+
+    return Qarray.create(dm, dims=physical_basis.dims, bdims=physical_basis[
+        ..., 0].bdims)
 
 
-def get_physical_basis(qubits: List) -> List:
+def get_physical_basis(qubits: List) -> Qarray:
     """Compute a complete operator basis of a QEC code on a
     physical system specified by a number of qubits.
 
@@ -99,8 +108,10 @@ def get_physical_basis(qubits: List) -> List:
     qubit = qubits[0]
     qubits = qubits[1:]
     try:
-        operators = [identity(qubit.params["N"]), qubit.common_gates["X"],
-                     qubit.common_gates["Y"], qubit.common_gates["Z"]]
+        operators = Qarray.from_list([identity(qubit.params["N"]),
+                                      qubit.common_gates["X"],
+                                      qubit.common_gates["Y"],
+                                      qubit.common_gates["Z"]])
     except KeyError:
         print("QEC code must have common_gates for all three axes.")
     except AttributeError:
@@ -116,10 +127,10 @@ def get_physical_basis(qubits: List) -> List:
         for sub_op in sub_basis:
             basis.append(op ^ sub_op)
 
-    return basis
+    return Qarray.from_list(basis)
 
 
-def get_logical_basis(n_qubits: int) -> List:
+def get_logical_basis(n_qubits: int) -> Qarray:
     """Compute a complete operator basis of a system composed of logical
     qubits.
 
@@ -134,7 +145,8 @@ def get_logical_basis(n_qubits: int) -> List:
 
     n_qubits -= 1
 
-    operators = [identity(2) / 2, sigmax() / 2, sigmay() / 2, sigmaz() / 2]
+    operators = Qarray.from_list([identity(2) / 2, sigmax() / 2, sigmay() /
+                                  2, sigmaz() / 2])
 
     if n_qubits == 0:
         return operators
@@ -146,4 +158,4 @@ def get_logical_basis(n_qubits: int) -> List:
         for sub_op in sub_basis:
             basis.append(op ^ sub_op)
 
-    return basis
+    return Qarray.from_list(basis)
