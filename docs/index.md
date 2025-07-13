@@ -71,9 +71,9 @@ def Ht(t):
 
 solver_options = jqt.SolverOptions.create(progress_meter=True)
 states = jqt.mesolve(Ht, initial_state_dm, ts, c_ops=c_ops, solver_options=solver_options) 
-nt = jnp.real(jqt.calc_expect(n, states))
-a_real = jnp.real(jqt.calc_expect(a, states))
-a_imag = jnp.imag(jqt.calc_expect(a, states))
+nt = jnp.real(jqt.overlap(n, states))
+a_real = jnp.real(jqt.overlap(a, states))
+a_imag = jnp.imag(jqt.overlap(a, states))
 
 fig, axs = plt.subplots(2,1, dpi=200, figsize=(6,5))
 ax = axs[0]

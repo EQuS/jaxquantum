@@ -35,26 +35,6 @@ class SolverOptions:
         return cls(progress_meter, solver, max_steps)
 
 
-# Vestigial Functions ----
-def calc_expect(op: Qarray, states: Qarray) -> Array:
-    return overlap(op, states)
-
-def spre(op: Qarray) -> Callable[[Qarray], Qarray]:
-    """Superoperator generator.
-
-    Args:
-        op: operator to be turned into a superoperator
-
-    Returns:
-        superoperator function
-    """
-    op_dag = op.dag()
-    return lambda rho: 0.5 * (
-        2 * op @ rho @ op_dag - rho @ op_dag @ op - op_dag @ op @ rho
-    )
-# ---
-
-
 class CustomProgressMeter(TqdmProgressMeter):
     @staticmethod
     def _init_bar() -> tqdm.tqdm:
@@ -142,12 +122,12 @@ def mesolve(
     else:
         Ht_data = lambda t: H(t).data if H is not None else None
     
-    ys = mesolve_data(Ht_data, ρ0, tlist, c_ops, solver_options=solver_options)
+    ys = _mesolve_data(Ht_data, ρ0, tlist, c_ops, solver_options=solver_options)
 
     return jnp2jqt(ys, dims=dims)
 
 
-def mesolve_data(
+def _mesolve_data(
     H: Callable[[float], Array],
     rho0: Array,
     tlist: Array,
@@ -169,10 +149,11 @@ def mesolve_data(
     
     c_ops = c_ops if c_ops is not None else jnp.array([])
 
-    if len(c_ops) == 0 and not is_dm_data(rho0):
-        logging.warning(
-            "Consider using `jqt.sesolve()` instead, as `c_ops` is an empty list and the initial state is not a density matrix."
-        )
+    # check is in mesolve
+    # if len(c_ops) == 0 and not is_dm_data(rho0):
+    #     logging.warning(
+    #         "Consider using `jqt.sesolve()` instead, as `c_ops` is an empty list and the initial state is not a density matrix."
+    #     )
 
     ρ0 = rho0 + 0.0j
 
@@ -253,11 +234,11 @@ def sesolve(
     else:
         Ht_data = lambda t: H(t).data if H is not None else None
     
-    ys = sesolve_data(Ht_data, ψ, tlist, solver_options=solver_options)
+    ys = _sesolve_data(Ht_data, ψ, tlist, solver_options=solver_options)
 
     return jnp2jqt(ys, dims=dims)
 
-def sesolve_data(
+def _sesolve_data(
     H: Callable[[float], Array],
     rho0: Array,
     tlist: Array,
@@ -386,12 +367,12 @@ def sesolve_data(
     Returns:
         Qarray: The propagator for the time dependent Hamiltonian for the time range [0, t_final].
     """
-    N = Ht(0).shape[0]
-    basis_states = jnp.eye(N)
+    # N = Ht(0).shape[0]
+    # basis_states = jnp.eye(N)
 
-    def propogate_state(initial_state):
-        return sesolve_data(initial_state, ts, Ht=Ht, solver_options=solver_options)
+    # def propogate_state(initial_state):
+    #     return sesolve_data(initial_state, ts, Ht=Ht, solver_options=solver_options)
         
-    U_prop = vmap(propogate_state)(basis_states)
-    U_prop = U_prop.transpose(1,0,2) # move time axis to the front
-    return U_prop
+    # U_prop = vmap(propogate_state)(basis_states)
+    # U_prop = U_prop.transpose(1,0,2) # move time axis to the front
+    # return U_prop
