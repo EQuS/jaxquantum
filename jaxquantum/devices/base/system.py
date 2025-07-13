@@ -38,9 +38,10 @@ def calculate_eig(Ns, H: Qarray):
 
     Es, kets = vmap(calc_order)(edxs)
 
-    kets = jnp.reshape(kets, (*Ns, -1))
+    kets = jnp.reshape(kets, (N_tot, N_tot, 1))
     kets = Qarray.create(kets)
     kets = kets.reshape_qdims(*Ns)
+    kets = kets.reshape_bdims(*Ns)
 
     return (
         jnp.reshape(Es, Ns),

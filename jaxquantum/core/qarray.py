@@ -203,7 +203,7 @@ class Qarray:
         if prod(new_bdims) == 0:
             new_shape = new_bdims 
         else:
-            new_shape = new_bdims + self.dims[0] + self.dims[1]
+            new_shape = new_bdims + (prod(self.dims[0]),) + (-1,)
         return Qarray.create(
             self.data.reshape(new_shape),
             dims=self.dims,
