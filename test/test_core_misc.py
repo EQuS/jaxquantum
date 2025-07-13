@@ -101,7 +101,7 @@ def test_misc_operators():
     calc_val = jnp.exp(-0.1*2)/(jnp.exp(-0.1*0)+jnp.exp(-0.1*1)+jnp.exp(-0.1*2))
     assert jnp.abs(state_val-calc_val) < 1e-7
 
-    assert jqt.thermal(10,jnp.inf) == jqt.basis(10,0)
+    assert jqt.thermal(10,jnp.inf) == jqt.basis(10,0).to_dm()
 
     assert jqt.basis_like((jqt.identity(2)^jqt.identity(3)), [1,0]) == (jqt.basis(2,1)^jqt.basis(3,0)) 
 # ========================================
