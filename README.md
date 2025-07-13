@@ -96,7 +96,7 @@ ax.set_ylabel("Expectations")
 ax.legend()
 fig.tight_layout()
 ```
-![Output of above code.](assets/readme_demo.png)
+![Output of above code.](docs/assets/readme_demo.png)
 
 
 ## Acknowledgements & History
