@@ -179,6 +179,22 @@ def coherent(N: int, α: complex) -> Qarray:
     return displace(N, α) @ basis(N, 0)
 
 
+def thermal(N: int, beta: float) -> Qarray:
+    """Thermal state.
+
+    Args:
+        N: Hilbert Space Size.
+        beta: thermal state inverse temperature.
+
+    Return:
+        Thermal state.
+    """
+    if beta == jnp.inf:
+        return basis(N, 0)
+
+    return Qarray.create(jnp.diag(jnp.exp(-beta*jnp.linspace(0, N-1, N)))).unit()
+
+
 def basis_like(A: Qarray, ks: List[int]) -> Qarray:
     """Creates a |k> (i.e. fock state) ket with the same space dims as A.
 

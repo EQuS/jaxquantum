@@ -74,7 +74,7 @@ def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", ax
     ax.set_aspect("equal", adjustable="box")
 
     if plot_cbar:
-        cbar = plt.colorbar(im, ax=ax, orientation="vertical")
+        cbar = plt.colorbar(im, ax=ax, orientation="vertical", ticks=np.linspace(-1, 1, 11))
         cbar.ax.set_title(cbar_label)
 
     ax.set_xlabel(r"Re[$\alpha$]")
