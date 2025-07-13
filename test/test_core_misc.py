@@ -85,3 +85,27 @@ def test_iso_transforms():
 # ========================================
 
 # Operators
+
+# ========================================
+
+def test_misc_operators():
+    assert jnp.max(jnp.abs(jqt.sigmay().data - jnp.array([[0.0, -1.0j], [1.0j, 0.0]]))) < 1e-12
+
+    assert jnp.max(jnp.abs(jqt.hadamard().data - jnp.array([[1, 1], [1, -1]]) / jnp.sqrt(2)))  < 1e-12
+
+    assert jnp.max(jnp.abs(jqt.sigmam().data - jnp.array([[0.0, 0.0], [1.0, 0.0]]))) < 1e-12
+
+    assert jnp.max(jnp.abs(jqt.sigmap().data - jnp.array([[0.0, 1.0], [0.0, 0.0]]))) < 1e-12
+
+    assert jnp.max(jnp.abs((jqt.qubit_rotation(0,0,0,0).data - jqt.identity(2).data))) < 1e-12
+
+    assert jnp.max(jnp.abs(jqt.identity_like(jqt.sigmax()).data - jqt.identity(2).data)) < 1e-12
+
+    state_val = jqt.thermal(3,0.1).data[2,2] 
+    calc_val = jnp.exp(-0.1*2)/(jnp.exp(-0.1*0)+jnp.exp(-0.1*1)+jnp.exp(-0.1*2))
+    assert jnp.abs(state_val-calc_val) < 1e-7
+
+    assert jqt.thermal(10,jnp.inf) == jqt.basis(10,0)
+
+    assert jqt.basis_like((jqt.identity(2)^jqt.identity(3)), [1,0]) == (jqt.basis(2,1)^jqt.basis(3,0)) 
+# ========================================
