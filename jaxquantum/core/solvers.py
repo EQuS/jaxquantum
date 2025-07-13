@@ -121,12 +121,12 @@ def mesolve(
         list of states
     """
     
-    c_ops = c_ops if c_ops is not None else jqt.Qarray.from_list([])
+    c_ops = c_ops if c_ops is not None else Qarray.from_list([])
 
     # if isinstance(H, Qarray):
         
 
-    if len(c_ops) == 0 and ρ0.qtype != Qtypes.oper:
+    if len(c_ops) == 0 and rho0.qtype != Qtypes.oper:
         logging.warning(
             "Consider using `jqt.sesolve()` instead, as `c_ops` is an empty list and the initial state is not a density matrix."
         )
@@ -183,9 +183,9 @@ def mesolve_data(
     
     ρ0 = jnp.resize(ρ0, test_data.shape)  # ensure correct shape
 
-    padded_dim = [1 for _ in range(len(ρ0.shape) - 2)]
-    c_ops_bdims = c_ops.shape[:-2]
-    c_ops = c_ops.reshape(*c_ops_bdims, *padded_dim, c_ops.shape[-2], c_ops.shape[-1])
+    if len(c_ops) != 0:
+        c_ops_bdims = c_ops.shape[:-2]
+        c_ops = c_ops.reshape(*c_ops_bdims, c_ops.shape[-2], c_ops.shape[-1])
 
     def f(
         t: float,
@@ -197,6 +197,9 @@ def mesolve_data(
         H_val = H_val + 0.0j
 
         rho_dot = -1j * (H_val @ rho - rho @ H_val)
+
+        if len(c_ops_val) == 0:
+            return rho_dot
 
         c_ops_val_dag = dag_data(c_ops_val)
 
