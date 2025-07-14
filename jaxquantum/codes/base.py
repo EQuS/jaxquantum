@@ -94,7 +94,7 @@ class BosonicQubit(metaclass=ABCMeta):
         Construct basis states |+-x>, |+-y>, |+-z> from |+-z>
         """
         basis: Dict[str, jqt.Qarray] = {}
-        N = self.params["N"]
+
 
         # import to make sure that each basis state is a column vec
         # otherwise, transposing a 1D vector will do nothing

@@ -100,7 +100,6 @@ class ATS(FluxDevice):
 
     def get_H_full(self):
         """Return full H in linear basis."""
-        id_op = self.linear_ops["id"]
         phi_b = self.linear_ops["phi"]
         H_nl = self.get_H_nonlinear(phi_b)
         H = self.get_H_linear() + H_nl

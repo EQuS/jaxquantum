@@ -1,6 +1,8 @@
 """ qubit gates. """
 
-from jaxquantum.core.operators import sigmax, sigmay, sigmaz, basis, hadamard, qubit_rotation
+from jaxquantum.core.operators import (identity, sigmax, sigmay, sigmaz,
+                                       basis,
+                                       hadamard, qubit_rotation)
 from jaxquantum.circuits.gates import Gate
 from jaxquantum.core.qarray import Qarray
 import jax.numpy as jnp

@@ -81,7 +81,6 @@ class System:
         return promote(op, device_num, self.Ns)
 
     def get_H_bare(self):
-        I_ops = [identity(N) for N in self.Ns]
         H = 0
         for j, device in enumerate(self.devices):
             H += self.promote(device.get_H(), j)

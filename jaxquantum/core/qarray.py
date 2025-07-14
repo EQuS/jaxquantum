@@ -32,7 +32,7 @@ def tidy_up(data, atol):
 class Qarray:
     _data: Array
     _qdims: Qdims = struct.field(pytree_node=False)
-    _bdims: Tuple[int] = struct.field(pytree_node=False)
+    _bdims: tuple[int] = struct.field(pytree_node=False)
 
 
     # Initialization ----
@@ -119,8 +119,7 @@ class Qarray:
                 lvl = lvl[0]
             else:
                 break
-        
-        depth = len(bdims)
+
 
         def flat(lis):
             flatList = []
@@ -550,7 +549,7 @@ def collapse(qarr: Qarray, mode="sum") -> Qarray:
     """
     if mode == "sum":
         if len(qarr.bdims) == 0:
-            return self
+            return qarr
 
         batch_axes = list(range(len(qarr.bdims)))
         return Qarray.create(
@@ -710,7 +709,7 @@ def powm(qarr: Qarray, n: Union[int, float]) -> Qarray:
     Returns:
         matrix power
     """
-    if type(n) == int:
+    if isinstance(n, int):
         data_res = jnp.linalg.matrix_power(qarr.data, n)
     else:
         evalues, evectors = jnp.linalg.eig(qarr.data)

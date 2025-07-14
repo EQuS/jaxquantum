@@ -89,6 +89,6 @@ plot_wigner = lambda state, pts, ax=None, contour=True, **kwargs: plot_qp(
     state, pts, ax=ax, contour=contour, qp_type=WIGNER, cbar_label=r"$\mathcal{W}(\alpha)$", **kwargs
 )
 
-plot_qfunc = lambda state, pts, ax=None, contour=True: plot_qp(
+plot_qfunc = lambda state, pts, ax=None, contour=True, **kwargs: plot_qp(
     state, pts, ax=ax, contour=contour, qp_type=QFUNC, cbar_label=r"$\mathcal{Q}(\alpha)$", **kwargs
 )

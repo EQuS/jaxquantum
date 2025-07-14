@@ -113,7 +113,6 @@ class GKPQubit(BosonicQubit):
         # step 2: make ideal eigenvector finite energy
         gstate = self.common_gates["E"] @ gstate_ideal
 
-        N = self.params["N"]
         plus_z = jqt.unit(gstate)
         minus_z = jqt.unit(self.common_gates["X"] @ plus_z)
         return plus_z, minus_z

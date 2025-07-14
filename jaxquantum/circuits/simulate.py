@@ -37,9 +37,6 @@ class Results:
     def append(self, result: Qarray):
         self.results.append(result)
 
-    def __getitem__(self, j: int):
-        return self.results[j]
-
     def __len__(self):
         return len(self.results)
 

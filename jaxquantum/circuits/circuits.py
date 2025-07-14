@@ -173,7 +173,7 @@ class Circuit:
         self.layers.append(layer)
 
     def append_operation(self, operation: Operation, default_simulate_mode=SimulateMode.UNITARY):
-        assert operation.register == self.register, f"Mismatch in operation register {operation.register} and circuit register {circuit.register}."
+        assert operation.register == self.register, (f"Mismatch in operation register {operation.register} and circuit register {self.register}.")
         self.append_layer(Layer.create([operation], default_simulate_mode=default_simulate_mode))
 
     def append(self, gate: Gate, indices: Union[int, List[int]], default_simulate_mode=SimulateMode.UNITARY):
