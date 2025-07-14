@@ -27,15 +27,11 @@ jobs:
         with:
           name: coverage-results
           path: coverage.xml
-      - name: Creating coverage folder
-        run: |
-          mkdir -p coverage
       - name: Coverage Bagdge
         uses: tj-actions/coverage-badge-py@v1.8
         with:
-          output: coverage/coverage.svg
-      - name: Publish coverage report to coverage-badge branch
+          output: coverage.svg
+      - name: Deploy badge to gh-pages branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          branch: gh-pages
-          folder: assets/images
+          branch: test-results
