@@ -14,6 +14,7 @@ class GKPQubit(BosonicQubit):
     """
     GKP Qubit Class.
     """
+
     name = "gkp"
 
     def _params_validation(self):
@@ -41,7 +42,7 @@ class GKPQubit(BosonicQubit):
 
         # finite energy
         self.common_gates["E"] = jqt.expm(
-            -self.params["delta"] ** 2
+            -(self.params["delta"] ** 2)
             * self.common_gates["a_dag"]
             @ self.common_gates["a"]
         )

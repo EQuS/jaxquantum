@@ -1,4 +1,4 @@
-""" System."""
+"""System."""
 
 from typing import List, Optional, Dict, Any, Union
 import math
@@ -71,7 +71,7 @@ class System:
         unique_labels = set(labels)
         if len(labels) != len(unique_labels):
             raise ValueError("Devices must have unique labels.")
-            
+
         Ns = tuple([device.N for device in devices])
         couplings = couplings if couplings is not None else []
         params = params if params is not None else {}
@@ -91,7 +91,7 @@ class System:
         for coupling in self.couplings:
             H += coupling
         return H
-    
+
     def get_H(self):
         H_bare = self.get_H_bare()
         H_couplings = self.get_H_couplings()

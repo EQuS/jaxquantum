@@ -16,6 +16,7 @@ class CatQubit(BosonicQubit):
     """
     Cat Qubit Class.
     """
+
     name = "cat"
 
     @property

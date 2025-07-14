@@ -20,6 +20,7 @@ class BinomialQubit(BosonicQubit):
     """
     Cat Qubit Class.
     """
+
     name = "binomial"
 
     def _params_validation(self):
@@ -46,7 +47,7 @@ class BinomialQubit(BosonicQubit):
         S = L + G
 
         M = jnp.max(jnp.array([L, G, 2 * D]))
-        
+
         def plus_z_gen(p):
             C = comb(M + 1, p)
             return jnp.sqrt(C) * jqt.basis(N, p * (S + 1)).data

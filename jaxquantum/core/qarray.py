@@ -1,4 +1,4 @@
-""" QArray. """
+"""QArray."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from jaxquantum.core.dims import Qtypes, Qdims, check_dims, ket_from_op_dims
 
 config.update("jax_enable_x64", True)
 
+
 def tidy_up(data, atol):
     data_re = jnp.real(data)
     data_im = jnp.imag(data)
@@ -28,17 +29,15 @@ def tidy_up(data, atol):
     return data_new
 
 
-@struct.dataclass # this allows us to send in and return Qarray from jitted functions
+@struct.dataclass  # this allows us to send in and return Qarray from jitted functions
 class Qarray:
     _data: Array
     _qdims: Qdims = struct.field(pytree_node=False)
     _bdims: tuple[int] = struct.field(pytree_node=False)
 
-
     # Initialization ----
     @classmethod
     def create(cls, data, dims=None, bdims=None):
-
         # Step 1: Prepare data ----
         data = jnp.asarray(data)
 
@@ -46,7 +45,9 @@ class Qarray:
             data = data.reshape(data.shape[0], 1)
 
         if len(data.shape) >= 2:
-            if data.shape[-2] != data.shape[-1] and not (data.shape[-2] == 1 or data.shape[-1] == 1):
+            if data.shape[-2] != data.shape[-1] and not (
+                data.shape[-2] == 1 or data.shape[-1] == 1
+            ):
                 data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
 
         if bdims is not None:
@@ -62,13 +63,13 @@ class Qarray:
             dims = ((data.shape[-2],), (data.shape[-1],))
 
         dims = (tuple(dims[0]), tuple(dims[1]))
-        
+
         check_dims(dims, bdims, data.shape)
 
         qdims = Qdims(dims)
 
         # NOTE: Constantly tidying up on Qarray creation might be a bit overkill.
-        # It increases the compilation time, but only very slightly 
+        # It increases the compilation time, but only very slightly
         # increased the runtime of the jit compiled function.
         # We could instead use this tidy_up where we think we need it.
         data = tidy_up(data, SETTINGS["auto_tidyup_atol"])
@@ -79,32 +80,31 @@ class Qarray:
 
     @classmethod
     def from_list(cls, qarr_list: List[Qarray]) -> Qarray:
-        """ Create a Qarray from a list of Qarrays. """
-        
+        """Create a Qarray from a list of Qarrays."""
+
         data = jnp.array([qarr.data for qarr in qarr_list])
-        
 
         if len(qarr_list) == 0:
-            dims = ((),())
+            dims = ((), ())
             bdims = ()
         else:
             dims = qarr_list[0].dims
             bdims = qarr_list[0].bdims
-        
+
         if not all(qarr.dims == dims and qarr.bdims == bdims for qarr in qarr_list):
             raise ValueError("All Qarrays in the list must have the same dimensions.")
-            
+
         bdims = (len(qarr_list),) + bdims
 
         return cls.create(data, dims=dims, bdims=bdims)
 
     @classmethod
     def from_array(cls, qarr_arr) -> Qarray:
-        """ Create a Qarray from a nested list of Qarrays. 
-        
+        """Create a Qarray from a nested list of Qarrays.
+
         Args:
             qarr_arr (list): nested list of Qarrays
-        
+
         Returns:
             Qarray: Qarray object
         """
@@ -120,7 +120,6 @@ class Qarray:
             else:
                 break
 
-
         def flat(lis):
             flatList = []
             for element in lis:
@@ -135,12 +134,11 @@ class Qarray:
         qarr = qarr.reshape_bdims(*bdims)
         return qarr
 
-
     # Properties ----
     @property
     def qtype(self):
         return self._qdims.qtype
-    
+
     @property
     def dtype(self):
         return self._data.dtype
@@ -156,7 +154,7 @@ class Qarray:
     @property
     def qdims(self):
         return self._qdims
-        
+
     @property
     def space_dims(self):
         if self.qtype in [Qtypes.oper, Qtypes.ket]:
@@ -166,16 +164,16 @@ class Qarray:
         else:
             # TODO: not reached for some reason
             raise ValueError("Unsupported qtype.")
-        
+
     @property
     def data(self):
         return self._data
-    
+
     @property
     def shaped_data(self):
         return self._data.reshape(self.bdims + self.dims[0] + self.dims[1])
 
-    @property 
+    @property
     def shape(self):
         return self.data.shape
 
@@ -193,11 +191,11 @@ class Qarray:
             raise ValueError("Cannot index a non-batched Qarray.")
 
     def reshape_bdims(self, *args):
-        """ Reshape the batch dimensions of the Qarray. """
+        """Reshape the batch dimensions of the Qarray."""
         new_bdims = tuple(args)
 
         if prod(new_bdims) == 0:
-            new_shape = new_bdims 
+            new_shape = new_bdims
         else:
             new_shape = new_bdims + (prod(self.dims[0]),) + (-1,)
         return Qarray.create(
@@ -207,7 +205,6 @@ class Qarray:
         )
 
     def space_to_qdims(self, space_dims: List[int]):
-        
         if isinstance(space_dims[0], (list, tuple)):
             return space_dims
 
@@ -219,13 +216,13 @@ class Qarray:
             raise ValueError("Unsupported qtype for space_to_qdims conversion.")
 
     def reshape_qdims(self, *args):
-        """ Reshape the quantum dimensions of the Qarray. 
-        
+        """Reshape the quantum dimensions of the Qarray.
+
         Note that this does not take in qdims but rather the new Hilbert space dimensions.
 
         Args:
             *args: new Hilbert dimensions for the Qarray.
-        
+
         Returns:
             Qarray: reshaped Qarray.
         """
@@ -234,19 +231,14 @@ class Qarray:
         current_space_dims = self.space_dims
         assert prod(new_space_dims) == prod(current_space_dims)
 
-
         new_qdims = self.space_to_qdims(new_space_dims)
         new_bdims = self.bdims
 
-        return Qarray.create(
-            self.data,
-            dims=new_qdims,
-            bdims=new_bdims
-        )
-        
+        return Qarray.create(self.data, dims=new_qdims, bdims=new_bdims)
+
     def resize(self, new_shape):
-        """ Resize the Qarray to a new shape. 
-        
+        """Resize the Qarray to a new shape.
+
         TODO: review and maybe deprecate this method.
         """
         dims = self.dims
@@ -257,12 +249,11 @@ class Qarray:
         )
 
     def __len__(self):
-        """ Length of the Qarray. """
+        """Length of the Qarray."""
         if len(self.bdims) > 0:
             return self.data.shape[0]
         else:
             raise ValueError("Cannot get length of a non-batched Qarray.")
-
 
     def __eq__(self, other):
         if not isinstance(other, Qarray):
@@ -275,11 +266,11 @@ class Qarray:
             return False
 
         return jnp.all(self.data == other.data)
-    
+
     def __ne__(self, other):
         return not self.__eq__(other)
-    # ----
 
+    # ----
 
     # Elementary Math ----
     def __matmul__(self, other):
@@ -290,9 +281,9 @@ class Qarray:
             self.data @ other.data,
             dims=_qdims_new.dims,
         )
-    
+
     # NOTE: not possible to reach this.
-    # def __rmatmul__(self, other):        
+    # def __rmatmul__(self, other):
     #     if not isinstance(other, Qarray):
     #         return NotImplemented
 
@@ -301,47 +292,46 @@ class Qarray:
     #         other.data @ self.data,
     #         dims=_qdims_new.dims,
     #     )
-        
-    
+
     def __mul__(self, other):
         if isinstance(other, Qarray):
             return self.__matmul__(other)
-     
 
         other = other + 0.0j
-        if not robust_isscalar(other) and len(other.shape) > 0: # not a scalar
-            other = other.reshape(other.shape + (1,1))
-            
+        if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
+            other = other.reshape(other.shape + (1, 1))
+
         return Qarray.create(
             other * self.data,
             dims=self._qdims.dims,
         )
 
     def __rmul__(self, other):
-        
         # NOTE: not possible to reach this.
         # if isinstance(other, Qarray):
         #     return self.__rmatmul__(other)
-        
+
         return self.__mul__(other)
 
     def __neg__(self):
         return self.__mul__(-1)
-    
+
     def __truediv__(self, other):
-        """ For Qarray's, this only really makes sense in the context of division by a scalar. """
+        """For Qarray's, this only really makes sense in the context of division by a scalar."""
 
         if isinstance(other, Qarray):
             raise ValueError("Cannot divide a Qarray by another Qarray.")
 
-        return self.__mul__(1/other)
-    
+        return self.__mul__(1 / other)
+
     def __add__(self, other):
         if isinstance(other, Qarray):
             if self.dims != other.dims:
                 msg = (
                     "Dimensions are incompatible: "
-                    + repr(self.dims) + " and " + repr(other.dims)
+                    + repr(self.dims)
+                    + " and "
+                    + repr(other.dims)
                 )
                 raise ValueError(msg)
             return Qarray.create(self.data + other.data, dims=self.dims)
@@ -351,22 +341,27 @@ class Qarray:
 
         if self.data.shape[-2] == self.data.shape[-1]:
             other = other + 0.0j
-            if not robust_isscalar(other) and len(other.shape) > 0: # not a scalar
-                other = other.reshape(other.shape + (1,1))
-            other = Qarray.create(other * jnp.eye(self.data.shape[-2], dtype=self.data.dtype), dims=self.dims)
+            if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
+                other = other.reshape(other.shape + (1, 1))
+            other = Qarray.create(
+                other * jnp.eye(self.data.shape[-2], dtype=self.data.dtype),
+                dims=self.dims,
+            )
             return self.__add__(other)
-        
+
         return NotImplemented
-    
+
     def __radd__(self, other):
         return self.__add__(other)
-    
-    def __sub__(self, other):    
+
+    def __sub__(self, other):
         if isinstance(other, Qarray):
             if self.dims != other.dims:
                 msg = (
                     "Dimensions are incompatible: "
-                    + repr(self.dims) + " and " + repr(other.dims)
+                    + repr(self.dims)
+                    + " and "
+                    + repr(other.dims)
                 )
                 raise ValueError(msg)
             return Qarray.create(self.data - other.data, dims=self.dims)
@@ -376,16 +371,19 @@ class Qarray:
 
         if self.data.shape[-2] == self.data.shape[-1]:
             other = other + 0.0j
-            if not robust_isscalar(other) and len(other.shape) > 0: # not a scalar
-                other = other.reshape(other.shape + (1,1))
-            other = Qarray.create(other * jnp.eye(self.data.shape[-2], dtype=self.data.dtype), dims=self.dims)
+            if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
+                other = other.reshape(other.shape + (1, 1))
+            other = Qarray.create(
+                other * jnp.eye(self.data.shape[-2], dtype=self.data.dtype),
+                dims=self.dims,
+            )
             return self.__sub__(other)
-        
+
         return NotImplemented
-        
+
     def __rsub__(self, other):
         return self.__neg__().__add__(other)
-    
+
     def __xor__(self, other):
         if not isinstance(other, Qarray):
             return NotImplemented
@@ -395,79 +393,80 @@ class Qarray:
         if not isinstance(other, Qarray):
             return NotImplemented
         return tensor(other, self)
-    
+
     def __pow__(self, other):
         if not isinstance(other, int):
             return NotImplemented
-        
+
         return powm(self, other)
-    
+
     # ----
 
     # String Representation ----
     def _str_header(self):
-        out = ", ".join([
-            "Quantum array: dims = " + str(self.dims),
-            "bdims = " + str(self.bdims),
-            "shape = " + str(self._data.shape),
-            "type = " + str(self.qtype),
-        ])
+        out = ", ".join(
+            [
+                "Quantum array: dims = " + str(self.dims),
+                "bdims = " + str(self.bdims),
+                "shape = " + str(self._data.shape),
+                "type = " + str(self.qtype),
+            ]
+        )
         return out
 
     def __str__(self):
         return self._str_header() + "\nQarray data =\n" + str(self.data)
-        
+
     @property
     def header(self):
-        """ Print the header of the Qarray. """
+        """Print the header of the Qarray."""
         return self._str_header()
 
     def __repr__(self):
         return self.__str__()
-    
+
     # ----
 
     # Utilities ----
     def copy(self, memo=None):
         # return Qarray.create(deepcopy(self.data), dims=self.dims)
         return self.__deepcopy__(memo)
-    
+
     def __deepcopy__(self, memo):
-        """ Need to override this when defininig __getattr__. """
+        """Need to override this when defininig __getattr__."""
 
         return Qarray(
-            _data = deepcopy(self._data, memo=memo),
-            _qdims = deepcopy(self._qdims, memo=memo),
-            _bdims = deepcopy(self._bdims, memo=memo)
+            _data=deepcopy(self._data, memo=memo),
+            _qdims=deepcopy(self._qdims, memo=memo),
+            _bdims=deepcopy(self._bdims, memo=memo),
         )
 
     def __getattr__(self, method_name):
-
         if "__" == method_name[:2]:
             # NOTE: we return NotImplemented for binary special methods logic in python, plus things like __jax_array__
             return lambda *args, **kwargs: NotImplemented
 
         modules = [jnp, jnp.linalg, jsp, jsp.linalg]
 
-        method_f = None 
+        method_f = None
         for mod in modules:
             method_f = getattr(mod, method_name, None)
             if method_f is not None:
                 break
 
         if method_f is None:
-            raise NotImplementedError(f"Method {method_name} does not exist. No backup method found in {modules}.")
+            raise NotImplementedError(
+                f"Method {method_name} does not exist. No backup method found in {modules}."
+            )
 
-        def func(*args, **kwargs): 
+        def func(*args, **kwargs):
             res = method_f(self.data, *args, **kwargs)
-            
+
             if getattr(res, "shape", None) is None or res.shape != self.data.shape:
                 return res
             else:
-                return Qarray.create(
-                    res,
-                    dims=self._qdims.dims
-                )
+                return Qarray.create(res, dims=self._qdims.dims)
+
         return func
 
     # ----
@@ -475,25 +474,25 @@ class Qarray:
     # Conversions / Reshaping ----
     def dag(self):
         return dag(self)
-    
+
     def to_dm(self):
         return ket2dm(self)
-    
+
     def is_dm(self):
         return self.qtype == Qtypes.oper
 
     def is_vec(self):
         return self.qtype == Qtypes.ket or self.qtype == Qtypes.bra
-    
+
     def to_ket(self):
         return to_ket(self)
-    
+
     def transpose(self, *args):
         return transpose(self, *args)
 
     def keep_only_diag_elements(self):
         return keep_only_diag_elements(self)
-    
+
     # ----
 
     # Math Functions ----
@@ -508,13 +507,13 @@ class Qarray:
 
     def powm(self, n):
         return powm(self, n)
-    
+
     def cosm(self):
         return cosm(self)
-    
+
     def sinm(self):
         return sinm(self)
-    
+
     def tr(self, **kwargs):
         return tr(self, **kwargs)
 
@@ -523,27 +522,30 @@ class Qarray:
 
     def ptrace(self, indx):
         return ptrace(self, indx)
-        
+
     def eigenstates(self):
         return eigenstates(self)
 
     def eigenenergies(self):
         return eigenenergies(self)
-    
+
     def collapse(self, mode="sum"):
-        return collapse(self, mode=mode)    
+        return collapse(self, mode=mode)
+
     # ----
+
 
 ARRAY_TYPES = (Array, ndarray, Qarray)
 
 # Qarray operations ---------------------------------------------------------------------
+
 
 def collapse(qarr: Qarray, mode="sum") -> Qarray:
     """Collapse the Qarray.
 
     Args:
         qarr (Qarray): quantum array array
-    
+
     Returns:
         Collapsed quantum array
     """
@@ -552,19 +554,16 @@ def collapse(qarr: Qarray, mode="sum") -> Qarray:
             return qarr
 
         batch_axes = list(range(len(qarr.bdims)))
-        return Qarray.create(
-            jnp.sum(qarr.data, axis=batch_axes),
-            dims=qarr.dims
-        )
-    
+        return Qarray.create(jnp.sum(qarr.data, axis=batch_axes), dims=qarr.dims)
+
 
 def transpose(qarr: Qarray, indices: List[int]) -> Qarray:
-    """ Transpose the quantum array.
+    """Transpose the quantum array.
 
     Args:
         qarr (Qarray): quantum array
         *args: axes to transpose
-    
+
     Returns:
         tranposed Qarray
     """
@@ -580,11 +579,15 @@ def transpose(qarr: Qarray, indices: List[int]) -> Qarray:
     reshape_indices = bdims_indxs + [j + len(bdims_indxs) for j in reshape_indices]
 
     shaped_data = shaped_data.transpose(reshape_indices)
-    new_dims = (tuple([dims[0][j] for j in indices]), tuple([dims[1][j] for j in indices]))
+    new_dims = (
+        tuple([dims[0][j] for j in indices]),
+        tuple([dims[1][j] for j in indices]),
+    )
 
     full_dims = prod(dims[0])
     full_data = shaped_data.reshape(*qarr.bdims, full_dims, -1)
-    return Qarray.create(full_data, dims = new_dims)
+    return Qarray.create(full_data, dims=new_dims)
+
 
 def unit(qarr: Qarray) -> Qarray:
     """Normalize the quantum array.
@@ -599,6 +602,7 @@ def unit(qarr: Qarray) -> Qarray:
     data = data / qarr.norm()
     return Qarray.create(data, dims=qarr.dims)
 
+
 def norm(qarr: Qarray) -> float:
     data = qarr.data
     data_dag = qarr.dag().data
@@ -610,12 +614,13 @@ def norm(qarr: Qarray) -> float:
     elif qarr.qtype in [Qtypes.ket, Qtypes.bra]:
         return jnp.linalg.norm(data)
 
+
 def tensor(*args, **kwargs) -> Qarray:
     """Tensor product.
 
     Args:
         *args (Qarray): tensors to take the product of
-        parallel (bool): if True, use parallel einsum for tensor product 
+        parallel (bool): if True, use parallel einsum for tensor product
             true: [A,B] ^ [C,D] = [A^C, B^D]
             false: [A,B] ^ [C,D] = [A^C, A^D, B^C, B^D]
 
@@ -625,15 +630,14 @@ def tensor(*args, **kwargs) -> Qarray:
     """
 
     parallel = kwargs.pop("parallel", False)
-    
+
     data = args[0].data
     dims = deepcopy(args[0].dims)
     dims_0 = dims[0]
     dims_1 = dims[1]
     for arg in args[1:]:
-
         if parallel:
-            a = data 
+            a = data
             b = arg.data
 
             if len(a.shape) > len(b.shape):
@@ -646,7 +650,9 @@ def tensor(*args, **kwargs) -> Qarray:
             else:
                 batch_dim = b.shape[:-2]
 
-            data = jnp.einsum("...ij,...kl->...ikjl", a, b).reshape(*batch_dim, a.shape[-2] * b.shape[-2], -1)
+            data = jnp.einsum("...ij,...kl->...ikjl", a, b).reshape(
+                *batch_dim, a.shape[-2] * b.shape[-2], -1
+            )
         else:
             data = jnp.kron(data, arg.data, **kwargs)
 
@@ -655,11 +661,12 @@ def tensor(*args, **kwargs) -> Qarray:
 
     return Qarray.create(data, dims=(dims_0, dims_1))
 
+
 def tr(qarr: Qarray, **kwargs) -> Array:
     """Full trace.
 
     Args:
-        qarr (Qarray): quantum array    
+        qarr (Qarray): quantum array
 
     Returns:
         Full trace.
@@ -668,17 +675,17 @@ def tr(qarr: Qarray, **kwargs) -> Array:
     axis2 = kwargs.get("axis2", -1)
     return jnp.trace(qarr.data, axis1=axis1, axis2=axis2, **kwargs)
 
+
 def trace(qarr: Qarray, **kwargs) -> Array:
     """Full trace.
 
     Args:
-        qarr (Qarray): quantum array    
+        qarr (Qarray): quantum array
 
     Returns:
         Full trace.
     """
     return tr(qarr, **kwargs)
-    
 
 
 def expm_data(data: Array, **kwargs) -> Array:
@@ -689,6 +696,7 @@ def expm_data(data: Array, **kwargs) -> Array:
     """
     return jsp.linalg.expm(data, **kwargs)
 
+
 def expm(qarr: Qarray, **kwargs) -> Qarray:
     """Matrix exponential wrapper.
 
@@ -698,6 +706,7 @@ def expm(qarr: Qarray, **kwargs) -> Qarray:
     dims = qarr.dims
     data = expm_data(qarr.data, **kwargs)
     return Qarray.create(data, dims=dims)
+
 
 def powm(qarr: Qarray, n: Union[int, float]) -> Qarray:
     """Matrix power.
@@ -714,19 +723,23 @@ def powm(qarr: Qarray, n: Union[int, float]) -> Qarray:
     else:
         evalues, evectors = jnp.linalg.eig(qarr.data)
         if not (evalues >= 0).all():
-            raise ValueError("Non-integer power of a matrix can only be "
-                             "computed if the matrix is positive semi-definite."
-                             "Got a matrix with a negative eigenvalue.")
+            raise ValueError(
+                "Non-integer power of a matrix can only be "
+                "computed if the matrix is positive semi-definite."
+                "Got a matrix with a negative eigenvalue."
+            )
         data_res = evectors * jnp.pow(evalues, n) @ jnp.linalg.inv(evectors)
     return Qarray.create(data_res, dims=qarr.dims)
-    
+
+
 def cosm_data(data: Array, **kwargs) -> Array:
     """Matrix cosine wrapper.
 
     Returns:
         matrix cosine
     """
-    return (expm_data(1j*data) + expm_data(-1j*data))/2 
+    return (expm_data(1j * data) + expm_data(-1j * data)) / 2
+
 
 def cosm(qarr: Qarray) -> Qarray:
     """Matrix cosine wrapper.
@@ -741,6 +754,7 @@ def cosm(qarr: Qarray) -> Qarray:
     data = cosm_data(qarr.data)
     return Qarray.create(data, dims=dims)
 
+
 def sinm_data(data: Array, **kwargs) -> Array:
     """Matrix sine wrapper.
 
@@ -750,12 +764,14 @@ def sinm_data(data: Array, **kwargs) -> Array:
     Returns:
         matrix sine
     """
-    return (expm_data(1j*data) - expm_data(-1j*data))/(2j)
+    return (expm_data(1j * data) - expm_data(-1j * data)) / (2j)
+
 
 def sinm(qarr: Qarray) -> Qarray:
     dims = qarr.dims
     data = sinm_data(qarr.data)
     return Qarray.create(data, dims=dims)
+
 
 def keep_only_diag_elements(qarr: Qarray) -> Qarray:
     if len(qarr.bdims) > 0:
@@ -765,6 +781,7 @@ def keep_only_diag_elements(qarr: Qarray) -> Qarray:
     data = jnp.diag(jnp.diag(qarr.data))
     return Qarray.create(data, dims=dims)
 
+
 def to_ket(qarr: Qarray) -> Qarray:
     if qarr.qtype == Qtypes.ket:
         return qarr
@@ -772,7 +789,8 @@ def to_ket(qarr: Qarray) -> Qarray:
         return qarr.dag()
     else:
         raise ValueError("Can only get ket from a ket or bra.")
-    
+
+
 def eigenstates(qarr: Qarray) -> Qarray:
     """Eigenstates of a quantum array.
 
@@ -789,7 +807,7 @@ def eigenstates(qarr: Qarray) -> Qarray:
     dims = ket_from_op_dims(qarr.dims)
 
     evals = jnp.take_along_axis(evals, idxs_sorted, axis=-1)
-    evecs = jnp.take_along_axis(evecs, idxs_sorted[...,None,:], axis=-1)
+    evecs = jnp.take_along_axis(evecs, idxs_sorted[..., None, :], axis=-1)
 
     evecs = Qarray.create(
         evecs,
@@ -798,6 +816,7 @@ def eigenstates(qarr: Qarray) -> Qarray:
     )
 
     return evals, evecs
+
 
 def eigenenergies(qarr: Qarray) -> Array:
     """Eigenvalues of a quantum array.
@@ -812,7 +831,9 @@ def eigenenergies(qarr: Qarray) -> Array:
     evals = jnp.linalg.eigvalsh(qarr.data)
     return evals
 
+
 # More quantum specific -----------------------------------------------------
+
 
 def ptrace(qarr: Qarray, indx) -> Qarray:
     """Partial Trace.
@@ -847,9 +868,10 @@ def ptrace(qarr: Qarray, indx) -> Qarray:
     rho = rho.transpose(indxs)
 
     for j in range(Nq - 1):
-        rho = jnp.trace(rho, axis1=2+len_bdims, axis2=3+len_bdims)
+        rho = jnp.trace(rho, axis1=2 + len_bdims, axis2=3 + len_bdims)
 
     return Qarray.create(rho)
+
 
 def dag(qarr: Qarray) -> Qarray:
     """Conjugate transpose.
@@ -863,8 +885,9 @@ def dag(qarr: Qarray) -> Qarray:
     dims = qarr.dims[::-1]
 
     data = dag_data(qarr.data)
-    
+
     return Qarray.create(data, dims=dims)
+
 
 def dag_data(arr: Array) -> Array:
     """Conjugate transpose.
@@ -878,10 +901,11 @@ def dag_data(arr: Array) -> Array:
     # TODO: revisit this case...
     if len(arr.shape) == 1:
         return jnp.conj(arr)
-        
+
     return jnp.moveaxis(
         jnp.conj(arr), -1, -2
     )  # transposes last two axes, good for batching
+
 
 def ket2dm(qarr: Qarray) -> Qarray:
     """Turns ket into density matrix.
@@ -896,7 +920,7 @@ def ket2dm(qarr: Qarray) -> Qarray:
 
     if qarr.qtype == Qtypes.oper:
         return qarr
-    
+
     if qarr.qtype == Qtypes.bra:
         qarr = qarr.dag()
 
@@ -904,6 +928,7 @@ def ket2dm(qarr: Qarray) -> Qarray:
 
 
 # Data level operations ----
+
 
 def is_dm_data(data: Array) -> bool:
     """Check if data is a density matrix.
@@ -914,6 +939,7 @@ def is_dm_data(data: Array) -> bool:
         True if data is a density matrix
     """
     return data.shape[-2] == data.shape[-1]
+
 
 def powm_data(data: Array, n: int) -> Array:
     """Matrix power.

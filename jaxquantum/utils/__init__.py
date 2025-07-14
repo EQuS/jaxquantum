@@ -1,3 +1,3 @@
 """Utils"""
 
-from .utils import * # noqa
+from .utils import *  # noqa

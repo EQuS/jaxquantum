@@ -1,4 +1,4 @@
-""" Transmon."""
+"""Transmon."""
 
 from flax import struct
 from jax import config
@@ -19,8 +19,8 @@ class TruncatedTransmon(FluxDevice):
     """
 
     def common_ops(self):
-        """ Written in the linear basis. """
-        
+        """Written in the linear basis."""
+
         ops = {}
 
         N = self.N_pre_diag
@@ -62,5 +62,4 @@ class TruncatedTransmon(FluxDevice):
 
     def potential(self, phi):
         """Return potential energy for a given phi."""
-        return - self.params["Ej"] * jnp.cos(2 * jnp.pi * phi)
-
+        return -self.params["Ej"] * jnp.cos(2 * jnp.pi * phi)

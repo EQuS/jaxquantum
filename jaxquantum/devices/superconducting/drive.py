@@ -1,4 +1,4 @@
-""" Base Drive."""
+"""Base Drive."""
 
 from abc import ABC
 from typing import Dict

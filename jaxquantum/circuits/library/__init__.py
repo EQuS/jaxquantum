@@ -1,4 +1,4 @@
-""" Library imports """ 
+"""Library imports"""
 
-from .qubit import * # noqa
-from .oscillator import * # noqa
+from .qubit import *  # noqa
+from .oscillator import *  # noqa

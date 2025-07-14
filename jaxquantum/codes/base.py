@@ -20,6 +20,7 @@ class BosonicQubit(metaclass=ABCMeta):
     """
     Base class for Bosonic Qubits.
     """
+
     name = "bqubit"
 
     @property
@@ -46,9 +47,9 @@ class BosonicQubit(metaclass=ABCMeta):
         self.basis = self._get_basis_states()
 
         for basis_state in ["+x", "-x", "+y", "-y", "+z", "-z"]:
-            assert (
-                basis_state in self.basis
-            ), f"Please set the {basis_state} basis state."
+            assert basis_state in self.basis, (
+                f"Please set the {basis_state} basis state."
+            )
 
     def _params_validation(self):
         """
@@ -94,7 +95,6 @@ class BosonicQubit(metaclass=ABCMeta):
         Construct basis states |+-x>, |+-y>, |+-z> from |+-z>
         """
         basis: Dict[str, jqt.Qarray] = {}
-
 
         # import to make sure that each basis state is a column vec
         # otherwise, transposing a 1D vector will do nothing
@@ -161,8 +161,7 @@ class BosonicQubit(metaclass=ABCMeta):
         """
         return None
 
-
-    @property 
+    @property
     def h_H(self) -> Optional[jqt.Qarray]:
         """
         Logical Hadamard hamiltonian.
@@ -174,7 +173,10 @@ class BosonicQubit(metaclass=ABCMeta):
         """
         Logical Hadamard unitary gate.
         """
-        return self.basis["+x"] @ self.basis["+z"].dag() + self.basis["-x"] @ self.basis["-z"].dag()
+        return (
+            self.basis["+x"] @ self.basis["+z"].dag()
+            + self.basis["-x"] @ self.basis["-z"].dag()
+        )
 
     def _gen_pauli_U(self, basis_state: str) -> jqt.Qarray:
         """
@@ -260,11 +262,11 @@ class BosonicQubit(metaclass=ABCMeta):
         Plot |±x⟩, |±y⟩, |±z⟩ code states.
 
         Args:
-            qp_type (str): 
+            qp_type (str):
                 WIGNER or QFUNC
-            
+
         Return:
-            axs: Axes 
+            axs: Axes
         """
         fig, axs = plt.subplots(2, 3, figsize=(12, 6), dpi=200)
         if qp_type == jqt.WIGNER:
@@ -290,7 +292,7 @@ class BosonicQubit(metaclass=ABCMeta):
         fig.subplots_adjust(right=0.8, hspace=0.2, wspace=0.2)
         fig.align_xlabels(axs)
         fig.align_ylabels(axs)
-        cbar_ax = fig.add_axes([0.85 , 0.15, 0.05, 0.7])
+        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
 
         ticks = np.linspace(vmin, vmax, 5)
         fig.colorbar(w_plt, cax=cbar_ax, ticks=ticks)
@@ -298,4 +300,3 @@ class BosonicQubit(metaclass=ABCMeta):
         cbar_ax.set_title(cbar_title, pad=20)
         fig.tight_layout()
         plt.show()
-

@@ -12,7 +12,16 @@ WIGNER = "wigner"
 QFUNC = "qfunc"
 
 
-def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", axis_scale_factor=1, plot_cbar=True):
+def plot_qp(
+    state,
+    pts,
+    ax=None,
+    contour=True,
+    qp_type=WIGNER,
+    cbar_label="",
+    axis_scale_factor=1,
+    plot_cbar=True,
+):
     """Plot quasi-probability distribution.
 
     TODO: decouple this from qutip.
@@ -74,7 +83,9 @@ def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", ax
     ax.set_aspect("equal", adjustable="box")
 
     if plot_cbar:
-        cbar = plt.colorbar(im, ax=ax, orientation="vertical", ticks=np.linspace(-1, 1, 11))
+        cbar = plt.colorbar(
+            im, ax=ax, orientation="vertical", ticks=np.linspace(-1, 1, 11)
+        )
         cbar.ax.set_title(cbar_label)
 
     ax.set_xlabel(r"Re[$\alpha$]")
@@ -86,9 +97,21 @@ def plot_qp(state, pts, ax=None, contour=True, qp_type=WIGNER, cbar_label="", ax
 
 
 plot_wigner = lambda state, pts, ax=None, contour=True, **kwargs: plot_qp(
-    state, pts, ax=ax, contour=contour, qp_type=WIGNER, cbar_label=r"$\mathcal{W}(\alpha)$", **kwargs
+    state,
+    pts,
+    ax=ax,
+    contour=contour,
+    qp_type=WIGNER,
+    cbar_label=r"$\mathcal{W}(\alpha)$",
+    **kwargs,
 )
 
 plot_qfunc = lambda state, pts, ax=None, contour=True, **kwargs: plot_qp(
-    state, pts, ax=ax, contour=contour, qp_type=QFUNC, cbar_label=r"$\mathcal{Q}(\alpha)$", **kwargs
+    state,
+    pts,
+    ax=ax,
+    contour=contour,
+    qp_type=QFUNC,
+    cbar_label=r"$\mathcal{Q}(\alpha)$",
+    **kwargs,
 )

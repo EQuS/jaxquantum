@@ -1,4 +1,4 @@
-""" Gates. """
+"""Gates."""
 
 from flax import struct
 from jax import Array, config
@@ -14,14 +14,14 @@ config.update("jax_enable_x64", True)
 @struct.dataclass
 class Gate:
     dims: List[int] = struct.field(pytree_node=False)
-    _U: Optional[Array] # Unitary
-    _H: Optional[Array] # Hamiltonian
-    _KM: Optional[Qarray] # Kraus map
+    _U: Optional[Array]  # Unitary
+    _H: Optional[Array]  # Hamiltonian
+    _KM: Optional[Qarray]  # Kraus map
     _params: Dict[str, Any]
     _ts: Array
     _name: str = struct.field(pytree_node=False)
     num_modes: int = struct.field(pytree_node=False)
-    
+
     @classmethod
     def create(
         cls,
@@ -34,8 +34,8 @@ class Gate:
         gen_KM: Optional[Callable[[Dict[str, Any]], List[Qarray]]] = None,
         num_modes: int = 1,
     ):
-        """ Create a gate. 
-        
+        """Create a gate.
+
         Args:
             dims: Dimensions of the gate.
             name: Name of the gate.
@@ -51,13 +51,14 @@ class Gate:
 
         if isinstance(dims, int):
             dims = [dims]
-        
-        assert len(dims) == num_modes, "Number of dimensions must match number of modes."
-        
+
+        assert len(dims) == num_modes, (
+            "Number of dimensions must match number of modes."
+        )
 
         # Unitary
-        _U = gen_U(params) if gen_U is not None else None 
-        _H = gen_H(params) if gen_H is not None else None 
+        _U = gen_U(params) if gen_U is not None else None
+        _H = gen_H(params) if gen_H is not None else None
 
         if gen_KM is not None:
             _KM = gen_KM(params)
@@ -65,14 +66,14 @@ class Gate:
             _KM = Qarray.from_list([_U])
 
         return Gate(
-            dims = dims,
-            _U = _U,
-            _H = _H,
-            _KM = _KM,
-            _params = params if params is not None else {},
+            dims=dims,
+            _U=_U,
+            _H=_H,
+            _KM=_KM,
+            _params=params if params is not None else {},
             _ts=ts if ts is not None else jnp.array([]),
-            _name = name,
-            num_modes = num_modes
+            _name=name,
+            num_modes=num_modes,
         )
 
     def __str__(self):

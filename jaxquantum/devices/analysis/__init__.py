@@ -1,3 +1,3 @@
-""" Analysis Tools """
+"""Analysis Tools"""
 
-from .sweeps import * # noqa
+from .sweeps import *  # noqa

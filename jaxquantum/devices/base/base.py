@@ -1,5 +1,4 @@
-
-""" Base device."""
+"""Base device."""
 
 from abc import abstractmethod, ABC
 from enum import Enum
@@ -39,6 +38,7 @@ class BasisTypes(str, Enum):
     def __hash__(self):
         return hash(self.value)
 
+
 class HamiltonianTypes(str, Enum):
     linear = "linear"
     truncated = "truncated"
@@ -63,6 +63,7 @@ class HamiltonianTypes(str, Enum):
     def __hash__(self):
         return hash(self.value)
 
+
 @struct.dataclass
 class Device(ABC):
     DEFAULT_BASIS = BasisTypes.fock
@@ -77,11 +78,20 @@ class Device(ABC):
 
     @classmethod
     def param_validation(cls, N, N_pre_diag, params, hamiltonian, basis):
-        """ This can be overridden by subclasses."""
+        """This can be overridden by subclasses."""
         pass
 
     @classmethod
-    def create(cls, N, params, label=0, N_pre_diag=None,use_linear=False, hamiltonian: HamiltonianTypes = None, basis: BasisTypes = None):
+    def create(
+        cls,
+        N,
+        params,
+        label=0,
+        N_pre_diag=None,
+        use_linear=False,
+        hamiltonian: HamiltonianTypes = None,
+        basis: BasisTypes = None,
+    ):
         """Create a device.
 
         Args:
@@ -93,26 +103,28 @@ class Device(ABC):
             hamiltonian (HamiltonianTypes, optional): type of Hamiltonian. Defaults to None, in which case the full hamiltonian is used.
             basis (BasisTypes, optional): type of basis. Defaults to None, in which case the fock basis is used.
         """
-        
+
         if N_pre_diag is None:
             N_pre_diag = N
 
         assert N_pre_diag >= N, "N_pre_diag must be greater than or equal to N."
 
         _basis = basis if basis is not None else cls.DEFAULT_BASIS
-        _hamiltonian = hamiltonian if hamiltonian is not None else cls.DEFAULT_HAMILTONIAN
-        
+        _hamiltonian = (
+            hamiltonian if hamiltonian is not None else cls.DEFAULT_HAMILTONIAN
+        )
+
         if use_linear:
             _hamiltonian = HamiltonianTypes.linear
-        
+
         cls.param_validation(N, N_pre_diag, params, _hamiltonian, _basis)
 
         return cls(N, N_pre_diag, params, label, _basis, _hamiltonian)
-    
+
     @property
     def basis(self):
         return self._basis
-    
+
     @property
     def hamiltonian(self):
         return self._hamiltonian
@@ -124,7 +136,7 @@ class Device(ABC):
     @property
     def linear_ops(self):
         return self.common_ops()
-    
+
     @property
     def original_ops(self):
         return self.common_ops()
@@ -153,16 +165,18 @@ class Device(ABC):
         """
         Return diagonalized H. Explicitly keep only diagonal elements of matrix.
         """
-        return self.get_op_in_H_eigenbasis(self._get_H_in_original_basis()).keep_only_diag_elements()
+        return self.get_op_in_H_eigenbasis(
+            self._get_H_in_original_basis()
+        ).keep_only_diag_elements()
 
     def _get_H_in_original_basis(self):
-        """ This returns the Hamiltonian in the original specified basis. This can be overridden by subclasses."""
+        """This returns the Hamiltonian in the original specified basis. This can be overridden by subclasses."""
 
         if self.hamiltonian == HamiltonianTypes.linear:
             return self.get_H_linear()
         elif self.hamiltonian == HamiltonianTypes.full:
             return self.get_H_full()
-        
+
     def _calculate_eig_systems(self):
         evs, evecs = jnp.linalg.eigh(self._get_H_in_original_basis().data)  # Hermitian
         idxs_sorted = jnp.argsort(evs)
@@ -181,7 +195,7 @@ class Device(ABC):
         evecs = self.eig_systems["vecs"][:, : self.N]
         dims = [[self.N], [self.N]]
         return get_op_in_new_basis(op, evecs, dims)
-    
+
     def get_op_data_in_H_eigenbasis(self, op: Array):
         evecs = self.eig_systems["vecs"][:, : self.N]
         return get_op_data_in_new_basis(op, evecs)
@@ -189,11 +203,11 @@ class Device(ABC):
     def get_vec_in_H_eigenbasis(self, vec: Qarray):
         evecs = self.eig_systems["vecs"][:, : self.N]
         if vec.qtype == Qtypes.ket:
-            dims = [[self.N],[1]]
+            dims = [[self.N], [1]]
         else:
             dims = [[1], [self.N]]
         return get_vec_in_new_basis(vec, evecs, dims)
-    
+
     def get_vec_data_in_H_eigenbasis(self, vec: Array):
         evecs = self.eig_systems["vecs"][:, : self.N]
         return get_vec_data_in_new_basis(vec, evecs)
@@ -213,11 +227,14 @@ def get_op_in_new_basis(op: Qarray, evecs: Array, dims: List[List[int]]) -> Qarr
     data = get_op_data_in_new_basis(op.data, evecs)
     return Qarray.create(data, dims=dims)
 
+
 def get_op_data_in_new_basis(op_data: Array, evecs: Array) -> Array:
     return jnp.dot(jnp.conjugate(evecs.transpose()), jnp.dot(op_data, evecs))
 
+
 def get_vec_in_new_basis(vec: Qarray, evecs: Array, dims: List[List[int]]) -> Qarray:
     return Qarray.create(get_vec_data_in_new_basis(vec.data, evecs), dims=dims)
+
 
 def get_vec_data_in_new_basis(vec_data: Array, evecs: Array) -> Array:
     return jnp.dot(jnp.conjugate(evecs.transpose()), vec_data)

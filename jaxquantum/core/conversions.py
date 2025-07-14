@@ -16,6 +16,7 @@ from jaxquantum.core.dims import DIMS_TYPE
 
 config.update("jax_enable_x64", True)
 
+
 # Convert between QuTiP and JAX
 # ===============================================================
 def qt2jqt(qt_obj, dtype=jnp.complex128):
@@ -45,16 +46,16 @@ def jqt2qt(jqt_obj):
     """
     if isinstance(jqt_obj, Qobj) or jqt_obj is None:
         return jqt_obj
-    
-    
+
     if jqt_obj.is_batched:
         res = []
         for i in range(len(jqt_obj)):
             res.append(jqt2qt(jqt_obj[i]))
         return res
-    
+
     dims = [list(jqt_obj.dims[0]), list(jqt_obj.dims[1])]
     return Qobj(np.array(jqt_obj.data), dims=dims)
+
 
 def extract_dims(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None):
     """Extract dims from a JAX array or Qarray.
@@ -71,9 +72,9 @@ def extract_dims(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None)
         if is_op:
             dims = [dims, dims]
         else:
-            dims = [dims, [1] * len(dims)] # defaults to ket 
+            dims = [dims, [1] * len(dims)]  # defaults to ket
     return dims
-                 
+
 
 def jnp2jqt(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None):
     """JAX array -> QuTiP state.
