@@ -117,6 +117,9 @@ def simulate_layer(layer: Layer, initial_state: Qarray, mode: SimulateMode = Sim
         
         result = Qarray.from_list([state])
 
+    elif mode == SimulateMode.HAMILTONIAN:
+        pass
+
     elif mode == SimulateMode.KRAUS:
         KM = layer.gen_KM()
         

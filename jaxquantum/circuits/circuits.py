@@ -101,7 +101,7 @@ class Layer:
         U = None
 
         if len(self.operations) == 0:
-            return U
+            return None
         
         indices_order = []
         for operation in self.operations:
@@ -123,6 +123,33 @@ class Layer:
         sorted_ind = list(argsort(combined_indices))
         U = U.transpose(sorted_ind)
         return U
+
+    def gen_Ht(self):
+        Ht = None
+
+        if len(self.operations) == 0:
+            return None
+        
+        indices_order = []
+        for operation in self.operations:
+            indices_order += operation.indices
+
+            if Ht is None:
+                Ht = operation.gate.Ht
+            else:
+                Ht = lambda t: Ht(t) ^ operation.gate.Ht(t)
+            
+        register = self.operations[0].register
+        missing_indices = [i for i in range(len(register.dims)) if i not in indices_order]
+
+        for j in missing_indices:
+            Ht = lambda t: Ht(t) ^ identity(register.dims[j])
+
+        combined_indices = indices_order + missing_indices
+
+        sorted_ind = list(argsort(combined_indices))
+        Ht = lambda t: Ht(t).transpose(sorted_ind)
+        return Ht
 
     def gen_KM(self):
         KM = []

@@ -22,7 +22,7 @@ config.update("jax_enable_x64", True)
 class Gate:
     dims: List[int] = struct.field(pytree_node=False)
     _U: Optional[Array] # Unitary
-    _H: Optional[Array] # Hamiltonian
+    _Ht: Optional[Array] # Hamiltonian
     _KM: Optional[Qarray] # Kraus map
     _params: Dict[str, Any]
     _ts: Array
@@ -37,7 +37,7 @@ class Gate:
         params: Optional[Dict[str, Any]] = None,
         ts: Optional[Array] = None,
         gen_U: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
-        gen_H: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
+        gen_Ht: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
         gen_KM: Optional[Callable[[Dict[str, Any]], List[Qarray]]] = None,
         num_modes: int = 1,
     ):
@@ -49,7 +49,7 @@ class Gate:
             params: Parameters of the gate.
             ts: Times of the gate.
             gen_U: Function to generate the unitary of the gate.
-            gen_H: Function to generate the Hamiltonian of the gate.
+            gen_Ht: Function to generate a function Ht(t) that takes in a time t and outputs a Hamiltonian Qarray.
             gen_KM: Function to generate the Kraus map of the gate.
             num_modes: Number of modes of the gate.
         """
@@ -64,7 +64,7 @@ class Gate:
 
         # Unitary
         _U = gen_U(params) if gen_U is not None else None 
-        _H = gen_H(params) if gen_H is not None else None 
+        _Ht = gen_Ht(params) if gen_H is not None else None 
 
         if gen_KM is not None:
             _KM = gen_KM(params)
@@ -74,7 +74,7 @@ class Gate:
         return Gate(
             dims = dims,
             _U = _U,
-            _H = _H,
+            _Ht = _Ht,
             _KM = _KM,
             _params = params if params is not None else {},
             _ts=ts if ts is not None else jnp.array([]),
@@ -93,8 +93,8 @@ class Gate:
         return self._U
 
     @property
-    def H(self):
-        return self._H
+    def Ht(self):
+        return self._Ht
 
     @property
     def KM(self):
