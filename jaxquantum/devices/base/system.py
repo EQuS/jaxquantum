@@ -1,6 +1,5 @@
 """ System."""
 
-from functools import partial
 from typing import List, Optional, Dict, Any, Union
 import math
 

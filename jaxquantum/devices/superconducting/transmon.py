@@ -4,7 +4,6 @@ from flax import struct
 from jax import config
 
 import jax.numpy as jnp
-import jax.scipy as jsp
 
 from jaxquantum.devices.base.base import BasisTypes, HamiltonianTypes
 from jaxquantum.devices.superconducting.flux_base import FluxDevice

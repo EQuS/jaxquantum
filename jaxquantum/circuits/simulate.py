@@ -1,18 +1,10 @@
 """ Circuit simulation methods. """
 
-import functools
 from flax import struct
-from enum import Enum
-from jax import Array, config
-from typing import List, Union
-from math import prod
-from copy import deepcopy
-from numbers import Number
-import jax.numpy as jnp
-import jax.scipy as jsp
+from jax import config
+from typing import List
 
 
-from jaxquantum.core.settings import SETTINGS
 from jaxquantum.core.qarray import Qarray, ket2dm
 from jaxquantum.circuits.circuits import Circuit, Layer
 from jaxquantum.circuits.constants import SimulateMode

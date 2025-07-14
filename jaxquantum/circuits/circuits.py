@@ -3,20 +3,12 @@
 Inspired by a mix of Cirq and Qiskit circuits.
 """
 
-import functools
 from flax import struct
-from enum import Enum
-from jax import Array, config
+from jax import config
 from typing import List, Optional, Union
-from math import prod
 from copy import deepcopy
-from numbers import Number
 from numpy import argsort
-import jax.numpy as jnp
-import jax.scipy as jsp
 
-from jaxquantum.core.settings import SETTINGS
-from jaxquantum.core.qarray import Qarray
 from jaxquantum.core.operators import identity
 from jaxquantum.circuits.gates import Gate
 from jaxquantum.circuits.constants import SimulateMode

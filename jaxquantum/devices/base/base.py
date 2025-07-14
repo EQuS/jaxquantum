@@ -8,9 +8,7 @@ from typing import Dict, Any, List
 from flax import struct
 from jax import config, Array
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 
-from jaxquantum.devices.common.utils import harm_osc_wavefunction
 from jaxquantum.core.qarray import Qarray
 from jaxquantum.core.dims import Qtypes
 

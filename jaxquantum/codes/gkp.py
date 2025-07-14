@@ -8,7 +8,6 @@ from jaxquantum.codes.base import BosonicQubit
 import jaxquantum as jqt
 
 import jax.numpy as jnp
-import jax.scipy as jsp
 
 
 class GKPQubit(BosonicQubit):

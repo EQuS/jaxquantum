@@ -11,7 +11,6 @@ import jaxquantum as jqt
 from jax import config
 import numpy as np
 import jax.numpy as jnp
-import jax.scipy as jsp
 import matplotlib.pyplot as plt
 
 config.update("jax_enable_x64", True)

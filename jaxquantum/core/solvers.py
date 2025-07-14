@@ -2,24 +2,19 @@
 
 
 from diffrax import diffeqsolve, ODETerm, SaveAt, PIDController, TqdmProgressMeter, NoProgressMeter
-from functools import partial
 from flax import struct
-from jax import vmap, Array
-from typing import Callable, List, Optional, Dict, Union
+from jax import Array
+from typing import Callable, Optional, Union
 import diffrax
 import jax.numpy as jnp
-import jax.scipy as jsp
 import warnings
 import tqdm
 import logging
 
 
 
-from jaxquantum.core.qarray import Qarray, Qtypes, is_dm_data, dag_data
+from jaxquantum.core.qarray import Qarray, Qtypes, dag_data
 from jaxquantum.core.conversions import jnp2jqt
-from jaxquantum.utils.utils import robust_isscalar
-from jaxquantum.core.operators import identity_like
-from jaxquantum.core.measurements import overlap
 
 # ----
 

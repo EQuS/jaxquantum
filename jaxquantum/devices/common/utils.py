@@ -2,7 +2,6 @@
 
 from scipy.special import pbdv
 from scipy import constants
-from jax import vmap, grad
 
 import jax.scipy as jsp
 import jax.numpy as jnp

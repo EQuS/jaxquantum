@@ -7,7 +7,6 @@ import jax.numpy as jnp
 from tqdm import tqdm
 
 from jaxquantum.core.qarray import Qarray, powm
-from jaxquantum.core.dims import Qtypes
 from jaxquantum.core.operators import identity, sigmax, sigmay, sigmaz
 
 config.update("jax_enable_x64", True)

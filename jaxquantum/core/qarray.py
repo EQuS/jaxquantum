@@ -2,23 +2,20 @@
 
 from __future__ import annotations
 
-import functools
 from flax import struct
-from enum import Enum
-from jax import Array, config, vmap
-from typing import List, Optional, Union
+from jax import Array, config
+from typing import List, Union
 
 
 from math import prod
 from copy import deepcopy
-from numbers import Number
 from numpy import ndarray
 import jax.numpy as jnp
 import jax.scipy as jsp
 
 from jaxquantum.core.settings import SETTINGS
 from jaxquantum.utils.utils import robust_isscalar
-from jaxquantum.core.dims import Qtypes, Qdims, check_dims, isket_dims, isbra_dims, isop_dims, ket_from_op_dims
+from jaxquantum.core.dims import Qtypes, Qdims, check_dims, ket_from_op_dims
 
 config.update("jax_enable_x64", True)
 

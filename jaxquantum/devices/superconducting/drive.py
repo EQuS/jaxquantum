@@ -1,10 +1,9 @@
 """ Base Drive."""
 
-from abc import abstractmethod, ABC
-from typing import Dict, Any
+from abc import ABC
+from typing import Dict
 
 from flax import struct
-from jax import tree_util, Array
 from jax import config
 import jax.numpy as jnp
 

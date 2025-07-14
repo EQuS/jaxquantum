@@ -1,12 +1,10 @@
 
 """ Flux base device."""
 
-from abc import abstractmethod, ABC
-from enum import Enum
-from typing import Dict, Any, List
+from abc import abstractmethod
 
 from flax import struct
-from jax import config, Array
+from jax import config
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 

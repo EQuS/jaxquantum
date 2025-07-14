@@ -7,7 +7,7 @@ from math import prod
 import jax.numpy as jnp
 from jax.nn import one_hot
 
-from jaxquantum.core.qarray import Qarray, Qtypes, tensor
+from jaxquantum.core.qarray import Qarray, tensor
 
 config.update("jax_enable_x64", True)
 
