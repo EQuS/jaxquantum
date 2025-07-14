@@ -30,15 +30,15 @@ jobs:
       - name: Move files
         run: |
           mkdir test-results
-          mv junit/test-results.xml test-results
-          mv coverage.xml test-results
-          cd test-results
+          mv junit/test-results.xml ./test-results
+          mv ./coverage.xml ./test-results
+          cd ./test-results
       - name: Coverage Bagdge
         uses: tj-actions/coverage-badge-py@v1.8
         with:
-          output: coverage.svg
+          output: test-results/coverage.svg
       - name: Deploy badge to gh-pages branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: test-results
-          folder: .
+          folder: test-results
