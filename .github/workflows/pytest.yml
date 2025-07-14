@@ -33,11 +33,7 @@ jobs:
       - name: Deploy badge to gh-pages branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          branch: test-results
+          branch: gh-pages
+          clean: false
           folder: test-results
-      - name: Deploy coverage report
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./coverage
-          publish_branch: gh-pages
+          target-folder: test-results
