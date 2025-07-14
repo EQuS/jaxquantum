@@ -1,0 +1,4 @@
+include docs/assets/logo.png
+include docs/assets/readme_demo.png
+include jaxquantum/VERSION.txt 
+include README.md
