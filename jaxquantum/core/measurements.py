@@ -1,4 +1,4 @@
-""" Helpers. """
+"""Helpers."""
 
 from typing import List
 from jax import config, Array
@@ -7,13 +7,13 @@ import jax.numpy as jnp
 from tqdm import tqdm
 
 from jaxquantum.core.qarray import Qarray, powm
-from jaxquantum.core.dims import Qtypes
 from jaxquantum.core.operators import identity, sigmax, sigmay, sigmaz
 
 config.update("jax_enable_x64", True)
 
 
 # Calculations ----------------------------------------------------------------
+
 
 def overlap(rho: Qarray, sigma: Qarray) -> Array:
     """Overlap between two states or operators.
@@ -58,31 +58,33 @@ def fidelity(rho: Qarray, sigma: Qarray) -> float:
     return ((powm(sqrt_rho @ sigma @ sqrt_rho, 0.5)).tr()) ** 2
 
 
-def quantum_state_tomography(rho: Qarray, physical_basis: Qarray,
-                             logical_basis: Qarray) -> Qarray:
-
-    """Perform quantum state tomography to retrieve the density matrix in 
-    the logical basis. 
+def quantum_state_tomography(
+    rho: Qarray, physical_basis: Qarray, logical_basis: Qarray
+) -> Qarray:
+    """Perform quantum state tomography to retrieve the density matrix in
+    the logical basis.
 
         Args:
             rho: state expressed in the physical Hilbert space basis.
             physical_basis: list of logical operators expressed in the physical
             Hilbert space basis forming a complete logical operator basis.
-            logical_basis: list of logical operators expressed in the 
+            logical_basis: list of logical operators expressed in the
             logical Hilbert space basis forming a complete operator basis.
 
 
         Returns:
             Density matrix of state rho expressed in the logical basis.
-        """
+    """
     dm = jnp.zeros_like(logical_basis[0].data)
     rho = rho.to_dm()
 
-    if physical_basis.bdims[-1]!=logical_basis.bdims[-1]:
-        raise ValueError(f"The two bases should have the same size for the "
-                         f"last batch dimension. Received "
-                         f"{physical_basis.bdims} and {logical_basis.bdims} "
-                         f"instead.")
+    if physical_basis.bdims[-1] != logical_basis.bdims[-1]:
+        raise ValueError(
+            f"The two bases should have the same size for the "
+            f"last batch dimension. Received "
+            f"{physical_basis.bdims} and {logical_basis.bdims} "
+            f"instead."
+        )
 
     space_size = physical_basis.bdims[-1]
 
@@ -103,15 +105,19 @@ def get_physical_basis(qubits: List) -> Qarray:
 
             Returns:
                 List containing the complete operator basis.
-            """
-    
+    """
+
     qubit = qubits[0]
     qubits = qubits[1:]
     try:
-        operators = Qarray.from_list([identity(qubit.params["N"]),
-                                      qubit.common_gates["X"],
-                                      qubit.common_gates["Y"],
-                                      qubit.common_gates["Z"]])
+        operators = Qarray.from_list(
+            [
+                identity(qubit.params["N"]),
+                qubit.common_gates["X"],
+                qubit.common_gates["Y"],
+                qubit.common_gates["Z"],
+            ]
+        )
     except KeyError:
         print("QEC code must have common_gates for all three axes.")
     except AttributeError:
@@ -141,14 +147,15 @@ def get_logical_basis(n_qubits: int) -> Qarray:
 
                 Returns:
                     List containing the complete operator basis.
-                """
+    """
     if n_qubits < 1:
         raise ValueError("n_qubits must be at least 1.")
 
     n_qubits -= 1
 
-    operators = Qarray.from_list([identity(2) / 2, sigmax() / 2, sigmay() /
-                                  2, sigmaz() / 2])
+    operators = Qarray.from_list(
+        [identity(2) / 2, sigmax() / 2, sigmay() / 2, sigmaz() / 2]
+    )
 
     if n_qubits == 0:
         return operators

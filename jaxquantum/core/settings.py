@@ -1,5 +1,3 @@
-""" Core settings. """
+"""Core settings."""
 
-SETTINGS = {
-    "auto_tidyup_atol": 1e-14
-}
+SETTINGS = {"auto_tidyup_atol": 1e-14}

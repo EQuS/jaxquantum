@@ -1,6 +1,5 @@
-""" System."""
+"""System."""
 
-from functools import partial
 from typing import List, Optional, Dict, Any, Union
 import math
 
@@ -72,7 +71,7 @@ class System:
         unique_labels = set(labels)
         if len(labels) != len(unique_labels):
             raise ValueError("Devices must have unique labels.")
-            
+
         Ns = tuple([device.N for device in devices])
         couplings = couplings if couplings is not None else []
         params = params if params is not None else {}
@@ -82,7 +81,6 @@ class System:
         return promote(op, device_num, self.Ns)
 
     def get_H_bare(self):
-        I_ops = [identity(N) for N in self.Ns]
         H = 0
         for j, device in enumerate(self.devices):
             H += self.promote(device.get_H(), j)
@@ -93,7 +91,7 @@ class System:
         for coupling in self.couplings:
             H += coupling
         return H
-    
+
     def get_H(self):
         H_bare = self.get_H_bare()
         H_couplings = self.get_H_couplings()

@@ -1,4 +1,4 @@
-""" Fluxonium."""
+"""Fluxonium."""
 
 from flax import struct
 from jax import config
@@ -18,7 +18,7 @@ class Fluxonium(FluxDevice):
     """
 
     def common_ops(self):
-        """ Written in the linear basis. """
+        """Written in the linear basis."""
         ops = {}
 
         N = self.N_pre_diag
@@ -55,7 +55,7 @@ class Fluxonium(FluxDevice):
 
     def get_H_full(self):
         """Return full H in linear basis."""
-        
+
         phi_op = self.linear_ops["phi"]
         return self.get_H_linear() + self.get_H_nonlinear(phi_op)
 
@@ -67,17 +67,17 @@ class Fluxonium(FluxDevice):
         Hcos = op_cos_phi * jnp.cos(2.0 * jnp.pi * phi_ext) + op_sin_phi * jnp.sin(
             2.0 * jnp.pi * phi_ext
         )
-        H_nl = - self.params["Ej"] * Hcos
+        H_nl = -self.params["Ej"] * Hcos
         return H_nl
 
     def potential(self, phi):
         """Return potential energy for a given phi."""
         phi_ext = self.params["phi_ext"]
         V_linear = 0.5 * self.params["El"] * (2 * jnp.pi * phi) ** 2
-    
+
         if self.hamiltonian == HamiltonianTypes.linear:
             return V_linear
-        
+
         V_nonlinear = -self.params["Ej"] * jnp.cos(2.0 * jnp.pi * (phi - phi_ext))
         if self.hamiltonian == HamiltonianTypes.full:
             return V_linear + V_nonlinear
