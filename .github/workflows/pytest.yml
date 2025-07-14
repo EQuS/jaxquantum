@@ -16,23 +16,13 @@ jobs:
       - name: Test with pytest
         run: |
           pip install pytest pytest-cov
-          pytest ./test --doctest-modules --junitxml=junit/test-results.xml --cov=jaxquantum --cov-report=xml --cov-report=html
-      - name: 'Upload pytest results'
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: junit/test-results.xml
-      - name: 'Upload coverage results'
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-results
-          path: coverage.xml
+          pytest ./test --doctest-modules --junitxml=junit/test-results.xml --cov=jaxquantum --cov-report=xml --cov-report=html:cov_html
       - name: Move files
         run: |
           mkdir test-results
           mv junit/test-results.xml ./test-results
           mv ./coverage.xml ./test-results
-          mv ./coverage.html ./test-results
+          mv ./cov_html ./test-results/
           cd ./test-results
       - name: Coverage Bagdge
         uses: tj-actions/coverage-badge-py@v1.8
