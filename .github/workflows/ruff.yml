@@ -9,3 +9,7 @@ jobs:
         with:
           args: check --fix
           src: "./jaxquantum"
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: format
+          src: "./jaxquantum"
