@@ -37,5 +37,5 @@ jobs:
       - name: Publish coverage report to coverage-badge branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          branch: feature/add_gh_actions
-          folder: coverage
+          branch: gh-pages
+          folder: assets/images
