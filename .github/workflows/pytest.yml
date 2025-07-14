@@ -24,8 +24,6 @@ jobs:
           mv ./coverage.xml ./test-results
           mv ./cov_html ./test-results
           rm ./test-results/cov_html/.gitignore
-          rm ./test-results/.gitignore
-          rm .gitignore
           cd ./test-results
           
       - name: Coverage Bagdge
