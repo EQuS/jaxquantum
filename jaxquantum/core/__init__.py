@@ -8,3 +8,4 @@ from .qarray import *  # noqa
 from .settings import SETTINGS
 from .dims import *  # noqa
 from .measurements import *  # noqa
+from .wigner import *  #noqa
