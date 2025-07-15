@@ -47,44 +47,45 @@ def comb(N, k):
     )
 
 
-def complex_to_real_iso_matrix(A): 
+def complex_to_real_iso_matrix(A):
     return jnp.block([[jnp.real(A), -jnp.imag(A)], [jnp.imag(A), jnp.real(A)]])
 
 
 def real_to_complex_iso_matrix(A):
     N = A.shape[0]
-    return A[:N//2,:N//2] + 1j*A[N//2:,:N//2]
+    return A[: N // 2, : N // 2] + 1j * A[N // 2 :, : N // 2]
 
 
-def complex_to_real_iso_vector(v): 
+def complex_to_real_iso_vector(v):
     return jnp.block([[jnp.real(v)], [jnp.imag(v)]])
 
 
-def real_to_complex_iso_vector(v): 
+def real_to_complex_iso_vector(v):
     N = v.shape[0]
-    return v[:N//2,:] + 1j*v[N//2:,:]
+    return v[: N // 2, :] + 1j * v[N // 2 :, :]
 
 
 def imag_times_iso_vector(v):
     N = v.shape[0]
-    return jnp.block([[-v[N//2:,:]], [v[:N//2,:]]])
+    return jnp.block([[-v[N // 2 :, :]], [v[: N // 2, :]]])
 
 
 def imag_times_iso_matrix(A):
     N = A.shape[0]
-    Ar = A[:N//2,:N//2]
-    Ai = A[N//2:,:N//2]
-    return jnp.block([[-Ai, -Ar],[Ar,-Ai]])
+    Ar = A[: N // 2, : N // 2]
+    Ai = A[N // 2 :, : N // 2]
+    return jnp.block([[-Ai, -Ar], [Ar, -Ai]])
+
 
 def conj_transpose_iso_matrix(A):
     N = A.shape[0]
-    Ar = A[:N//2,:N//2].T
-    Ai = A[N//2:,:N//2].T
-    return jnp.block([[Ar, Ai],[-Ai,Ar]])
+    Ar = A[: N // 2, : N // 2].T
+    Ai = A[N // 2 :, : N // 2].T
+    return jnp.block([[Ar, Ai], [-Ai, Ar]])
+
 
 def robust_isscalar(val):
     is_scalar = isinstance(val, Number) or jnp.isscalar(val)
     if isinstance(val, Array):
         is_scalar = is_scalar or (len(val.shape) == 0)
     return is_scalar
-

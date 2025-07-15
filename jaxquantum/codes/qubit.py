@@ -9,7 +9,6 @@ from jaxquantum.codes.base import BosonicQubit
 import jaxquantum as jqt
 
 from jax import config
-import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import qutip as qt
 

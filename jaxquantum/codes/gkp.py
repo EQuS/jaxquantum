@@ -8,13 +8,13 @@ from jaxquantum.codes.base import BosonicQubit
 import jaxquantum as jqt
 
 import jax.numpy as jnp
-import jax.scipy as jsp
 
 
 class GKPQubit(BosonicQubit):
     """
     GKP Qubit Class.
     """
+
     name = "gkp"
 
     def _params_validation(self):
@@ -42,7 +42,7 @@ class GKPQubit(BosonicQubit):
 
         # finite energy
         self.common_gates["E"] = jqt.expm(
-            -self.params["delta"] ** 2
+            -(self.params["delta"] ** 2)
             * self.common_gates["a_dag"]
             @ self.common_gates["a"]
         )
@@ -114,7 +114,6 @@ class GKPQubit(BosonicQubit):
         # step 2: make ideal eigenvector finite energy
         gstate = self.common_gates["E"] @ gstate_ideal
 
-        N = self.params["N"]
         plus_z = jqt.unit(gstate)
         minus_z = jqt.unit(self.common_gates["X"] @ plus_z)
         return plus_z, minus_z

@@ -1,4 +1,4 @@
-""" Constants. """
+"""Constants."""
 
 from enum import Enum
 

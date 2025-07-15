@@ -1,4 +1,4 @@
-""" Base. """
+"""Base."""
 
-from .base import *
-from .system import *
+from .base import *  # noqa
+from .system import *  # noqa

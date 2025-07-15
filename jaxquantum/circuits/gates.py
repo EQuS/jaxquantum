@@ -1,18 +1,11 @@
-""" Gates. """
+"""Gates."""
 
-import functools
 from flax import struct
-from enum import Enum
 from jax import Array, config
 from typing import List, Dict, Any, Optional, Callable, Union
-from math import prod
-from copy import deepcopy
-from numbers import Number
 import jax.numpy as jnp
-import jax.scipy as jsp
 
 
-from jaxquantum.core.settings import SETTINGS
 from jaxquantum.core.qarray import Qarray
 
 config.update("jax_enable_x64", True)
@@ -28,7 +21,7 @@ class Gate:
     _ts: Array
     _name: str = struct.field(pytree_node=False)
     num_modes: int = struct.field(pytree_node=False)
-    
+
     @classmethod
     def create(
         cls,
@@ -41,8 +34,8 @@ class Gate:
         gen_KM: Optional[Callable[[Dict[str, Any]], List[Qarray]]] = None,
         num_modes: int = 1,
     ):
-        """ Create a gate. 
-        
+        """Create a gate.
+
         Args:
             dims: Dimensions of the gate.
             name: Name of the gate.
@@ -58,9 +51,10 @@ class Gate:
 
         if isinstance(dims, int):
             dims = [dims]
-        
-        assert len(dims) == num_modes, "Number of dimensions must match number of modes."
-        
+
+        assert len(dims) == num_modes, (
+            "Number of dimensions must match number of modes."
+        )
 
         # Unitary
         _U = gen_U(params) if gen_U is not None else None 
@@ -78,8 +72,8 @@ class Gate:
             _KM = _KM,
             _params = params if params is not None else {},
             _ts=ts if ts is not None else jnp.array([]),
-            _name = name,
-            num_modes = num_modes
+            _name=name,
+            num_modes=num_modes,
         )
 
     def __str__(self):

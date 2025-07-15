@@ -1,3 +1,3 @@
-""" Common module. """
+"""Common module."""
 
-from .utils import *
+from .utils import *  # noqa

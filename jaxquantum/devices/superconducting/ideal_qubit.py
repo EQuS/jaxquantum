@@ -1,4 +1,4 @@
-""" IdealQubit."""
+"""IdealQubit."""
 
 from flax import struct
 from jax import config
@@ -18,9 +18,13 @@ class IdealQubit(Device):
 
     @classmethod
     def param_validation(cls, N, N_pre_diag, params, hamiltonian, basis):
-        """ This can be overridden by subclasses."""
-        assert basis == BasisTypes.fock, "IdealQubit is a two-level system defined in the Fock basis." 
-        assert hamiltonian == HamiltonianTypes.full, "IdealQubit requires a full Hamiltonian."
+        """This can be overridden by subclasses."""
+        assert basis == BasisTypes.fock, (
+            "IdealQubit is a two-level system defined in the Fock basis."
+        )
+        assert hamiltonian == HamiltonianTypes.full, (
+            "IdealQubit requires a full Hamiltonian."
+        )
         assert N == N_pre_diag == 2, "IdealQubit is a two-level system."
         assert "ω" in params, "IdealQubit requires a frequency parameter 'ω'."
 

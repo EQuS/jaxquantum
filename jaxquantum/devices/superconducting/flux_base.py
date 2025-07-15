@@ -1,12 +1,9 @@
+"""Flux base device."""
 
-""" Flux base device."""
-
-from abc import abstractmethod, ABC
-from enum import Enum
-from typing import Dict, Any, List
+from abc import abstractmethod
 
 from flax import struct
-from jax import config, Array
+from jax import config
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
@@ -14,6 +11,7 @@ from jaxquantum.devices.common.utils import harm_osc_wavefunction
 from jaxquantum.devices.base.base import Device, BasisTypes
 
 config.update("jax_enable_x64", True)
+
 
 @struct.dataclass
 class FluxDevice(Device):
@@ -23,7 +21,7 @@ class FluxDevice(Device):
 
     def _calculate_wavefunctions_fock(self, phi_vals):
         """Calculate wavefunctions at phi_exts."""
-        phi_osc = self.phi_zpf() * jnp.sqrt(2) # length of oscillator
+        phi_osc = self.phi_zpf() * jnp.sqrt(2)  # length of oscillator
         phi_vals = jnp.array(phi_vals)
 
         # calculate basis functions
@@ -35,13 +33,15 @@ class FluxDevice(Device):
         basis_functions = jnp.array(basis_functions)
 
         # transform to better diagonal basis
-        basis_functions_in_H_eigenbasis = self.get_vec_data_in_H_eigenbasis(basis_functions)
-        
+        basis_functions_in_H_eigenbasis = self.get_vec_data_in_H_eigenbasis(
+            basis_functions
+        )
+
         # the below is equivalent to evecs_in_H_eigenbasis @ basis_functions_in_H_eigenbasis
         # since evecs in H_eigenbasis is diagonal, i.e. the identity matrix
-        wavefunctions = basis_functions_in_H_eigenbasis 
+        wavefunctions = basis_functions_in_H_eigenbasis
         return wavefunctions
-    
+
     def _calculate_wavefunctions_charge(self, phi_vals):
         phi_vals = jnp.array(phi_vals)
 
@@ -50,40 +50,45 @@ class FluxDevice(Device):
         n_max = (self.N_pre_diag - 1) // 2
         for n in jnp.arange(-n_max, n_max + 1):
             basis_functions.append(
-                1/(jnp.sqrt(2*jnp.pi)) * jnp.exp(1j * n * (2*jnp.pi*phi_vals))
+                1 / (jnp.sqrt(2 * jnp.pi)) * jnp.exp(1j * n * (2 * jnp.pi * phi_vals))
             )
         basis_functions = jnp.array(basis_functions)
 
         # transform to better diagonal basis
-        basis_functions_in_H_eigenbasis = self.get_vec_data_in_H_eigenbasis(basis_functions)
-        
+        basis_functions_in_H_eigenbasis = self.get_vec_data_in_H_eigenbasis(
+            basis_functions
+        )
+
         # the below is equivalent to evecs_in_H_eigenbasis @ basis_functions_in_H_eigenbasis
         # since evecs in H_eigenbasis is diagonal, i.e. the identity matrix
-        phase_correction_factors =  (1j**(jnp.arange(0,self.N_pre_diag))).reshape(self.N_pre_diag,1) # TODO: review why these are needed...
+        phase_correction_factors = (1j ** (jnp.arange(0, self.N_pre_diag))).reshape(
+            self.N_pre_diag, 1
+        )  # TODO: review why these are needed...
         wavefunctions = basis_functions_in_H_eigenbasis * phase_correction_factors
         return wavefunctions
-    
+
     @abstractmethod
     def potential(self, phi):
         """Return potential energy as a function of phi."""
 
     def plot_wavefunctions(self, phi_vals, max_n=None, which=None, ax=None, mode="abs"):
-
         if self.basis == BasisTypes.fock:
             _calculate_wavefunctions = self._calculate_wavefunctions_fock
         elif self.basis == BasisTypes.charge:
             _calculate_wavefunctions = self._calculate_wavefunctions_charge
         else:
-            raise NotImplementedError(f"The {self.basis} is not yet supported for plotting wavefunctions.")
+            raise NotImplementedError(
+                f"The {self.basis} is not yet supported for plotting wavefunctions."
+            )
 
         """Plot wavefunctions at phi_exts."""
         wavefunctions = _calculate_wavefunctions(phi_vals)
-        energy_levels = self.eig_systems["vals"][:self.N]
+        energy_levels = self.eig_systems["vals"][: self.N]
 
         potential = self.potential(phi_vals)
 
         if ax is None:
-            fig, ax = plt.subplots(1,1, figsize = (3.5, 2.5), dpi = 1000)
+            fig, ax = plt.subplots(1, 1, figsize=(3.5, 2.5), dpi=1000)
         else:
             fig = ax.get_figure()
 
@@ -97,7 +102,7 @@ class FluxDevice(Device):
 
         for n in levels:
             if mode == "abs":
-                wf_vals = jnp.abs(wavefunctions[n, :])**2
+                wf_vals = jnp.abs(wavefunctions[n, :]) ** 2
             elif mode == "real":
                 wf_vals = wavefunctions[n, :].real
             elif mode == "imag":
@@ -113,12 +118,21 @@ class FluxDevice(Device):
             if max_val is None or curr_max_val > max_val:
                 max_val = curr_max_val
 
-            ax.plot(phi_vals, wf_vals, label=f"$|${n}$\\rangle$", linestyle = '-', linewidth = 1)
+            ax.plot(
+                phi_vals, wf_vals, label=f"$|${n}$\\rangle$", linestyle="-", linewidth=1
+            )
             ax.fill_between(phi_vals, energy_levels[n], wf_vals, alpha=0.5)
-        
-        ax.plot(phi_vals, potential, label="potential", color="black", linestyle = '-', linewidth = 1)
 
-        ax.set_ylim([min_val-1, max_val+1])
+        ax.plot(
+            phi_vals,
+            potential,
+            label="potential",
+            color="black",
+            linestyle="-",
+            linewidth=1,
+        )
+
+        ax.set_ylim([min_val - 1, max_val + 1])
 
         ax.set_xlabel(r"$\Phi/\Phi_0$")
         ax.set_ylabel(r"Energy [GHz]")
@@ -136,4 +150,3 @@ class FluxDevice(Device):
         fig.tight_layout()
 
         return ax
-
