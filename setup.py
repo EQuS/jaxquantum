@@ -35,7 +35,8 @@ EXTRA_REQUIREMENTS = {
         "mkdocs-section-index",
         "mkdocs-gen-files",
         "mkdocstrings-python",
-        "mkdocs-jupyter"
+        "mkdocs-jupyter",
+        "pymdown-extensions"
     ]
 }
 

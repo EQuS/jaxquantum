@@ -59,6 +59,13 @@ plugins:
       - jaxquantum
 markdown_extensions:
   - toc
+  - admonition
+  - codehilite
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+
 nav:
   - About: 
     - index.md
