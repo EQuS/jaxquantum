@@ -6,7 +6,7 @@ This is a non-exhaustive, but growing list of common pitfalls when using `jaxqua
 !!! quote 
     When walking about the countryside of Italy, the people will not hesitate to tell you that JAX has [*“una anima di pura programmazione funzionale”*](https://www.sscardapane.it/iaml-backup/jax-intro/). ~ JAX docs
 
-Often the sharp bits at poking you originate from the paradigm within which JAX operates. The JAX developers have compiled a great list of these: https://docs.jax.dev/en/latest/notebooks/Common_Gotchas_in_JAX.html 
+Often the sharp bits poking at you originate from the functional paradigm within which JAX operates. The JAX developers have compiled a great list of these common "gotchas": https://docs.jax.dev/en/latest/notebooks/Common_Gotchas_in_JAX.html 
 
 
 # Operations
