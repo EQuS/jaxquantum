@@ -104,7 +104,7 @@ fig.tight_layout()
 **Core Devs:** [Shantanu R. Jha](https://github.com/Phionx), [Shoumik Chowdhury](https://github.com/shoumikdc), [Gabriele Rolleri](https://github.com/GabrieleRolleri)
 
 
-This package was initially a small part of [`bosonic`](https://github.com/EQuS/bosonic). In early 2022, `jaxquantum` was extracted and made into its own package. This package was briefly announced to the world at APS March Meeting 2023 and released to a select few academic groups shortly after. Since then, this package has been open sourced and developed while conducting research in the Engineering Quantum Systems Group at MIT with invaluable advice from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/). 
+This package was initially a small part of [`bosonic`](https://github.com/EQuS/bosonic). In early 2022, `jaxquantum` was extracted and made into its own package. This package was briefly announced to the world at APS March Meeting 2023 and released to a select few academic groups shortly after. Since then, this package has been open sourced and developed while conducting research in the Engineering Quantum Systems Group at MIT with advice and support from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/). 
 
 ## Citation
 
