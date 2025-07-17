@@ -1,9 +1,9 @@
 name: Pytest
 on:
-  push:
-    branches:
-      - master 
-      - main
+  workflow_run:
+    workflows: ["ci"]
+    types:
+      - completed
 jobs:
   pytest:
     runs-on: ubuntu-latest
