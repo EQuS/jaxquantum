@@ -17,6 +17,7 @@ class Gate:
     _U: Optional[Array] # Unitary
     _Ht: Optional[Array] # Hamiltonian
     _KM: Optional[Qarray] # Kraus map
+    _c_ops: Optional[Qarray]
     _params: Dict[str, Any]
     _ts: Array
     _name: str = struct.field(pytree_node=False)
@@ -31,6 +32,7 @@ class Gate:
         ts: Optional[Array] = None,
         gen_U: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
         gen_Ht: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
+        gen_c_ops: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
         gen_KM: Optional[Callable[[Dict[str, Any]], List[Qarray]]] = None,
         num_modes: int = 1,
     ):
@@ -58,7 +60,8 @@ class Gate:
 
         # Unitary
         _U = gen_U(params) if gen_U is not None else None 
-        _Ht = gen_Ht(params) if gen_H is not None else None 
+        _Ht = gen_Ht(params) if gen_Ht is not None else None 
+        _c_ops = gen_c_ops(params) if gen_c_ops is not None else Qarray.from_list([])
 
         if gen_KM is not None:
             _KM = gen_KM(params)
@@ -70,6 +73,7 @@ class Gate:
             _U = _U,
             _Ht = _Ht,
             _KM = _KM,
+            _c_ops = _c_ops,
             _params = params if params is not None else {},
             _ts=ts if ts is not None else jnp.array([]),
             _name=name,
@@ -83,6 +87,10 @@ class Gate:
         return self._name
 
     @property
+    def name(self):
+        return self._name
+
+    @property
     def U(self):
         return self._U
 
@@ -93,3 +101,32 @@ class Gate:
     @property
     def KM(self):
         return self._KM
+
+    @property
+    def c_ops(self):
+        return self._c_ops
+
+    @property
+    def params(self):
+        return self._params
+
+    @property
+    def ts(self):
+        return self._ts
+
+    def add_Ht(self, Ht: Callable[[float], Qarray]):
+        """Add a Hamiltonian function to the gate."""
+        def new_Ht(t):
+            return Ht(t) + self.Ht(t) if self.Ht is not None else Ht(t)
+
+        return Gate(
+            dims = self.dims,
+            _U = self.U,
+            _Ht = new_Ht,
+            _KM = self.KM,
+            _c_ops = self.c_ops,
+            _params = self.params,
+            _ts = self.ts,
+            _name = self.name,
+            num_modes = self.num_modes,
+        )

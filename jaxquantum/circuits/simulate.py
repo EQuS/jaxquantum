@@ -8,6 +8,8 @@ from typing import List
 from jaxquantum.core.qarray import Qarray, ket2dm
 from jaxquantum.circuits.circuits import Circuit, Layer
 from jaxquantum.circuits.constants import SimulateMode
+from jaxquantum.core.solvers import mesolve, sesolve, SolverOptions
+
 
 config.update("jax_enable_x64", True)
 
@@ -37,7 +39,7 @@ class Results:
 
 
 def simulate(
-    circuit: Circuit, initial_state: Qarray, mode: SimulateMode = SimulateMode.UNITARY
+    circuit: Circuit, initial_state: Qarray, mode: SimulateMode = SimulateMode.UNITARY, **kwargs
 ) -> Results:
     """
     Simulates the evolution of a quantum state through a given quantum circuit.
@@ -61,7 +63,7 @@ def simulate(
     results.append(Qarray.from_list([state]))
 
     for layer in circuit.layers:
-        result = simulate_layer(layer, state, mode=mode)
+        result = simulate_layer(layer, state, mode=mode, **kwargs)
         results.append(result)
         state = result[-1]
 
@@ -69,7 +71,7 @@ def simulate(
 
 
 def simulate_layer(
-    layer: Layer, initial_state: Qarray, mode: SimulateMode = SimulateMode.UNITARY
+    layer: Layer, initial_state: Qarray, mode: SimulateMode = SimulateMode.UNITARY, **kwargs
 ) -> Qarray:
     """
     Simulates the evolution of a quantum state through a given layer.
@@ -104,20 +106,26 @@ def simulate_layer(
         result = Qarray.from_list([state])
 
     elif mode == SimulateMode.HAMILTONIAN:
-        pass
+
+        solver_options = kwargs.get("solver_options", SolverOptions.create(progress_meter=True))
+
+        Ht = layer.gen_Ht()
+        c_ops = layer.gen_c_ops()
+        ts = layer.gen_ts()
+
+        if state.is_dm() or c_ops is not None:
+            intermediate_states = mesolve(Ht, state, ts, c_ops=c_ops, solver_options=solver_options)
+        else:
+            intermediate_states = sesolve(Ht, state, ts, solver_options=solver_options)
+
+        result = intermediate_states
+        state = intermediate_states[-1]
 
     elif mode == SimulateMode.KRAUS:
         KM = layer.gen_KM()
 
         state = ket2dm(state)
         state = (KM @ state @ KM.dag()).collapse()
-
-        # new_state = 0
-        # for op_j in range(len(KM)):
-        #     op = KM[op_j]
-        #     new_state += op @ state @ op.dag()
-        # state = new_state
-
         result = Qarray.from_list([state])
 
     return result
