@@ -8,11 +8,13 @@ from jax import config
 from typing import List, Optional, Union
 from copy import deepcopy
 from numpy import argsort
+import jax.numpy as jnp
 
 from jaxquantum.core.operators import identity
 from jaxquantum.circuits.gates import Gate
 from jaxquantum.circuits.constants import SimulateMode
 from jaxquantum.core.qarray import Qarray
+
 
 config.update("jax_enable_x64", True)
 
