@@ -8,10 +8,13 @@ from jax import config
 from typing import List, Optional, Union
 from copy import deepcopy
 from numpy import argsort
+import jax.numpy as jnp
 
 from jaxquantum.core.operators import identity
 from jaxquantum.circuits.gates import Gate
 from jaxquantum.circuits.constants import SimulateMode
+from jaxquantum.core.qarray import Qarray
+
 
 config.update("jax_enable_x64", True)
 
@@ -87,8 +90,8 @@ class Layer:
         U = None
 
         if len(self.operations) == 0:
-            return U
-
+            return None
+            
         indices_order = []
         for operation in self.operations:
             indices_order += operation.indices
@@ -112,8 +115,37 @@ class Layer:
         U = U.transpose(sorted_ind)
         return U
 
-    def gen_KM(self):
-        KM = []
+    def gen_Ht(self):
+        Ht = None
+
+        if len(self.operations) == 0:
+            return None
+        
+        indices_order = []
+        for operation in self.operations:
+            indices_order += operation.indices
+
+            if Ht is None:
+                Ht = operation.gate.Ht
+            else:
+                def Ht(t, prev_Ht=Ht, prev_operation=operation):
+                    return prev_Ht(t) ^ prev_operation.gate.Ht(t)
+
+        register = self.operations[0].register
+        missing_indices = [i for i in range(len(register.dims)) if i not in indices_order]
+
+        for j in missing_indices:
+            def Ht(t, prev_Ht=Ht, j=j):
+                return prev_Ht(t) ^ identity(register.dims[j])
+                
+        combined_indices = indices_order + missing_indices
+
+        sorted_ind = list(argsort(combined_indices))
+        Ht = lambda t, prev_Ht=Ht: prev_Ht(t).transpose(sorted_ind)
+        return Ht
+
+    def gen_KM(self, KM_label = "KM"):
+        KM = Qarray.from_list([])
 
         if len(self.operations) == 0:
             return KM
@@ -123,14 +155,12 @@ class Layer:
             indices_order += operation.indices
 
             if len(KM) == 0:
-                KM = deepcopy(operation.gate.KM)
+                KM = deepcopy(getattr(operation.gate, KM_label))
             else:
-                # updated_KM = []
-                # for op1 in KM:
-                #     for op2 in operation.gate.KM:
-                #         updated_KM.append(op1^op2)
-                # KM = updated_KM
-                KM = KM.arraytensor(operation.gate.KM)
+                KM = KM.arraytensor(getattr(operation.gate, KM_label))
+
+        if len(KM) == 0:
+            return KM
 
         register = self.operations[0].register
         missing_indices = [
@@ -147,7 +177,22 @@ class Layer:
 
         return KM
 
+    def gen_c_ops(self):
+        return self.gen_KM(KM_label="c_ops")
 
+    def gen_ts(self):
+        ts = None
+
+        for operation in self.operations:
+            if operation.gate.ts is not None:
+                if ts is None:
+                    ts = operation.gate.ts
+                else:
+                    assert jnp.array_equal(ts, operation.gate.ts), (
+                        "All operations in a layer must have the same specified time steps, but not all operations need to have time steps."
+                    )
+        return ts
+        
 @struct.dataclass
 class Circuit:
     register: Register
