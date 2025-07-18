@@ -212,20 +212,33 @@ class Circuit:
         self.layers.append(layer)
 
     def append_operation(
-        self, operation: Operation, default_simulate_mode=SimulateMode.UNITARY
+        self, operation: Operation, default_simulate_mode: Optional[SimulateMode] = None, new_layer: bool =True
     ):
         assert operation.register == self.register, (
             f"Mismatch in operation register {operation.register} and circuit register {self.register}."
         )
-        self.append_layer(
-            Layer.create([operation], default_simulate_mode=default_simulate_mode)
-        )
+
+        new_layer = new_layer or len(self.layers) == 0
+
+        if new_layer:
+            default_simulate_mode = default_simulate_mode if default_simulate_mode is not None else SimulateMode.UNITARY
+            self.append_layer(
+                Layer.create([operation], default_simulate_mode=default_simulate_mode)
+            )
+        else:
+            if default_simulate_mode is not None:
+                assert (
+                    self.layers[-1]._default_simulate_mode == default_simulate_mode
+                ), "Cannot append operation to last layer with different default simulate mode."
+
+            self.layers[-1].add(operation)
 
     def append(
         self,
         gate: Gate,
         indices: Union[int, List[int]],
-        default_simulate_mode=SimulateMode.UNITARY,
+        default_simulate_mode: Optional[SimulateMode] = None,
+        new_layer: bool = True,
     ):
         operation = Operation.create(gate, indices, self.register)
-        self.append_operation(operation, default_simulate_mode=default_simulate_mode)
+        self.append_operation(operation, default_simulate_mode=default_simulate_mode, new_layer=new_layer)
