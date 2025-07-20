@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional, Callable, Union
 import jax.numpy as jnp
 
 
-from jaxquantum.core.qarray import Qarray
+from jaxquantum.core.qarray import Qarray, concatenate
 
 config.update("jax_enable_x64", True)
 
@@ -125,6 +125,20 @@ class Gate:
             _Ht = new_Ht,
             _KM = self.KM,
             _c_ops = self.c_ops,
+            _params = self.params,
+            _ts = self.ts,
+            _name = self.name,
+            num_modes = self.num_modes,
+        )
+
+    def add_c_ops(self, c_ops: Qarray):
+        """Add a c_ops to the gate."""
+        return Gate(
+            dims = self.dims,
+            _U = self.U,
+            _Ht = self.Ht,
+            _KM = self.KM,
+            _c_ops = concatenate([self.c_ops, c_ops]),
             _params = self.params,
             _ts = self.ts,
             _name = self.name,

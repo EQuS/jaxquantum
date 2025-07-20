@@ -13,7 +13,7 @@ import jax.numpy as jnp
 from jaxquantum.core.operators import identity
 from jaxquantum.circuits.gates import Gate
 from jaxquantum.circuits.constants import SimulateMode
-from jaxquantum.core.qarray import Qarray
+from jaxquantum.core.qarray import Qarray, concatenate
 
 
 config.update("jax_enable_x64", True)
@@ -58,6 +58,19 @@ class Operation:
             raise ValueError("Indices must be integers within the register.")
 
         return Operation(gate=gate, indices=indices, register=register)
+
+
+    def promote(self, op: Qarray) -> Qarray:
+        indices_order = self.indices
+        missing_indices = [
+            i for i in range(len(self.register.dims)) if i not in indices_order
+        ]
+        for j in missing_indices:
+            op = op ^ identity(self.register.dims[j])
+        combined_indices = indices_order + missing_indices
+        sorted_ind = list(argsort(combined_indices))
+        op = op.transpose(sorted_ind)
+        return op
 
 
 @struct.dataclass
@@ -116,35 +129,19 @@ class Layer:
         return U
 
     def gen_Ht(self):
-        Ht = None
+        Ht = lambda t: 0
 
         if len(self.operations) == 0:
-            return None
+            return Ht
         
-        indices_order = []
         for operation in self.operations:
-            indices_order += operation.indices
-
-            if Ht is None:
-                Ht = operation.gate.Ht
-            else:
-                def Ht(t, prev_Ht=Ht, prev_operation=operation):
-                    return prev_Ht(t) ^ prev_operation.gate.Ht(t)
-
-        register = self.operations[0].register
-        missing_indices = [i for i in range(len(register.dims)) if i not in indices_order]
-
-        for j in missing_indices:
-            def Ht(t, prev_Ht=Ht, j=j):
-                return prev_Ht(t) ^ identity(register.dims[j])
-                
-        combined_indices = indices_order + missing_indices
-
-        sorted_ind = list(argsort(combined_indices))
-        Ht = lambda t, prev_Ht=Ht: prev_Ht(t).transpose(sorted_ind)
+            def Ht(t, prev_Ht=Ht, prev_operation=operation):
+                return prev_Ht(t) + prev_operation.promote(prev_operation.gate.Ht(t))
+        
         return Ht
 
-    def gen_KM(self, KM_label = "KM"):
+    def gen_KM(self):
+        KM_label = "KM"
         KM = Qarray.from_list([])
 
         if len(self.operations) == 0:
@@ -152,12 +149,15 @@ class Layer:
 
         indices_order = []
         for operation in self.operations:
+            if len(getattr(operation.gate, KM_label)) == 0:
+                continue
+
             indices_order += operation.indices
 
             if len(KM) == 0:
                 KM = deepcopy(getattr(operation.gate, KM_label))
             else:
-                KM = KM.arraytensor(getattr(operation.gate, KM_label))
+                KM = KM ^ getattr(operation.gate, KM_label)
 
         if len(KM) == 0:
             return KM
@@ -178,7 +178,18 @@ class Layer:
         return KM
 
     def gen_c_ops(self):
-        return self.gen_KM(KM_label="c_ops")
+        c_ops = Qarray.from_list([])
+
+        if len(self.operations) == 0:
+            return c_ops
+
+        for operation in self.operations:
+            if len(operation.gate.c_ops) == 0:
+                continue
+            promoted_c_ops = operation.promote(operation.gate.c_ops)
+            c_ops = concatenate([c_ops, promoted_c_ops])
+            
+        return c_ops
 
     def gen_ts(self):
         ts = None
