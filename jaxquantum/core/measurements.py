@@ -1,13 +1,20 @@
-"""Helpers."""
+"""Measurements."""
 
-from typing import List
-from jax import config, Array
-
+import optax
 import jax.numpy as jnp
+
+from collections.abc import Callable
+from matplotlib import pyplot as plt
 from tqdm import tqdm
+from typing import List, Optional, NamedTuple
+from functools import partial, reduce
+
+from jax import config, Array, jit, value_and_grad, lax, vmap
 
 from jaxquantum.core.qarray import Qarray, powm
-from jaxquantum.core.operators import identity, sigmax, sigmay, sigmaz
+from jaxquantum.core.operators import identity, sigmax, sigmay, sigmaz, basis
+
+from jax_tqdm import scan_tqdm
 
 config.update("jax_enable_x64", True)
 
@@ -40,7 +47,7 @@ def overlap(rho: Qarray, sigma: Qarray) -> Array:
         return (rho.dag() @ sigma).trace()
 
 
-def fidelity(rho: Qarray, sigma: Qarray) -> float:
+def fidelity(rho: Qarray, sigma: Qarray) -> jnp.ndarray:
     """Fidelity between two states.
 
     Args:
@@ -53,120 +60,325 @@ def fidelity(rho: Qarray, sigma: Qarray) -> float:
     rho = rho.to_dm()
     sigma = sigma.to_dm()
 
-    sqrt_rho = powm(rho, 0.5)
+    sqrt_rho = powm(rho, 0.5, clip=True)
 
-    return ((powm(sqrt_rho @ sigma @ sqrt_rho, 0.5)).tr()) ** 2
-
-
-def quantum_state_tomography(
-    rho: Qarray, physical_basis: Qarray, logical_basis: Qarray
-) -> Qarray:
-    """Perform quantum state tomography to retrieve the density matrix in
-    the logical basis.
-
-        Args:
-            rho: state expressed in the physical Hilbert space basis.
-            physical_basis: list of logical operators expressed in the physical
-            Hilbert space basis forming a complete logical operator basis.
-            logical_basis: list of logical operators expressed in the
-            logical Hilbert space basis forming a complete operator basis.
+    return jnp.real(((powm(sqrt_rho @ sigma @ sqrt_rho, 0.5, clip=True)).tr()) ** 2)
 
 
-        Returns:
-            Density matrix of state rho expressed in the logical basis.
+def _reconstruct_density_matrix(params: jnp.ndarray, dim: int) -> jnp.ndarray:
     """
-    dm = jnp.zeros_like(logical_basis[0].data)
-    rho = rho.to_dm()
+    Pure function to parameterize a density matrix.
+    Ensures the resulting matrix is positive semi-definite and has trace 1.
+    """
+    num_real_params = dim * (dim + 1) // 2
 
-    if physical_basis.bdims[-1] != logical_basis.bdims[-1]:
-        raise ValueError(
-            f"The two bases should have the same size for the "
-            f"last batch dimension. Received "
-            f"{physical_basis.bdims} and {logical_basis.bdims} "
-            f"instead."
+    real_part_flat = params[:num_real_params]
+    imag_part_flat = params[num_real_params:]
+
+    T = jnp.zeros((dim, dim), dtype=jnp.complex128)
+
+    # Set the real parts of the lower triangle from the first part of params
+    tril_indices = jnp.tril_indices(dim)
+    T = T.at[tril_indices].set(real_part_flat)
+
+    # Set the imaginary parts of the strictly lower triangle from the second part of params
+    tril_indices_off_diag = jnp.tril_indices(dim, k=-1)
+    T = T.at[tril_indices_off_diag].add(1j * imag_part_flat)
+
+    rho_unnormalized = T @ T.conj().T
+    # Enforce trace=1 by dividing by the trace
+    trace = jnp.trace(rho_unnormalized)
+    return rho_unnormalized / jnp.where(trace == 0, 1.0, trace)
+
+
+def _parametrize_density_matrix(rho_data: jnp.ndarray, dim: int) -> jnp.ndarray:
+    """
+    Calculates the parameter vector from a density matrix using Cholesky decomposition.
+    This is the inverse of the _reconstruct_density_matrix function.
+    """
+    # Add a small epsilon for numerical stability, ensuring the matrix is positive definite
+    T = jnp.linalg.cholesky(rho_data + 1e-9 * jnp.eye(dim))
+
+    # T is lower-triangular with a real, positive diagonal. This matches our
+    # parameterization convention.
+
+    # Extract the real parts of all lower-triangular elements
+    tril_indices = jnp.tril_indices(dim)
+    real_part = T[tril_indices].real
+
+    # Extract the imaginary parts of the strictly lower-triangular elements
+    tril_indices_off_diag = jnp.tril_indices(dim, k=-1)
+    imag_part = T[tril_indices_off_diag].imag
+
+    return jnp.concatenate([real_part, imag_part])
+
+
+def _L1_reg(params: jnp.ndarray) -> jnp.ndarray:
+    """Pure function for L1 regularization."""
+    return jnp.sum(jnp.abs(params))
+
+
+def _likelihood(
+    params: jnp.ndarray, dim: int, basis: jnp.ndarray, results: jnp.ndarray
+) -> jnp.ndarray:
+    """Pure function for the log-likelihood."""
+    rho = _reconstruct_density_matrix(params, dim)
+    expected_outcomes = jnp.real(jnp.einsum("ijk,jk->i", basis, rho))
+    return -jnp.sum((expected_outcomes - results) ** 2)
+
+
+# This is the core JIT-ted training loop. It is a pure function.
+@partial(
+    jit,
+    static_argnames=[
+        "dim",
+        "epochs",
+        "optimizer",
+        "compute_infidelity",
+        "L1_reg_strength",
+    ],
+)
+def _run_tomography_scan(
+    initial_params,
+    initial_opt_state,
+    true_rho_data,
+    measurement_basis,
+    measurement_results,
+    dim,
+    epochs,
+    optimizer,
+    compute_infidelity,
+    L1_reg_strength,
+):
+    """
+    A pure, JIT-compiled function that runs the entire optimization.
+    Static arguments are those that define the computation graph and don't change during the run.
+    """
+
+    def loss(params):
+        log_likelihood = _likelihood(
+            params, dim, measurement_basis, measurement_results
+        )
+        regularization = L1_reg_strength * _L1_reg(params)
+        return -log_likelihood + regularization
+
+    loss_val_grad = value_and_grad(loss)
+
+    @scan_tqdm(epochs)
+    def train_step(carry, _):
+        params, opt_state = carry
+        loss_val, grads = loss_val_grad(params)
+        updates, new_opt_state = optimizer.update(grads, opt_state, params)
+        new_params = optax.apply_updates(params, updates)
+
+        # This `if` statement is safe inside a JIT-ted function because
+        # `compute_infidelity` is a "static" argument. JAX compiles a
+        # separate version of the code for each value of this flag.
+        if compute_infidelity:
+            rho = Qarray.create(_reconstruct_density_matrix(params, dim))
+            fid = fidelity(Qarray.create(true_rho_data), rho)
+            infidelity = 1.0 - fid
+        else:
+            infidelity = jnp.nan
+
+        new_carry = (new_params, new_opt_state)
+        history = {
+            "loss": loss_val,
+            "grads": grads,
+            "params": params,
+            "infidelity": infidelity,
+        }
+        return new_carry, history
+
+    initial_carry = (initial_params, initial_opt_state)
+    final_carry, history = lax.scan(
+        train_step, initial_carry, jnp.arange(epochs), length=epochs
+    )
+    return final_carry, history
+
+
+class MLETomographyResult(NamedTuple):
+    rho: Qarray
+    params_history: list
+    loss_history: list
+    grads_history: list
+    infidelity_history: Optional[list]
+
+
+class QuantumStateTomography:
+    def __init__(
+        self,
+        rho_guess: Qarray,
+        measurement_basis: Qarray,
+        measurement_results: jnp.ndarray,
+        complete_basis: Optional[Qarray] = None,
+        true_rho: Optional[Qarray] = None,
+    ):
+        self.rho_guess = rho_guess.data
+        self.measurement_basis = measurement_basis.data
+        self.measurement_results = measurement_results
+        self.complete_basis = (
+            complete_basis.data
+            if (complete_basis is not None)
+            else measurement_basis.data
+        )
+        self.true_rho = true_rho
+        self._result = None
+
+    @property
+    def result(self) -> Optional[MLETomographyResult]:
+        return self._result
+
+    def parameterize_density_matrix(self, params: jnp.ndarray, dim: int) -> jnp.ndarray:
+        return _reconstruct_density_matrix(params, dim)
+
+    def L1_reg(self, params: jnp.ndarray) -> jnp.ndarray:
+        return _L1_reg(params)
+
+    def likelihood(
+        self, dim: int, params: jnp.ndarray, basis: jnp.ndarray, results: jnp.ndarray
+    ) -> jnp.ndarray:
+        return _likelihood(params, dim, basis, results)
+
+    def quantum_state_tomography_mle(
+        self, L1_reg_strength: float = 0.0, epochs: int = 10000, lr: float = 5e-3
+    ) -> MLETomographyResult:
+        dim = self.rho_guess.shape[0]
+        optimizer = optax.adam(lr)
+
+        # Initialize parameters from the initial guess for the density matrix
+        params = _parametrize_density_matrix(self.rho_guess, dim)
+        opt_state = optimizer.init(params)
+
+        compute_infidelity_flag = self.true_rho is not None
+
+        # Provide a dummy array if no true_rho is available. It won't be used.
+        true_rho_data_or_dummy = (
+            self.true_rho.data
+            if compute_infidelity_flag
+            else jnp.empty((dim, dim), dtype=jnp.complex64)
         )
 
-    space_size = physical_basis.bdims[-1]
+        final_carry, history = _run_tomography_scan(
+            initial_params=params,
+            initial_opt_state=opt_state,
+            true_rho_data=true_rho_data_or_dummy,
+            measurement_basis=self.measurement_basis,
+            measurement_results=self.measurement_results,
+            dim=dim,
+            epochs=epochs,
+            optimizer=optimizer,
+            compute_infidelity=compute_infidelity_flag,
+            L1_reg_strength=L1_reg_strength,
+        )
 
-    for i in tqdm(range(space_size), total=space_size):
-        p_i = (rho @ physical_basis[i]).trace()
-        dm += p_i * logical_basis[i].data
+        final_params, _ = final_carry
 
-    return Qarray.create(dm, dims=logical_basis.dims, bdims=physical_basis[0].bdims)
+        rho = Qarray.create(self.parameterize_density_matrix(final_params, dim))
 
+        self._result = MLETomographyResult(
+            rho=rho,
+            params_history=history["params"],
+            loss_history=history["loss"],
+            grads_history=history["grads"],
+            infidelity_history=history["infidelity"]
+            if compute_infidelity_flag
+            else None,
+        )
+        return self._result
 
-def get_physical_basis(qubits: List) -> Qarray:
-    """Compute a complete operator basis of a QEC code on a
-    physical system specified by a number of qubits.
+    def quantum_state_tomography_direct(
+        self,
+    ) -> Qarray:
+        """Perform quantum state tomography to retrieve the density matrix in
+        the logical basis.
 
             Args:
-                qubits: list of qubit codes, must have
-                common_gates and params attributes.
+                rho: state expressed in the physical Hilbert space basis.
+                physical_basis: list of logical operators expressed in the physical
+                Hilbert space basis forming a complete logical operator basis.
+                logical_basis: list of logical operators expressed in the
+                logical Hilbert space basis forming a complete operator basis.
+                ensure_psd: enforce the condition on the bloch sphere
+                coordinates for positive semidefiniteness
 
             Returns:
-                List containing the complete operator basis.
-    """
+                Density matrix of state rho expressed in the logical basis.
+        """
+        # Compute overlaps of measurement and complete operator bases
+        A = jnp.einsum("ijk,ljk->il", self.complete_basis, self.measurement_basis)
+        # Solve the linear system to find the coefficients
+        coefficients = jnp.linalg.solve(A, self.measurement_results)
+        # Reconstruct the density matrix
+        rho = jnp.einsum("i, ijk->jk", coefficients, self.complete_basis)
 
-    qubit = qubits[0]
-    qubits = qubits[1:]
-    try:
-        operators = Qarray.from_list(
-            [
-                identity(qubit.params["N"]),
-                qubit.common_gates["X"],
-                qubit.common_gates["Y"],
-                qubit.common_gates["Z"],
-            ]
-        )
-    except KeyError:
-        print("QEC code must have common_gates for all three axes.")
-    except AttributeError:
-        print("QEC code must have common_gates and params attribute.")
+        return Qarray.create(rho)
 
-    if len(qubits) == 0:
-        return operators
+    def plot_results(self):
+        if self._result is None:
+            raise ValueError(
+                "No results to plot. Run quantum_state_tomography_mle first."
+            )
 
-    sub_basis = get_physical_basis(qubits)
-    basis = []
+        fig, ax = plt.subplots(1, figsize=(5, 4))
+        if self._result.infidelity_history is not None:
+            ax2 = ax.twinx()
 
-    sub_basis_size = sub_basis.bdims[-1]
+        ax.plot(self._result.loss_history, color="C0")
+        ax.set_xlabel("Epoch")
+        ax.set_ylabel("$\mathcal{L}$", color="C0")
+        ax.set_yscale("log")
 
-    for i in range(4):
-        for j in range(sub_basis_size):
-            basis.append(operators[i] ^ sub_basis[j])
+        if self._result.infidelity_history is not None:
+            ax2.plot(self._result.infidelity_history, color="C1")
+            ax2.set_yscale("log")
+            ax2.set_ylabel("$1-\mathcal{F}$", color="C1")
+            plt.grid(False)
 
-    return Qarray.from_list(basis)
+        plt.show()
+
+def tensor_basis(single_basis: Qarray, n: int) -> Qarray:
+
+    dims = single_basis.dims
+
+    single_basis = single_basis.data
+    b, d, _ = single_basis.shape
+    indices = jnp.stack(jnp.meshgrid(*[jnp.arange(b)] * n, indexing="ij"),
+                        axis=-1).reshape(-1, n)  # shape (b^n, n)
+
+    # Select the operators based on indices: shape (b^n, n, d, d)
+    selected = single_basis[indices]  # shape: (b^n, n, d, d)
+
+    # Vectorized Kronecker products
+    full_basis = vmap(lambda ops: reduce(jnp.kron, ops))(selected)
+
+    new_dims = tuple(tuple(x**n for x in row) for row in dims)
+
+    return Qarray.create(full_basis, dims=new_dims, bdims=(b**n,))
 
 
-def get_logical_basis(n_qubits: int) -> Qarray:
-    """Compute a complete operator basis of a system composed of logical
-    qubits.
+def _quantum_process_tomography(
+    map: Callable[[Qarray], Qarray],
+    physical_basis: Qarray,
+    logical_basis: Qarray,
+    physical_operator_basis: Qarray,
+    logical_operator_basis: Qarray,
+) -> Qarray:
+    #WIP
+    d = physical_basis.bdims[-1]
 
-                Args:
-                    n_qubits: number of qubits
+    choi = Qarray.create(jnp.zeros((d, d))) ^ Qarray.create(jnp.zeros((d, d)))
 
-                Returns:
-                    List containing the complete operator basis.
-    """
-    if n_qubits < 1:
-        raise ValueError("n_qubits must be at least 1.")
+    with tqdm(total=d * d) as pbar:
+        for i in range(d):
+            for j in range(d):
+                rho_k = physical_basis[i] @ physical_basis[j].dag()
 
-    n_qubits -= 1
-
-    operators = Qarray.from_list(
-        [identity(2) / 2, sigmax() / 2, sigmay() / 2, sigmaz() / 2]
-    )
-
-    if n_qubits == 0:
-        return operators
-
-    sub_basis = get_logical_basis(n_qubits)
-    basis = []
-
-    sub_basis_size = sub_basis.bdims[-1]
-
-    for i in range(4):
-        for j in range(sub_basis_size):
-            basis.append(operators[i] ^ sub_basis[j])
-
-    return Qarray.from_list(basis)
+                E_rho_k = map(rho_k)
+                r = quantum_state_tomography_direct(
+                    E_rho_k, physical_operator_basis, logical_operator_basis
+                )
+                print(jnp.linalg.eigvals(r.data))
+                choi += (logical_basis[i] @ logical_basis[j].dag()) ^ r
+                pbar.update(1)
+    return choi
