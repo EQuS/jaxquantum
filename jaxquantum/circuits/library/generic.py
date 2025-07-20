@@ -8,13 +8,13 @@ import jax.numpy as jnp
 from jaxquantum import Qarray, tensor
 
 
-def I(Ns, ts=None, c_ops=None):
+def Id(Ns, ts=None, c_ops=None):
 
     Is = tensor(*[identity(N) for N in Ns])
 
     return Gate.create(
         Ns,
-        name="I",
+        name="Id",
         params={},
         gen_U=lambda params: Is,
         gen_Ht=lambda params: (lambda t: 0*Is),
