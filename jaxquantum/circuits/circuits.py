@@ -85,8 +85,11 @@ class Layer:
     ):
         all_indices = [ind for op in operations for ind in op.indices]
         unique_indices = list(set(all_indices))
-        if len(all_indices) != len(unique_indices):
-            raise ValueError("Operations must not have overlapping indices.")
+
+        if default_simulate_mode != SimulateMode.HAMILTONIAN:
+            if len(all_indices) != len(unique_indices):
+                raise ValueError("Operations must not have overlapping indices.")
+
         return Layer(
             operations=operations,
             _unique_indices=unique_indices,
@@ -94,8 +97,9 @@ class Layer:
         )
 
     def add(self, operation: Operation):
-        if any(ind in self._unique_indices for ind in operation.indices):
-            raise ValueError("Operations must not have overlapping indices.")
+        if self._default_simulate_mode != SimulateMode.HAMILTONIAN:
+            if any(ind in self._unique_indices for ind in operation.indices):
+                raise ValueError("Operations must not have overlapping indices.")
         self.operations.append(operation)
         self._unique_indices.extend(operation.indices)
 
@@ -188,14 +192,14 @@ class Layer:
                 continue
             promoted_c_ops = operation.promote(operation.gate.c_ops)
             c_ops = concatenate([c_ops, promoted_c_ops])
-            
+
         return c_ops
 
     def gen_ts(self):
         ts = None
 
         for operation in self.operations:
-            if operation.gate.ts is not None:
+            if operation.gate.ts is not None and len(operation.gate.ts) > 0:
                 if ts is None:
                     ts = operation.gate.ts
                 else:

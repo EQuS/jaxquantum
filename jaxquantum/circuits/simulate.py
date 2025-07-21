@@ -113,7 +113,7 @@ def simulate_layer(
         c_ops = layer.gen_c_ops()
         ts = layer.gen_ts()
 
-        if state.is_dm() or c_ops is not None:
+        if state.is_dm() or (c_ops is not None and len(c_ops) > 0):
             intermediate_states = mesolve(Ht, state, ts, c_ops=c_ops, solver_options=solver_options)
         else:
             intermediate_states = sesolve(Ht, state, ts, solver_options=solver_options)
