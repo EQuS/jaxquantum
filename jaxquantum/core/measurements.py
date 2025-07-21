@@ -359,26 +359,43 @@ def tensor_basis(single_basis: Qarray, n: int) -> Qarray:
 
 def _quantum_process_tomography(
     map: Callable[[Qarray], Qarray],
-    physical_basis: Qarray,
-    logical_basis: Qarray,
+    physical_state_basis: Qarray,
     physical_operator_basis: Qarray,
-    logical_operator_basis: Qarray,
+    logical_state_basis: Optional[Qarray] = None,
+    logical_operator_basis: Optional[Qarray] = None,
 ) -> Qarray:
-    #WIP
-    d = physical_basis.bdims[-1]
+
+    if logical_state_basis is None:
+        logical_state_basis = physical_state_basis
+    if logical_operator_basis is None:
+        logical_operator_basis = physical_operator_basis
+
+    dsqr = logical_state_basis.bdims[-1]
+
+    d = int(jnp.sqrt(dsqr+1))
 
     choi = Qarray.create(jnp.zeros((d, d))) ^ Qarray.create(jnp.zeros((d, d)))
 
-    with tqdm(total=d * d) as pbar:
-        for i in range(d):
-            for j in range(d):
-                rho_k = physical_basis[i] @ physical_basis[j].dag()
+    with (tqdm(total=d * d) as pbar):
+        for k in range(dsqr):
+                rho_k = physical_state_basis[k] @ physical_state_basis[k].dag()
 
                 E_rho_k = map(rho_k)
-                r = quantum_state_tomography_direct(
-                    E_rho_k, physical_operator_basis, logical_operator_basis
-                )
-                print(jnp.linalg.eigvals(r.data))
-                choi += (logical_basis[i] @ logical_basis[j].dag()) ^ r
+
+                measurement_results = jnp.real(
+                    jnp.einsum('ijk,jk->i', physical_operator_basis.data,
+                               E_rho_k.data))
+
+                QST = QuantumStateTomography(rho_guess=identity(d)/d,
+                                             measurement_results=measurement_results,
+                                             measurement_basis=logical_operator_basis,
+                                             )
+                res = QST.quantum_state_tomography_mle()
+                r = res.rho
+                print("----------------------")
+                print(logical_state_basis[k] @ logical_state_basis[k].dag())
+                print(r)
+                choi += (logical_state_basis[k] @ logical_state_basis[k].dag()
+                         ) ^ r
                 pbar.update(1)
     return choi
