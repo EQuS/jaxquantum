@@ -145,7 +145,6 @@ class Layer:
         return Ht
 
     def gen_KM(self):
-        KM_label = "KM"
         KM = Qarray.from_list([])
 
         if len(self.operations) == 0:
@@ -153,15 +152,15 @@ class Layer:
 
         indices_order = []
         for operation in self.operations:
-            if len(getattr(operation.gate, KM_label)) == 0:
+            if len(operation.gate.KM) == 0:
                 continue
 
             indices_order += operation.indices
 
             if len(KM) == 0:
-                KM = deepcopy(getattr(operation.gate, KM_label))
+                KM = deepcopy(operation.gate.KM)
             else:
-                KM = KM ^ getattr(operation.gate, KM_label)
+                KM = KM ^ operation.gate.KM
 
         if len(KM) == 0:
             return KM
