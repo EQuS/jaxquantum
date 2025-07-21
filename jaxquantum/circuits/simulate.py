@@ -3,6 +3,7 @@
 from flax import struct
 from jax import config
 from typing import List
+from tqdm import tqdm
 
 
 from jaxquantum.core.qarray import Qarray, ket2dm
@@ -62,16 +63,20 @@ def simulate(
     state = initial_state
     results.append(Qarray.from_list([state]))
 
-    for layer in circuit.layers:
-        result = simulate_layer(layer, state, mode=mode, **kwargs)
+    start_time = 0
+
+    for layer in tqdm(circuit.layers):
+        result_dict = _simulate_layer(layer, state, mode=mode, start_time=start_time, **kwargs)
+        result = result_dict["result"]
+        start_time = result_dict["start_time"]
         results.append(result)
         state = result[-1]
 
     return results
 
 
-def simulate_layer(
-    layer: Layer, initial_state: Qarray, mode: SimulateMode = SimulateMode.UNITARY, **kwargs
+def _simulate_layer(
+    layer: Layer, initial_state: Qarray, mode: SimulateMode = SimulateMode.UNITARY, start_time: float = 0, **kwargs
 ) -> Qarray:
     """
     Simulates the evolution of a quantum state through a given layer.
@@ -113,6 +118,8 @@ def simulate_layer(
         c_ops = layer.gen_c_ops()
         ts = layer.gen_ts()
 
+        ts = ts + start_time
+
         if state.is_dm() or (c_ops is not None and len(c_ops) > 0):
             intermediate_states = mesolve(Ht, state, ts, c_ops=c_ops, solver_options=solver_options)
         else:
@@ -120,6 +127,7 @@ def simulate_layer(
 
         result = intermediate_states
         state = intermediate_states[-1]
+        start_time = ts[-1]
 
     elif mode == SimulateMode.KRAUS:
         KM = layer.gen_KM()
@@ -128,4 +136,7 @@ def simulate_layer(
         state = (KM @ state @ KM.dag()).collapse()
         result = Qarray.from_list([state])
 
-    return result
+    return {
+        "result": result,
+        "start_time": start_time
+    }

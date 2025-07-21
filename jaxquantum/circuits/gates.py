@@ -1,5 +1,6 @@
 """Gates."""
 
+from copy import deepcopy
 from flax import struct
 from jax import Array, config
 from typing import List, Dict, Any, Optional, Callable, Union
@@ -140,6 +141,20 @@ class Gate:
             _KM = self.KM,
             _c_ops = concatenate([self.c_ops, c_ops]),
             _params = self.params,
+            _ts = self.ts,
+            _name = self.name,
+            num_modes = self.num_modes,
+        )
+
+    def copy(self):
+        """Return a copy of the gate."""
+        return Gate(
+            dims = deepcopy(self.dims),
+            _U = self.U,
+            _Ht = deepcopy(self.Ht),
+            _KM = self.KM,
+            _c_ops = self.c_ops,
+            _params = deepcopy(self.params),
             _ts = self.ts,
             _name = self.name,
             num_modes = self.num_modes,
