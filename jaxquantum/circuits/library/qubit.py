@@ -92,7 +92,7 @@ def MX_plus():
     e = basis(2, 1)
     plus = (g + e).unit()
     pp = plus @ plus.dag()
-    kmap = Qarray.from_list([2 * pp])
+    kmap = Qarray.from_list([pp])
 
     return Gate.create(2, name="MXplus", gen_KM=lambda params: kmap, num_modes=1)
 
@@ -101,7 +101,7 @@ def MZ_plus():
     g = basis(2, 0)
     plus = g
     pp = plus @ plus.dag()
-    kmap = Qarray.from_list([2 * pp])
+    kmap = Qarray.from_list([pp])
 
     return Gate.create(2, name="MZplus", gen_KM=lambda params: kmap, num_modes=1)
 

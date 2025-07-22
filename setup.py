@@ -16,7 +16,8 @@ REQUIREMENTS = [
     "diffrax",
     "flax",
     "tqdm",
-    "pytest"
+    "pytest",
+    "optax"
 ]
 
 EXTRA_REQUIREMENTS = {

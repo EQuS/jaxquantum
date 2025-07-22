@@ -40,7 +40,7 @@ class Results:
 
 
 def simulate(
-    circuit: Circuit, initial_state: Qarray, mode: SimulateMode = SimulateMode.UNITARY, **kwargs
+    circuit: Circuit, initial_state: Qarray, mode: SimulateMode = SimulateMode.DEFAULT, **kwargs
 ) -> Results:
     """
     Simulates the evolution of a quantum state through a given quantum circuit.

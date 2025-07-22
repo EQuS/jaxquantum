@@ -46,7 +46,7 @@ extra:
 plugins:
   - search
   - mkdocs-jupyter:
-      execute: true
+      execute: false
   - gen-files:
       scripts:
       - docs/gen_ref_pages.py
@@ -83,6 +83,7 @@ nav:
       # - Examples: getting_started/examples.md
       - The Sharp Bits 🔪: documentation/getting_started/sharp_bits.md
     - Tutorials:
+      - Circuits: documentation/tutorials/circuits.ipynb
       - Bosonic Codes: documentation/tutorials/bosonic_codes.md
     - Advanced Concepts:
       - Excitation Number Restricted Basis: documentation/advanced/enr.md
