@@ -171,6 +171,19 @@ def basis(N: int, k: int):
     """
     return Qarray.create(one_hot(k, N).reshape(N, 1))
 
+def multi_mode_basis_set(Ns: List[int]) -> Qarray:
+    """Creates a multi-mode basis set.
+
+    Args:
+        Ns: List of Hilbert space dimensions for each mode.
+
+    Returns:
+        Multi-mode basis set.
+    """
+    data = jnp.eye(prod(Ns))
+    dims = (tuple(Ns), tuple([1 for _ in Ns]))
+    return Qarray.create(data, dims=dims, bdims=(prod(Ns),))
+
 
 def coherent(N: int, α: complex) -> Qarray:
     """Coherent state.

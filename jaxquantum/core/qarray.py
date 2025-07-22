@@ -62,7 +62,16 @@ class Qarray:
         if dims is None:
             dims = ((data.shape[-2],), (data.shape[-1],))
 
-        dims = (tuple(dims[0]), tuple(dims[1]))
+        if not isinstance(dims[0], (list, tuple)):
+            # This handles the case where only the hilbert space dimensions are sent in.
+            if data.shape[-1] == 1:
+                dims = (tuple(dims), tuple([1 for _ in dims]))
+            elif data.shape[-2] == 1:
+                dims = (tuple([1 for _ in dims]), tuple(dims))
+            else:
+                dims = (tuple(dims), tuple(dims))
+        else:
+            dims = (tuple(dims[0]), tuple(dims[1]))
 
         check_dims(dims, bdims, data.shape)
 
