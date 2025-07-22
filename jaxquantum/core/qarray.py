@@ -539,6 +539,29 @@ ARRAY_TYPES = (Array, ndarray, Qarray)
 
 # Qarray operations ---------------------------------------------------------------------
 
+def concatenate(qarr_list: List[Qarray], axis: int = 0) -> Qarray:
+    """Concatenate a list of Qarrays along a specified axis.
+
+    Args:
+        qarr_list (List[Qarray]): List of Qarrays to concatenate.
+        axis (int): Axis along which to concatenate. Default is 0.
+
+    Returns:
+        Qarray: Concatenated Qarray.
+    """
+
+    non_empty_qarr_list = [qarr for qarr in qarr_list if len(qarr.data) != 0]
+
+    if len(non_empty_qarr_list) == 0:
+        return Qarray.from_list([])
+
+    concatenated_data = jnp.concatenate(
+        [qarr.data for qarr in non_empty_qarr_list], axis=axis
+    )
+
+    dims = non_empty_qarr_list[0].dims
+    return Qarray.create(concatenated_data, dims=dims)
+
 
 def collapse(qarr: Qarray, mode="sum") -> Qarray:
     """Collapse the Qarray.
@@ -622,7 +645,7 @@ def tensor(*args, **kwargs) -> Qarray:
         *args (Qarray): tensors to take the product of
         parallel (bool): if True, use parallel einsum for tensor product
             true: [A,B] ^ [C,D] = [A^C, B^D]
-            false: [A,B] ^ [C,D] = [A^C, A^D, B^C, B^D]
+            false (default): [A,B] ^ [C,D] = [A^C, A^D, B^C, B^D]
 
     Returns:
         Tensor product of given tensors

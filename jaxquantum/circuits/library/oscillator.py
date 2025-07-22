@@ -1,18 +1,29 @@
 """Oscillator gates."""
 
-from jaxquantum.core.operators import displace, basis, destroy, num
+from jaxquantum.core.operators import displace, basis, destroy, create, num
 from jaxquantum.circuits.gates import Gate
 from jax.scipy.special import factorial
 import jax.numpy as jnp
 from jaxquantum import Qarray
 
 
-def D(N, alpha):
+def D(N, alpha, ts=None, c_ops=None):
+
+    gen_Ht = None
+    if ts is not None:
+        final_t = ts[-1]
+        amp = 1j * alpha / final_t / 2
+        a = destroy(N)
+        gen_Ht = lambda params: (lambda t: jnp.conj(amp) * a + amp * a.dag())
+
     return Gate.create(
         N,
         name="D",
         params={"alpha": alpha},
         gen_U=lambda params: displace(N, params["alpha"]),
+        gen_Ht=gen_Ht,
+        ts=ts,
+        gen_c_ops=lambda params: Qarray.from_list([]) if c_ops is None else c_ops,
         num_modes=1,
     )
 
