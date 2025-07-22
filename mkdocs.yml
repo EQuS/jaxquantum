@@ -68,6 +68,12 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.tabbed
   - pymdownx.extra
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - js/mathjax-config.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 nav:
   - About: 
