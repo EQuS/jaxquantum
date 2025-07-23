@@ -6,13 +6,13 @@ import jax.numpy as jnp
 from collections.abc import Callable
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-from typing import List, Optional, NamedTuple
+from typing import Optional, NamedTuple
 from functools import partial, reduce
 
 from jax import config, Array, jit, value_and_grad, lax, vmap
 
 from jaxquantum.core.qarray import Qarray, powm
-from jaxquantum.core.operators import identity, sigmax, sigmay, sigmaz, basis
+from jaxquantum.core.operators import identity
 
 from jax_tqdm import scan_tqdm
 
@@ -47,12 +47,14 @@ def overlap(rho: Qarray, sigma: Qarray) -> Array:
         return (rho.dag() @ sigma).trace()
 
 
-def fidelity(rho: Qarray, sigma: Qarray) -> jnp.ndarray:
+def fidelity(rho: Qarray, sigma: Qarray, force_positivity: bool=False) -> (
+        jnp.ndarray):
     """Fidelity between two states.
 
     Args:
         rho: state.
         sigma: state.
+        force_positivity: force the states to be positive semidefinite
 
     Returns:
         Fidelity between rho and sigma.
@@ -60,9 +62,11 @@ def fidelity(rho: Qarray, sigma: Qarray) -> jnp.ndarray:
     rho = rho.to_dm()
     sigma = sigma.to_dm()
 
-    sqrt_rho = powm(rho, 0.5, clip=True)
+    sqrt_rho = powm(rho, 0.5, clip_eigvals=force_positivity)
 
-    return jnp.real(((powm(sqrt_rho @ sigma @ sqrt_rho, 0.5, clip=True)).tr()) ** 2)
+    return jnp.real(((powm(sqrt_rho @ sigma @ sqrt_rho, 0.5,
+                           clip_eigvals=force_positivity)).tr())
+                    ** 2)
 
 
 def _reconstruct_density_matrix(params: jnp.ndarray, dim: int) -> jnp.ndarray:
@@ -121,7 +125,7 @@ def _L1_reg(params: jnp.ndarray) -> jnp.ndarray:
 def _likelihood(
     params: jnp.ndarray, dim: int, basis: jnp.ndarray, results: jnp.ndarray
 ) -> jnp.ndarray:
-    """Pure function for the log-likelihood."""
+    """Compute the log-likelihood."""
     rho = _reconstruct_density_matrix(params, dim)
     expected_outcomes = jnp.real(jnp.einsum("ijk,jk->i", basis, rho))
     return -jnp.sum((expected_outcomes - results) ** 2)
@@ -176,7 +180,8 @@ def _run_tomography_scan(
         # separate version of the code for each value of this flag.
         if compute_infidelity:
             rho = Qarray.create(_reconstruct_density_matrix(params, dim))
-            fid = fidelity(Qarray.create(true_rho_data), rho)
+            fid = fidelity(Qarray.create(true_rho_data), rho,
+                           force_positivity=True)
             infidelity = 1.0 - fid
         else:
             infidelity = jnp.nan
@@ -214,6 +219,20 @@ class QuantumStateTomography:
         complete_basis: Optional[Qarray] = None,
         true_rho: Optional[Qarray] = None,
     ):
+        """
+        Reconstruct a quantum state from measurement results using quantum state tomography.
+        The tomography can be performed either by direct inversion or by maximum likelihood estimation.
+
+        Args:
+            rho_guess (Qarray): The initial guess for the quantum state.
+            measurement_basis (Qarray): The basis in which measurements are performed.
+            measurement_results (jnp.ndarray): The results of the measurements.
+            complete_basis (Optional[Qarray]): The complete basis for state 
+            reconstruction used when using direct inversion. 
+            Defaults to the measurement basis if not provided.
+            true_rho (Optional[Qarray]): The true quantum state, if known.
+
+        """
         self.rho_guess = rho_guess.data
         self.measurement_basis = measurement_basis.data
         self.measurement_results = measurement_results
@@ -243,6 +262,33 @@ class QuantumStateTomography:
     def quantum_state_tomography_mle(
         self, L1_reg_strength: float = 0.0, epochs: int = 10000, lr: float = 5e-3
     ) -> MLETomographyResult:
+        """Perform quantum state tomography using maximum likelihood 
+        estimation (MLE).
+
+        This method reconstructs the quantum state from measurement results 
+        by optimizing
+        a likelihood function using gradient descent. The optimization 
+        ensures the 
+        resulting density matrix is positive semi-definite with trace 1.
+
+        Args:
+            L1_reg_strength (float, optional): Strength of L1 
+            regularization. Defaults to 0.0.
+            epochs (int, optional): Number of optimization iterations. 
+            Defaults to 10000.
+            lr (float, optional): Learning rate for the Adam optimizer. 
+            Defaults to 5e-3.
+
+        Returns:
+            MLETomographyResult: Named tuple containing:
+                - rho: Reconstructed quantum state as Qarray
+                - params_history: List of parameter values during optimization
+                - loss_history: List of loss values during optimization
+                - grads_history: List of gradient values during optimization
+                - infidelity_history: List of infidelities if true_rho was 
+                provided, None otherwise
+        """
+
         dim = self.rho_guess.shape[0]
         optimizer = optax.adam(lr)
 
@@ -290,22 +336,19 @@ class QuantumStateTomography:
     def quantum_state_tomography_direct(
         self,
     ) -> Qarray:
-        """Perform quantum state tomography to retrieve the density matrix in
-        the logical basis.
 
-            Args:
-                rho: state expressed in the physical Hilbert space basis.
-                physical_basis: list of logical operators expressed in the physical
-                Hilbert space basis forming a complete logical operator basis.
-                logical_basis: list of logical operators expressed in the
-                logical Hilbert space basis forming a complete operator basis.
-                ensure_psd: enforce the condition on the bloch sphere
-                coordinates for positive semidefiniteness
-
-            Returns:
-                Density matrix of state rho expressed in the logical basis.
+        """Perform quantum state tomography using direct inversion.
+    
+        This method reconstructs the quantum state from measurement results by 
+        directly solving a system of linear equations. The method assumes that
+        the measurement basis is complete and the measurement results are 
+        noise-free.
+    
+        Returns:
+            Qarray: Reconstructed quantum state.
         """
-        # Compute overlaps of measurement and complete operator bases
+
+    # Compute overlaps of measurement and complete operator bases
         A = jnp.einsum("ijk,ljk->il", self.complete_basis, self.measurement_basis)
         # Solve the linear system to find the coefficients
         coefficients = jnp.linalg.solve(A, self.measurement_results)
@@ -326,18 +369,29 @@ class QuantumStateTomography:
 
         ax.plot(self._result.loss_history, color="C0")
         ax.set_xlabel("Epoch")
-        ax.set_ylabel("$\mathcal{L}$", color="C0")
+        ax.set_ylabel("$\\mathcal{L}$", color="C0")
         ax.set_yscale("log")
 
         if self._result.infidelity_history is not None:
             ax2.plot(self._result.infidelity_history, color="C1")
             ax2.set_yscale("log")
-            ax2.set_ylabel("$1-\mathcal{F}$", color="C1")
+            ax2.set_ylabel("$1-\\mathcal{F}$", color="C1")
             plt.grid(False)
 
         plt.show()
 
 def tensor_basis(single_basis: Qarray, n: int) -> Qarray:
+    """Construct n-fold tensor product basis from a single-system basis.
+
+    Args:
+        single_basis: The single-system operator basis as a Qarray.
+        n: Number of tensor copies to construct.
+
+    Returns:
+        Qarray containing the n-fold tensor product basis operators.
+        The resulting basis has b^n elements where b is the number
+        of operators in the single-system basis.
+    """
 
     dims = single_basis.dims
 
