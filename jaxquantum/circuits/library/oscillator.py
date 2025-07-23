@@ -12,7 +12,7 @@ def D(N, alpha, ts=None, c_ops=None):
     gen_Ht = None
     if ts is not None:
         final_t = ts[-1]
-        amp = 1j * alpha / final_t / 2
+        amp = 1j * alpha / final_t
         a = destroy(N)
         gen_Ht = lambda params: (lambda t: jnp.conj(amp) * a + amp * a.dag())
 
