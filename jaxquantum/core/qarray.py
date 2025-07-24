@@ -740,12 +740,14 @@ def expm(qarr: Qarray, **kwargs) -> Qarray:
     return Qarray.create(data, dims=dims)
 
 
-def powm(qarr: Qarray, n: Union[int, float]) -> Qarray:
+def powm(qarr: Qarray, n: Union[int, float], clip_eigvals=False) -> Qarray:
     """Matrix power.
 
     Args:
         qarr (Qarray): quantum array
         n (int): power
+        clip_eigvals (bool): clip eigenvalues to always be able to compute
+        non-integer powers
 
     Returns:
         matrix power
@@ -754,12 +756,15 @@ def powm(qarr: Qarray, n: Union[int, float]) -> Qarray:
         data_res = jnp.linalg.matrix_power(qarr.data, n)
     else:
         evalues, evectors = jnp.linalg.eig(qarr.data)
-        if not (evalues >= 0).all():
-            raise ValueError(
-                "Non-integer power of a matrix can only be "
-                "computed if the matrix is positive semi-definite."
-                "Got a matrix with a negative eigenvalue."
-            )
+        if clip_eigvals:
+            evalues = jnp.maximum(evalues, 0)
+        else:
+            if not (evalues >= 0).all():
+                raise ValueError(
+                    "Non-integer power of a matrix can only be "
+                    "computed if the matrix is positive semi-definite."
+                    "Got a matrix with a negative eigenvalue."
+                )
         data_res = evectors * jnp.pow(evalues, n) @ jnp.linalg.inv(evectors)
     return Qarray.create(data_res, dims=qarr.dims)
 
