@@ -17,6 +17,7 @@ def plot_qp(
     state,
     pts_x,
     pts_y=None,
+    g=2,
     axs=None,
     contour=True,
     qp_type=WIGNER,
@@ -37,6 +38,10 @@ def plot_qp(
         be flattened to a 2d grid to allow for plotting
         pts_x: x points to evaluate quasi-probability distribution at
         pts_y: y points to evaluate quasi-probability distribution at
+        g : float, default: 2
+        Scaling factor for ``a = 0.5 * g * (x + iy)``.  The value of `g` is
+        related to the value of :math:`\hbar` in the commutation relation
+        :math:`[x,\,y] = i\hbar` via :math:`\hbar=2/g^2`.
         axs: matplotlib axes to plot on
         contour: make the plot use contouring
         qp_type: type of quasi probability distribution ("wigner", "qfunc")
@@ -56,6 +61,10 @@ def plot_qp(
         pts_y = pts_x
     pts_x = jnp.array(pts_x)
     pts_y = jnp.array(pts_y)
+
+    if len(state.bdims)==1 and state.bdims[0]==1:
+        state = state[0]
+
 
     bdims = state.bdims
     added_baxes = 0
@@ -99,7 +108,7 @@ def plot_qp(
         scale = np.pi / 2
         cmap = "seismic"
         cbar_label = r"$\mathcal{W}(\alpha)$"
-        QP = scale * wigner(state, pts_x, pts_y, g=2)
+        QP = scale * wigner(state, pts_x, pts_y, g=g)
 
     elif qp_type == HUSIMI:
         vmin = 0
@@ -107,12 +116,17 @@ def plot_qp(
         scale = np.pi
         cmap = "jet"
         cbar_label = r"$\mathcal{Q}(\alpha)$"
-        QP = scale * husimi(state, pts_x, pts_y, g=2)
+        QP = scale * husimi(state, pts_x, pts_y, g=g)
+
+
 
     for _ in range(added_baxes):
         QP = jnp.array([QP])
         axs = np.array([axs])
-        subtitles = np.array([subtitles])
+        if subtitles is not None:
+            subtitles = np.array([subtitles])
+
+
 
 
     pts_x = pts_x * axis_scale_factor
@@ -128,8 +142,8 @@ def plot_qp(
 
     for row in range(bdims[0]):
         for col in range(bdims[1]):
+            ax = axs[row, col]
             if contour:
-                ax = axs[row, col]
                 im = ax.contourf(
                     pts_x,
                     pts_y,
@@ -164,7 +178,8 @@ def plot_qp(
 
             ax.set_xlabel(r"Re[$\alpha$]")
             ax.set_ylabel(r"Im[$\alpha$]")
-            ax.set_title(subtitles[row, col])
+            if subtitles is not None:
+                ax.set_title(subtitles[row, col])
 
     fig = ax.get_figure()
     fig.tight_layout()
@@ -177,6 +192,7 @@ def plot_wigner(
     state,
     pts_x,
     pts_y=None,
+    g=2,
     axs=None,
     contour=True,
     cbar_label="",
@@ -196,6 +212,10 @@ def plot_wigner(
         be flattened to a 2d grid to allow for plotting
         pts_x: x points to evaluate quasi-probability distribution at
         pts_y: y points to evaluate quasi-probability distribution at
+        g : float, default: 2
+        Scaling factor for ``a = 0.5 * g * (x + iy)``.  The value of `g` is
+        related to the value of :math:`\hbar` in the commutation relation
+        :math:`[x,\,y] = i\hbar` via :math:`\hbar=2/g^2`.
         axs: matplotlib axes to plot on
         contour: make the plot use contouring
         cbar_label: label for the cbar
@@ -214,6 +234,7 @@ def plot_wigner(
         state=state,
         pts_x=pts_x,
         pts_y=pts_y,
+        g=g,
         axs=axs,
         contour=contour,
         qp_type=WIGNER,
@@ -232,6 +253,7 @@ def plot_husimi(
     state,
     pts_x,
     pts_y=None,
+    g=2,
     axs=None,
     contour=True,
     cbar_label="",
@@ -251,6 +273,10 @@ def plot_husimi(
         be flattened to a 2d grid to allow for plotting
         pts_x: x points to evaluate quasi-probability distribution at
         pts_y: y points to evaluate quasi-probability distribution at
+        g : float, default: 2
+        Scaling factor for ``a = 0.5 * g * (x + iy)``.  The value of `g` is
+        related to the value of :math:`\hbar` in the commutation relation
+        :math:`[x,\,y] = i\hbar` via :math:`\hbar=2/g^2`.
         axs: matplotlib axes to plot on
         contour: make the plot use contouring
         cbar_label: label for the cbar
@@ -269,6 +295,7 @@ def plot_husimi(
         state=state,
         pts_x=pts_x,
         pts_y=pts_y,
+        g=g,
         axs=axs,
         contour=contour,
         qp_type=HUSIMI,
@@ -377,7 +404,13 @@ def plot_cf(
     for _ in range(added_baxes):
         QP = jnp.array([QP])
         axs = np.array([axs])
-        subtitles = np.array([subtitles])
+        if subtitles is not None:
+            subtitles = np.array([subtitles])
+
+    if added_baxes==2:
+        axs = axs[0] # When the input state is zero-dimensional, remove an
+                     # axis that is automatically added due to the subcolumns
+
 
     pts_x = pts_x * axis_scale_factor
     pts_y = pts_y * axis_scale_factor
@@ -391,12 +424,12 @@ def plot_cf(
                      5) if y_ticks is None else y_ticks
     )
     z_ticks = jnp.linspace(vmin, vmax, 11) if z_ticks is None else z_ticks
-
+    print(axs.shape)
     for row in range(bdims[0]):
         for col in range(bdims[1]):
             for subcol in range(2):
+                ax = axs[row, 2 * col + subcol]
                 if contour:
-                    ax = axs[row, 2*col+subcol]
                     im = ax.contourf(
                         pts_x,
                         pts_y,
@@ -434,7 +467,8 @@ def plot_cf(
 
                 ax.set_xlabel(r"Re[$\alpha$]")
                 ax.set_ylabel(r"Im[$\alpha$]")
-                ax.set_title(subtitles[row, col])
+                if subtitles is not None:
+                    ax.set_title(subtitles[row, col])
 
     fig = ax.get_figure()
     fig.tight_layout()

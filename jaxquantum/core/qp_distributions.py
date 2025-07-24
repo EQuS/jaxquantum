@@ -232,9 +232,10 @@ def _qfunc_iterative_single(
     state vector, using the iterative algorithm which recomputes the powers of
     the coherent-state matrix.
     """
-    ns = jnp.arange(vector.shape[0])
+    vector = vector.squeeze()
+    ns = jnp.arange(vector.shape[-1])
     out = jnp.polyval(
-        (0.5 * g * vector / jnp.sqrt(factorial(ns)))[::-1],
+        (vector / jnp.sqrt(factorial(ns)))[::-1],
         grid,
     )
     out *= prefactor
