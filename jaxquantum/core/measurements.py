@@ -95,7 +95,8 @@ def _reconstruct_density_matrix(params: jnp.ndarray, dim: int) -> jnp.ndarray:
     return rho_unnormalized / jnp.where(trace == 0, 1.0, trace)
 
 
-def _parametrize_density_matrix(rho_data: jnp.ndarray, dim: int) -> jnp.ndarray:
+def _parametrize_density_matrix(rho_data: jnp.ndarray, dim: int) -> (
+        jnp.ndarray):
     """
     Calculates the parameter vector from a density matrix using Cholesky decomposition.
     This is the inverse of the _reconstruct_density_matrix function.
@@ -248,16 +249,6 @@ class QuantumStateTomography:
     def result(self) -> Optional[MLETomographyResult]:
         return self._result
 
-    def parameterize_density_matrix(self, params: jnp.ndarray, dim: int) -> jnp.ndarray:
-        return _reconstruct_density_matrix(params, dim)
-
-    def L1_reg(self, params: jnp.ndarray) -> jnp.ndarray:
-        return _L1_reg(params)
-
-    def likelihood(
-        self, dim: int, params: jnp.ndarray, basis: jnp.ndarray, results: jnp.ndarray
-    ) -> jnp.ndarray:
-        return _likelihood(params, dim, basis, results)
 
     def quantum_state_tomography_mle(
         self, L1_reg_strength: float = 0.0, epochs: int = 10000, lr: float = 5e-3
@@ -320,7 +311,7 @@ class QuantumStateTomography:
 
         final_params, _ = final_carry
 
-        rho = Qarray.create(self.parameterize_density_matrix(final_params, dim))
+        rho = Qarray.create(_reconstruct_density_matrix(final_params, dim))
 
         self._result = MLETomographyResult(
             rho=rho,

@@ -17,7 +17,8 @@ REQUIREMENTS = [
     "flax",
     "tqdm",
     "pytest",
-    "optax"
+    "optax",
+    "jax-tqdm"
 ]
 
 EXTRA_REQUIREMENTS = {
