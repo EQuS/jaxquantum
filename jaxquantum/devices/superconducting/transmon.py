@@ -30,8 +30,14 @@ class Transmon(FluxDevice):
         elif hamiltonian == HamiltonianTypes.truncated:
             assert basis == BasisTypes.fock, "Truncated Hamiltonian only works with Fock basis."
         elif hamiltonian == HamiltonianTypes.full:
-            assert basis in [BasisTypes.charge, BasisTypes.singlecharge, BasisTypes.singlecharge_even, BasisTypes.singlecharge_odd], "Full Hamiltonian only works with Cooper pair charge or single-electron charge bases."
-        
+            charge_basis_types = [
+                BasisTypes.charge,
+                BasisTypes.singlecharge,
+                BasisTypes.singlecharge_even,
+                BasisTypes.singlecharge_odd,
+            ]
+            assert basis in charge_basis_types, "Full Hamiltonian only works with Cooper pair charge or single-electron charge bases."
+
         # Set the gate offset charge to zero if not provided
         if "ng" not in params:
             params["ng"] = 0.0
