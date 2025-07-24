@@ -8,6 +8,7 @@ import jax.scipy as jsp
 
 from jaxquantum.devices.superconducting.flux_base import FluxDevice
 from jaxquantum.core.operators import identity, destroy, create
+from jaxquantum.core import cosm, powm
 
 config.update("jax_enable_x64", True)
 
@@ -50,14 +51,11 @@ class TruncatedTransmon(FluxDevice):
 
     def get_H_full(self):
         """Return full H in linear basis."""
-        cos_phi_op = (
-            jsp.linalg.expm(1j * self.linear_ops["phi"])
-            + jsp.linalg.expm(-1j * self.linear_ops["phi"])
-        ) / 2
+        cos_phi_op = cosm(self.linear_ops["phi"])
 
         H_nl = -self.params["Ej"] * cos_phi_op - self.params[
             "Ej"
-        ] / 2 * jnp.linalg.matrix_power(self.linear_ops["phi"], 2)
+        ] / 2 * powm(self.linear_ops["phi"], 2)
         return self.get_H_linear() + H_nl
 
     def potential(self, phi):
