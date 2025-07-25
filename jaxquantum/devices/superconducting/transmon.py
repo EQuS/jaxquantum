@@ -70,13 +70,30 @@ class Transmon(FluxDevice):
             ops["sin(φ)"] = 0.5j * (jnp2jqt(jnp.eye(N, k=1) - jnp.eye(N, k=-1)))
             ops["cos(2φ)"] = 0.5 * (jnp2jqt(jnp.eye(N, k=2) + jnp.eye(N, k=-2)))
             ops["sin(2φ)"] = 0.5j * (jnp2jqt(jnp.eye(N, k=2) - jnp.eye(N, k=-2)))
+            
             n_max = (N - 1) // 2
-
             n_array = jnp.arange(-n_max, n_max + 1)
             ops["n"] = jnp2jqt(jnp.diag(n_array))
-
             n_minus_ng_array = n_array - self.params["ng"] * jnp.ones(N)
             ops["H_charge"] = jnp2jqt(jnp.diag(4 * self.params["Ec"] * n_minus_ng_array**2))
+
+        elif self.basis in [BasisTypes.singlecharge_even, BasisTypes.singlecharge_odd]:
+            n_max = N
+
+            if self.basis == BasisTypes.singlecharge_even:
+                n_array = jnp.arange(-n_max, n_max, 2)
+            elif self.basis == BasisTypes.singlecharge_odd:
+                n_array = jnp.arange(-n_max + 1, n_max, 2)
+
+            ops["id"] = identity(n_max)
+            ops["cos(φ)"] = 0.5 * (jnp2jqt(jnp.eye(n_max, k=1) + jnp.eye(n_max, k=-1)))
+            ops["sin(φ)"] = 0.5j * (jnp2jqt(jnp.eye(n_max, k=1) - jnp.eye(n_max, k=-1)))
+            ops["cos(2φ)"] = 0.5 * (jnp2jqt(jnp.eye(n_max, k=2) + jnp.eye(n_max, k=-2)))
+            ops["sin(2φ)"] = 0.5j * (jnp2jqt(jnp.eye(n_max, k=2) - jnp.eye(n_max, k=-2)))
+
+            ops["n"] = jnp2jqt(jnp.diag(n_array))
+            n_minus_ng_array = n_array - 2 * self.params["ng"] * jnp.ones(n_max)
+            ops["H_charge"] = jnp2jqt(jnp.diag(self.params["Ec"] * n_minus_ng_array**2))
 
         elif self.basis == BasisTypes.singlecharge:
             """
@@ -96,34 +113,6 @@ class Transmon(FluxDevice):
             n_array = jnp.arange(-n_max, n_max)
             ops["n"] = jnp2jqt(jnp.diag(n_array))
             n_minus_ng_array = n_array - 2 * self.params["ng"] * jnp.ones(N)
-            ops["H_charge"] = jnp2jqt(jnp.diag(self.params["Ec"] * n_minus_ng_array**2))
-
-        elif self.basis == BasisTypes.singlecharge_even:
-            n_max = N
-
-            ops["id"] = identity(n_max)
-            ops["cos(φ)"] = 0.5 * (jnp2jqt(jnp.eye(n_max, k=1) + jnp.eye(n_max, k=-1)))
-            ops["sin(φ)"] = 0.5j * (jnp2jqt(jnp.eye(n_max, k=1) - jnp.eye(n_max, k=-1)))
-            ops["cos(2φ)"] = 0.5 * (jnp2jqt(jnp.eye(n_max, k=2) + jnp.eye(n_max, k=-2)))
-            ops["sin(2φ)"] = 0.5j * (jnp2jqt(jnp.eye(n_max, k=2) - jnp.eye(n_max, k=-2)))
-
-            n_array = jnp.arange(-n_max, n_max, 2)
-            ops["n"] = jnp2jqt(jnp.diag(n_array))
-            n_minus_ng_array = n_array - 2 * self.params["ng"] * jnp.ones(n_max)
-            ops["H_charge"] = jnp2jqt(jnp.diag(self.params["Ec"] * n_minus_ng_array**2))
-
-        elif self.basis == BasisTypes.singlecharge_odd:
-            n_max = N
-
-            ops["id"] = identity(n_max)
-            ops["cos(φ)"] = 0.5 * (jnp2jqt(jnp.eye(n_max, k=1) + jnp.eye(n_max, k=-1)))
-            ops["sin(φ)"] = 0.5j * (jnp2jqt(jnp.eye(n_max, k=1) - jnp.eye(n_max, k=-1)))
-            ops["cos(2φ)"] = 0.5 * (jnp2jqt(jnp.eye(n_max, k=2) + jnp.eye(n_max, k=-2)))
-            ops["sin(2φ)"] = 0.5j * (jnp2jqt(jnp.eye(n_max, k=2) - jnp.eye(n_max, k=-2)))
-
-            n_array = jnp.arange(-n_max + 1, n_max, 2)
-            ops["n"] = jnp2jqt(jnp.diag(n_array))
-            n_minus_ng_array = n_array - 2 * self.params["ng"] * jnp.ones(n_max)
             ops["H_charge"] = jnp2jqt(jnp.diag(self.params["Ec"] * n_minus_ng_array**2))
 
         return ops
