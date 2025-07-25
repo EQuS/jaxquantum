@@ -1,4 +1,4 @@
-name: Pytest
+name: tests
 on:
   workflow_run:
     workflows: ["ci"]
