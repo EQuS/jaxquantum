@@ -30,32 +30,61 @@ def H():
     return Gate.create(2, name="H", gen_U=lambda params: hadamard(), num_modes=1)
 
 
-def Rx(theta):
+def Rx(theta, ts):
+
+    gen_Ht = None
+    if ts is not None:
+        delta_t = ts[-1] - ts[0]
+        amp = theta / delta_t
+        gen_Ht = lambda params: (
+            lambda t: -1.0j * jnp.cos(amp / 2) * identity(2) - 1j *
+                      jnp.sin(amp / 2) * (1 * sigmax()))
+
     return Gate.create(
         2,
         name="Rx",
         params={"theta": theta},
         gen_U=lambda params: qubit_rotation(params["theta"], 1, 0, 0),
+        gen_Ht=gen_Ht,
+        ts=ts,
         num_modes=1,
     )
 
 
-def Ry(theta):
+def Ry(theta, ts):
+    gen_Ht = None
+    if ts is not None:
+        delta_t = ts[-1] - ts[0]
+        amp = theta / delta_t
+        gen_Ht = lambda params: (
+            lambda t: -1.0j * jnp.cos(amp / 2) * identity(2) - 1j *
+                      jnp.sin(amp / 2) * (1 * sigmay()))
     return Gate.create(
         2,
         name="Ry",
         params={"theta": theta},
         gen_U=lambda params: qubit_rotation(params["theta"], 0, 1, 0),
+        gen_Ht=gen_Ht,
+        ts=ts,
         num_modes=1,
     )
 
 
-def Rz(theta):
+def Rz(theta, ts):
+    gen_Ht = None
+    if ts is not None:
+        delta_t = ts[-1] - ts[0]
+        amp = theta / delta_t
+        gen_Ht = lambda params: (
+            lambda t: -1.0j * jnp.cos(amp / 2) * identity(2) - 1j *
+                      jnp.sin(amp / 2) * (1 * sigmaz()))
     return Gate.create(
         2,
         name="Rz",
         params={"theta": theta},
         gen_U=lambda params: qubit_rotation(params["theta"], 0, 0, 1),
+        gen_Ht=gen_Ht,
+        ts=ts,
         num_modes=1,
     )
 
