@@ -2,11 +2,12 @@
 
 from flax import struct
 from jax import config
-import jaxquantum as jqt
 import jax.numpy as jnp
 
 from jaxquantum.devices.superconducting.flux_base import FluxDevice
 from jaxquantum.devices.base.base import HamiltonianTypes
+from jaxquantum.core.operators import identity, destroy, create
+from jaxquantum.core import cosm, sinm
 
 config.update("jax_enable_x64", True)
 
@@ -22,14 +23,14 @@ class Fluxonium(FluxDevice):
         ops = {}
 
         N = self.N_pre_diag
-        ops["id"] = jqt.identity(N)
-        ops["a"] = jqt.destroy(N)
-        ops["a_dag"] = jqt.create(N)
+        ops["id"] = identity(N)
+        ops["a"] = destroy(N)
+        ops["a_dag"] = create(N)
         ops["phi"] = self.phi_zpf() * (ops["a"] + ops["a_dag"])
         ops["n"] = 1j * self.n_zpf() * (ops["a_dag"] - ops["a"])
 
-        ops["cos(φ/2)"] = jqt.cosm(ops["phi"] / 2)
-        ops["sin(φ/2)"] = jqt.sinm(ops["phi"] / 2)
+        ops["cos(φ/2)"] = cosm(ops["phi"] / 2)
+        ops["sin(φ/2)"] = sinm(ops["phi"] / 2)
 
         return ops
 
@@ -60,8 +61,8 @@ class Fluxonium(FluxDevice):
         return self.get_H_linear() + self.get_H_nonlinear(phi_op)
 
     def get_H_nonlinear(self, phi_op):
-        op_cos_phi = jqt.cosm(phi_op)
-        op_sin_phi = jqt.sinm(phi_op)
+        op_cos_phi = cosm(phi_op)
+        op_sin_phi = sinm(phi_op)
 
         phi_ext = self.params["phi_ext"]
         Hcos = op_cos_phi * jnp.cos(2.0 * jnp.pi * phi_ext) + op_sin_phi * jnp.sin(

@@ -17,7 +17,9 @@ config.update("jax_enable_x64", True)
 class BasisTypes(str, Enum):
     fock = "fock"
     charge = "charge"
-    single_charge = "single_charge"
+    singlecharge = "single_charge"
+    singlecharge_even = "singlecharge_even"
+    singlecharge_odd = "singlecharge_odd"
 
     @classmethod
     def from_str(cls, string: str):

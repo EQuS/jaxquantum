@@ -52,7 +52,7 @@ class IdealQubit(Device):
     def get_H_linear(self):
         """Return linear terms in H."""
         w = self.get_linear_ω()
-        return (w / 2) * self.linear_ops["sigma_z"]
+        return (w / 2) * self.linear_ops["sigmaz"]
 
     def get_H_full(self):
         """Return full H in linear basis."""
