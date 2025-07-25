@@ -40,7 +40,6 @@
             * [kno](jaxquantum/devices/superconducting/kno.md)
             * [resonator](jaxquantum/devices/superconducting/resonator.md)
             * [transmon](jaxquantum/devices/superconducting/transmon.md)
-            * [truncated_transmon](jaxquantum/devices/superconducting/truncated_transmon.md)
             * [tunable_transmon](jaxquantum/devices/superconducting/tunable_transmon.md)
     * [utils](jaxquantum/utils/index.md)
         * [utils](jaxquantum/utils/utils.md)

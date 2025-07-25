@@ -16,7 +16,6 @@ REQUIREMENTS = [
     "diffrax",
     "flax",
     "tqdm",
-    "pytest",
     "optax",
     "jax-tqdm"
 ]
@@ -27,8 +26,7 @@ EXTRA_REQUIREMENTS = {
         "mypy",
         "pylint",
         "black",
-        "coverage",
-        "pytest"
+        "coverage"
     ],
     "docs": [
         "mkdocs",
@@ -39,6 +37,10 @@ EXTRA_REQUIREMENTS = {
         "mkdocstrings-python",
         "mkdocs-jupyter",
         "pymdown-extensions"
+    ],
+    "tests": [
+        "pytest",
+        "pytest-cov"
     ]
 }
 
