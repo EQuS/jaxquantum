@@ -43,7 +43,7 @@ EXTRA_REQUIREMENTS = {
         "pytest-cov"
     ],
     "gpu": [
-        "jax[cuda12_pip]"
+        "jax[cuda12]"
     ]
 }
 
