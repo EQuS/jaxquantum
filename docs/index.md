@@ -68,6 +68,17 @@ If you face issues running JAX on your hardware, visit this page: [https://docs.
 
 For more details, please visit the getting started > installation section of our [docs](https://equs.github.io/jaxquantum/getting_started/installation.html).
 
+### Check Hardware
+
+To check which hardware JAX is running on, run the following python code:
+```python
+import jax.numpy as jnp
+x = jnp.array([1.0, 2.0, 3.0])
+print(x.device)
+```
+This will, for example, print out `cuda:0` if running on a GPU.
+
+
 ## An Example
 
 Here's an example of how to set up a simulation in jaxquantum.

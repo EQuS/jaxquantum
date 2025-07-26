@@ -48,6 +48,16 @@ pip install 'jaxquantum[tpu]'
 
 If you face issues running JAX on your hardware, visit this page: [https://docs.jax.dev/en/latest/installation.html](https://docs.jax.dev/en/latest/installation.html)
 
+## Check Hardware
+
+To check which hardware JAX is running on, run the following python code:
+```python
+import jax.numpy as jnp
+x = jnp.array([1.0, 2.0, 3.0])
+print(x.device)
+```
+This will, for example, print out `cuda:0` if running on a GPU.
+
 ## Common Issues
 
 ### Errors installing with GPU support (Linux)
@@ -81,7 +91,7 @@ Try rebooting or running:
 ### jaxlib error after installing GPU support
 
 
-```
+```text
 An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.
 ```
 
