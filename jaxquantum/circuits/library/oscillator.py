@@ -14,7 +14,7 @@ def D(N, alpha, ts=None, c_ops=None):
         delta_t = ts[-1] - ts[0]
         amp = 1j * alpha / delta_t
         a = destroy(N)
-        gen_Ht = lambda params: (lambda t: -1.0j * (amp * a.dag() - jnp.conj(amp) * a))
+        gen_Ht = lambda params: (lambda t: jnp.conj(amp) * a + amp * a.dag())
 
     return Gate.create(
         N,
@@ -38,11 +38,12 @@ def CD(N, beta, ts=None):
     gen_Ht = None
     if ts is not None:
         delta_t = ts[-1] - ts[0]
-        amp = 1j * beta / delta_t
+        amp = 1j * beta / delta_t / 2
         a = destroy(N)
-        gen_Ht = lambda params: lambda t: (-1.0j *
-            (gg ^ (amp / 2 * a.dag() - jnp.conj(amp / 2) * a)) +
-            (ee ^ (-amp / 2 * a.dag() - jnp.conj(-amp / 2) * a)))
+        gen_Ht = lambda params: lambda t: (
+            gg ^ (jnp.conj(amp) * a + amp * a.dag())
+            + ee ^ (jnp.conj(-amp) * a + (-amp) * a.dag())
+        )
 
     return Gate.create(
         [2, N],
