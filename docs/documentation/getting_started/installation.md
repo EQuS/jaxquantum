@@ -77,3 +77,15 @@ If you receive this error:
 
 Try rebooting or running:
 `sudo reboot now`
+
+### jaxlib error after installing GPU support
+
+
+```
+An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.
+```
+
+Following this [thread](https://github.com/jax-ml/jax/issues/29068), try running:
+```
+unset LD_LIBRARY_PATH
+```
