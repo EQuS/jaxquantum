@@ -4,17 +4,29 @@
 ### Installing from source (recommended)
 
 **Recommended:** As this is a rapidly evolving project, we recommend installing the latest version of `jaxquantum` from source as follows:
-```
+```bash
 pip install git+https://github.com/EQuS/jaxquantum.git
 ```
+
+If you are installing on a GPU (NVIDIA, CUDA12), then run this instead:
+```bash
+pip install 'git+https://github.com/EQuS/jaxquantum.git#egg=jaxquantum[gpu]'
+```
+
+And, on a TPU, run this:
+```bash
+pip install 'git+https://github.com/EQuS/jaxquantum.git#egg=jaxquantum[tpu]'
+```
+
+If you face issues running JAX on your hardware, visit this page: [https://docs.jax.dev/en/latest/installation.html](https://docs.jax.dev/en/latest/installation.html)
 
 ### Installing from source in editable mode (recommended for developers)
 
 If you are interested in contributing to the package, please clone this repository and install this package in editable mode after changing into the root directory of this repository:
-```
+```bash
 pip install -e ".[dev,docs]"
 ```
-This will also install extras from the `dev` and `docs` flags, which can be useful when developing the package. Since this is installed in editable mode, the package will automatically be updated after pulling new changes in the repository. 
+This will also install extras from the `dev` and `docs` flags, which can be useful when developing the package. Since this is installed in editable mode, the package will automatically be updated after pulling new changes in the repository. Again, add the `gpu` or `tpu` extra, if needed.
 
 ### Installing from PyPI (not recommended)
 
@@ -24,7 +36,21 @@ This will also install extras from the `dev` and `docs` flags, which can be usef
 pip install jaxquantum
 ```
 
-### Install with GPU support (Linux)
+If you are installing on a GPU (NVIDIA, CUDA12), then run this instead:
+```bash
+pip install 'jaxquantum[gpu]'
+```
+
+And, on a TPU, run this:
+```bash
+pip install 'jaxquantum[tpu]'
+```
+
+If you face issues running JAX on your hardware, visit this page: [https://docs.jax.dev/en/latest/installation.html](https://docs.jax.dev/en/latest/installation.html)
+
+## Common Issues
+
+### Errors installing with GPU support (Linux)
 
 For linux users who wish to enable Nvidia GPU support, here are some steps ([ref](https://jax.readthedocs.io/en/latest/installation.html#nvidia-gpu)):
 

@@ -44,6 +44,9 @@ EXTRA_REQUIREMENTS = {
     ],
     "gpu": [
         "jax[cuda12]"
+    ],
+    "tpu": [
+        "jax[tpu]"
     ]
 }
 
