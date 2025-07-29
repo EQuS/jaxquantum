@@ -78,3 +78,13 @@ def Amp_Damp(N, err_prob, max_l):
         gen_KM=kmap,
         num_modes=1,
     )
+
+def selfKerr(N, K):
+    a = destroy(N)
+    return Gate.create(
+        N,
+        name="selfKerr",
+        params={"Kerr": K},
+        gen_U=lambda params: (-1.j * K/2 * (a.dag() @ a.dag() @ a @ a)).expm(),
+        num_modes=1,
+    )
