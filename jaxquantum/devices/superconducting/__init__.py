@@ -10,3 +10,4 @@ from .tunable_transmon import *  # noqa
 from .fluxonium import *  # noqa
 from .ats import *  # noqa
 from .ideal_qubit import *  # noqa
+from .snail import *  # noqa

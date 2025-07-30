@@ -173,7 +173,10 @@ class Transmon(FluxDevice):
             return second_order + fourth_order + sixth_order
 
     def calculate_wavefunctions(self, phi_vals):
-        """Calculate wavefunctions at phi_exts."""
+        """Calculate wavefunctions at phi_exts.
+        
+        TODO: this is not currently being used for plotting... needs to be updated!
+        """
 
         if self.basis == BasisTypes.fock:
             return super().calculate_wavefunctions(phi_vals)

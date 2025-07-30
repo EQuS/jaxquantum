@@ -47,10 +47,10 @@ class FluxDevice(Device):
 
         # calculate basis functions
         basis_functions = []
-        n_max = (self.N_pre_diag - 1) // 2
-        for n in jnp.arange(-n_max, n_max + 1):
+        n_labels = jnp.diag(self.original_ops["n"].data)
+        for n in n_labels:
             basis_functions.append(
-                1 / (jnp.sqrt(2 * jnp.pi)) * jnp.exp(1j * n * (2 * jnp.pi * phi_vals))
+                1 / (jnp.sqrt(2 * jnp.pi)) * jnp.exp(1j * n * (2 * jnp.pi * -1 * phi_vals)) # Added a -1 to work with the SNAIL
             )
         basis_functions = jnp.array(basis_functions)
 
@@ -71,7 +71,7 @@ class FluxDevice(Device):
     def potential(self, phi):
         """Return potential energy as a function of phi."""
 
-    def plot_wavefunctions(self, phi_vals, max_n=None, which=None, ax=None, mode="abs"):
+    def plot_wavefunctions(self, phi_vals, max_n=None, which=None, ax=None, mode="abs", ylim=None):
         if self.basis == BasisTypes.fock:
             _calculate_wavefunctions = self._calculate_wavefunctions_fock
         elif self.basis == BasisTypes.charge:
@@ -132,8 +132,8 @@ class FluxDevice(Device):
             linewidth=1,
         )
 
-        ax.set_ylim([min_val - 1, max_val + 1])
-
+        ylim = ylim if ylim is not None else [min_val - 1, max_val + 1]
+        ax.set_ylim(ylim)
         ax.set_xlabel(r"$\Phi/\Phi_0$")
         ax.set_ylabel(r"Energy [GHz]")
 
