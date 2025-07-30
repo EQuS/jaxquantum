@@ -65,7 +65,7 @@ def simulate(
 
     start_time = 0
 
-    for layer in tqdm(circuit.layers):
+    for layer in circuit.layers:
         result_dict = _simulate_layer(layer, state, mode=mode, start_time=start_time, **kwargs)
         result = result_dict["result"]
         start_time = result_dict["start_time"]
@@ -112,7 +112,7 @@ def _simulate_layer(
 
     elif mode == SimulateMode.HAMILTONIAN:
 
-        solver_options = kwargs.get("solver_options", SolverOptions.create(progress_meter=True))
+        solver_options = kwargs.get("solver_options", SolverOptions.create(progress_meter=False))
 
         Ht = layer.gen_Ht()
         c_ops = layer.gen_c_ops()

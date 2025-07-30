@@ -37,8 +37,7 @@ def Rx(theta, ts):
         delta_t = ts[-1] - ts[0]
         amp = theta / delta_t
         gen_Ht = lambda params: (
-            lambda t: -1.0j * jnp.cos(amp / 2) * identity(2) - 1j *
-                      jnp.sin(amp / 2) * (1 * sigmax()))
+            lambda t: amp / 2 * sigmax())
 
     return Gate.create(
         2,
@@ -57,8 +56,7 @@ def Ry(theta, ts):
         delta_t = ts[-1] - ts[0]
         amp = theta / delta_t
         gen_Ht = lambda params: (
-            lambda t: -1.0j * jnp.cos(amp / 2) * identity(2) - 1j *
-                      jnp.sin(amp / 2) * (1 * sigmay()))
+            lambda t: amp / 2 * sigmay())
     return Gate.create(
         2,
         name="Ry",
@@ -76,8 +74,7 @@ def Rz(theta, ts):
         delta_t = ts[-1] - ts[0]
         amp = theta / delta_t
         gen_Ht = lambda params: (
-            lambda t: -1.0j * jnp.cos(amp / 2) * identity(2) - 1j *
-                      jnp.sin(amp / 2) * (1 * sigmaz()))
+            lambda t: amp / 2 * sigmaz())
     return Gate.create(
         2,
         name="Rz",

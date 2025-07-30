@@ -70,7 +70,7 @@ def solve(f, ρ0, tlist, args, solver_options: Optional[SolverOptions] = None):
 
     solver_name = solver_options.solver
     solver = getattr(diffrax, solver_name)()
-    stepsize_controller = PIDController(rtol=1e-6, atol=1e-6)
+    stepsize_controller = PIDController(rtol=1e-9, atol=1e-9)
 
     # solve!
     with warnings.catch_warnings():
