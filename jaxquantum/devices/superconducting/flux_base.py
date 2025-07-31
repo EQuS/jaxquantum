@@ -71,7 +71,7 @@ class FluxDevice(Device):
     def potential(self, phi):
         """Return potential energy as a function of phi."""
 
-    def plot_wavefunctions(self, phi_vals, max_n=None, which=None, ax=None, mode="abs", ylim=None):
+    def plot_wavefunctions(self, phi_vals, max_n=None, which=None, ax=None, mode="abs", ylim=None, y_scale_factor=1, zero_potential=False):
         if self.basis == BasisTypes.fock:
             _calculate_wavefunctions = self._calculate_wavefunctions_fock
         elif self.basis == BasisTypes.charge:
@@ -87,6 +87,7 @@ class FluxDevice(Device):
 
         potential = self.potential(phi_vals)
 
+        min_potential = 0 if not zero_potential else jnp.min(potential)
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=(3.5, 2.5), dpi=1000)
         else:
@@ -119,22 +120,22 @@ class FluxDevice(Device):
                 max_val = curr_max_val
 
             ax.plot(
-                phi_vals, wf_vals, label=f"$|${n}$\\rangle$", linestyle="-", linewidth=1
+                phi_vals, (wf_vals - min_potential)*y_scale_factor, label=f"$|${n}$\\rangle$", linestyle="-", linewidth=1
             )
-            ax.fill_between(phi_vals, energy_levels[n], wf_vals, alpha=0.5)
+            ax.fill_between(phi_vals, (energy_levels[n] - min_potential)*y_scale_factor, (wf_vals - min_potential)*y_scale_factor, alpha=0.5)
 
         ax.plot(
             phi_vals,
-            potential,
+            (potential - min_potential)*y_scale_factor,
             label="potential",
             color="black",
             linestyle="-",
             linewidth=1,
         )
 
-        ylim = ylim if ylim is not None else [min_val - 1, max_val + 1]
+        ylim = ylim if ylim is not None else [jnp.min(jnp.array([min_val - 1 - min_potential, jnp.min(potential) - min_potential]))*y_scale_factor, (max_val + 1 - min_potential)*y_scale_factor]
         ax.set_ylim(ylim)
-        ax.set_xlabel(r"$\Phi/\Phi_0$")
+        ax.set_xlabel(r"$\varphi/2\pi$")
         ax.set_ylabel(r"Energy [GHz]")
 
         if mode == "abs":
@@ -146,7 +147,7 @@ class FluxDevice(Device):
 
         ax.set_title(f"{title_str}")
 
-        plt.legend(fontsize=6)
+        ax.legend(fontsize='xx-small')
         fig.tight_layout()
 
         return ax
