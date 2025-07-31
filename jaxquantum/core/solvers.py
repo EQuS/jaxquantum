@@ -31,6 +31,8 @@ class SolverOptions:
     progress_meter: bool = struct.field(pytree_node=False)
     solver: str = (struct.field(pytree_node=False),)
     max_steps: int = (struct.field(pytree_node=False),)
+    rtol: float = (struct.field(pytree_node=False),)
+    atol: float = (struct.field(pytree_node=False),)
 
     @classmethod
     def create(
@@ -38,8 +40,10 @@ class SolverOptions:
         progress_meter: bool = True,
         solver: str = "Tsit5",
         max_steps: int = 100_000,
+        rtol: float = 1e-6,
+        atol: float = 1e-6,
     ):
-        return cls(progress_meter, solver, max_steps)
+        return cls(progress_meter, solver, max_steps, rtol, atol)
 
 
 class CustomProgressMeter(TqdmProgressMeter):
@@ -70,7 +74,7 @@ def solve(f, ρ0, tlist, args, solver_options: Optional[SolverOptions] = None):
 
     solver_name = solver_options.solver
     solver = getattr(diffrax, solver_name)()
-    stepsize_controller = PIDController(rtol=1e-9, atol=1e-9)
+    stepsize_controller = PIDController(rtol=solver_options.rtol, atol=solver_options.atol)
 
     # solve!
     with warnings.catch_warnings():
