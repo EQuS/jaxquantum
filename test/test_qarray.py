@@ -414,7 +414,7 @@ def test_eigh():
     evals, evecs = jqt.eigenstates(H)
 
     assert evecs.shape == (2,3,4,4,1)
-    assert evals[0,1,1] == 3.4
+    assert jnp.isclose(evals[0,1,1], 3.4, rtol=0, atol=1e-9)
 
 
 

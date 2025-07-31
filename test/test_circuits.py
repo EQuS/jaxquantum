@@ -41,7 +41,7 @@ def test_unitary_simulation():
     
 
 def test_hamiltonian_simulation():
-    N = 10
+    N = 20
     alpha = 1
     reg = jqtc.Register([2,N])
     cirq = jqtc.Circuit.create(reg, layers=[])
