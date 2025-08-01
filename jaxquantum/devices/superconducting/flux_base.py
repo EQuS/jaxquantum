@@ -61,8 +61,9 @@ class FluxDevice(Device):
 
         # the below is equivalent to evecs_in_H_eigenbasis @ basis_functions_in_H_eigenbasis
         # since evecs in H_eigenbasis is diagonal, i.e. the identity matrix
-        phase_correction_factors = (1j ** (jnp.arange(0, self.N_pre_diag))).reshape(
-            self.N_pre_diag, 1
+        num_eigenstates = basis_functions_in_H_eigenbasis.shape[0]
+        phase_correction_factors = (1j ** (jnp.arange(0, num_eigenstates))).reshape(
+            num_eigenstates, 1
         )  # TODO: review why these are needed...
         wavefunctions = basis_functions_in_H_eigenbasis * phase_correction_factors
         return wavefunctions
