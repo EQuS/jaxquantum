@@ -40,8 +40,8 @@ class SolverOptions:
         progress_meter: bool = True,
         solver: str = "Tsit5",
         max_steps: int = 100_000,
-        rtol: float = 1e-6,
-        atol: float = 1e-6,
+        rtol: float = 1e-7,
+        atol: float = 1e-9,
     ):
         return cls(progress_meter, solver, max_steps, rtol, atol)
 
@@ -78,9 +78,9 @@ def solve(f, ρ0, tlist, args, solver_options: Optional[SolverOptions] = None):
 
     # solve!
     with warnings.catch_warnings():
-        warnings.simplefilter(
-            "ignore", UserWarning
-        )  # NOTE: suppresses complex dtype warning in diffrax
+        warnings.filterwarnings("ignore",
+                                message="Complex dtype support in Diffrax",
+                                category=UserWarning)  # NOTE: suppresses complex dtype warning in diffrax
         sol = diffeqsolve(
             term,
             solver,
