@@ -55,7 +55,8 @@ class CustomProgressMeter(TqdmProgressMeter):
         )
 
 
-def solve(f, ρ0, tlist, args, solver_options: Optional[SolverOptions] = None):
+def solve(f, ρ0, tlist, saveat_tlist, args, solver_options: Optional[
+    SolverOptions] = None):
     """Gets teh desired solver from diffrax.
 
     Args:
@@ -67,7 +68,7 @@ def solve(f, ρ0, tlist, args, solver_options: Optional[SolverOptions] = None):
 
     # f and ts
     term = ODETerm(f)
-    saveat = SaveAt(ts=tlist)
+    saveat = SaveAt(ts=saveat_tlist)
 
     # solver
     solver_options = solver_options or SolverOptions.create()
@@ -104,6 +105,7 @@ def mesolve(
     H: Union[Qarray, Callable[[float], Qarray]],
     rho0: Qarray,
     tlist: Array,
+    saveat_tlist: Optional[Array] = None,
     c_ops: Optional[Qarray] = None,
     solver_options: Optional[SolverOptions] = None,
 ) -> Qarray:
@@ -113,12 +115,15 @@ def mesolve(
         H: time dependent Hamiltonian function or time-independent Qarray.
         rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
         tlist: time list
+        saveat_tlist: list of times at which to save the state. If None, save at all times in tlist. Default: None.
         c_ops: qarray list of collapse operators
         solver_options: SolverOptions with solver options
 
     Returns:
         list of states
     """
+
+    saveat_tlist = saveat_tlist if saveat_tlist is not None else tlist
 
     c_ops = c_ops if c_ops is not None else Qarray.from_list([])
 
@@ -140,7 +145,8 @@ def mesolve(
     else:
         Ht_data = lambda t: H(t).data if H is not None else None
 
-    ys = _mesolve_data(Ht_data, ρ0, tlist, c_ops, solver_options=solver_options)
+    ys = _mesolve_data(Ht_data, ρ0, tlist, saveat_tlist, c_ops,
+                       solver_options=solver_options)
 
     return jnp2jqt(ys, dims=dims)
 
@@ -149,6 +155,7 @@ def _mesolve_data(
     H: Callable[[float], Array],
     rho0: Array,
     tlist: Array,
+    saveat_tlist: Array,
     c_ops: Optional[Qarray] = None,
     solver_options: Optional[SolverOptions] = None,
 ) -> Array:
@@ -213,7 +220,8 @@ def _mesolve_data(
 
         return rho_dot
 
-    sol = solve(f, ρ0, tlist, c_ops, solver_options=solver_options)
+    sol = solve(f, ρ0, tlist, saveat_tlist, c_ops,
+                solver_options=solver_options)
 
     return sol.ys
 
@@ -222,6 +230,7 @@ def sesolve(
     H: Union[Qarray, Callable[[float], Qarray]],
     rho0: Qarray,
     tlist: Array,
+    saveat_tlist: Optional[Array] = None,
     solver_options: Optional[SolverOptions] = None,
 ) -> Qarray:
     """Schrödinger Equation solver.
@@ -230,11 +239,14 @@ def sesolve(
         H: time dependent Hamiltonian function or time-independent Qarray.
         rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
         tlist: time list
+        saveat_tlist: list of times at which to save the state. If None, save at all times in tlist. Default: None.
         solver_options: SolverOptions with solver options
 
     Returns:
         list of states
     """
+
+    saveat_tlist = saveat_tlist if saveat_tlist is not None else tlist
 
     ψ = rho0
 
@@ -252,7 +264,8 @@ def sesolve(
     else:
         Ht_data = lambda t: H(t).data if H is not None else None
 
-    ys = _sesolve_data(Ht_data, ψ, tlist, solver_options=solver_options)
+    ys = _sesolve_data(Ht_data, ψ, tlist, saveat_tlist,
+                       solver_options=solver_options)
 
     return jnp2jqt(ys, dims=dims)
 
@@ -261,6 +274,7 @@ def _sesolve_data(
     H: Callable[[float], Array],
     rho0: Array,
     tlist: Array,
+    saveat_tlist: Array,
     solver_options: Optional[SolverOptions] = None,
 ):
     """Schrödinger Equation solver.
@@ -289,7 +303,7 @@ def _sesolve_data(
     ψ_test = f(0, ψ, None)
     ψ = jnp.resize(ψ, ψ_test.shape)  # ensure correct shape
 
-    sol = solve(f, ψ, tlist, None, solver_options=solver_options)
+    sol = solve(f, ψ, tlist, saveat_tlist, None, solver_options=solver_options)
     return sol.ys
 
 # ----
