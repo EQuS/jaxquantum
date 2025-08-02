@@ -125,6 +125,8 @@ def mesolve(
 
     saveat_tlist = saveat_tlist if saveat_tlist is not None else tlist
 
+    saveat_tlist = jnp.atleast_1d(saveat_tlist)
+
     c_ops = c_ops if c_ops is not None else Qarray.from_list([])
 
     # if isinstance(H, Qarray):
@@ -247,6 +249,8 @@ def sesolve(
     """
 
     saveat_tlist = saveat_tlist if saveat_tlist is not None else tlist
+
+    saveat_tlist = jnp.atleast_1d(saveat_tlist)
 
     ψ = rho0
 
