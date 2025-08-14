@@ -93,26 +93,6 @@ def test_wigner_mixed_state():
     assert jnp.all(jnp.isreal(W))
     assert jnp.abs(jnp.sum(W) * (xvec[1]-xvec[0]) * (yvec[1]-yvec[0]) - 1.0) < 1e-5
 
-#%%
-def test_wig_laguerre_val():
-    """Test _wig_laguerre_val function"""
-    # Test with simple inputs
-    L = 0
-    x = jnp.array([1.0])
-    c = jnp.array([1.0])
-    result = _wig_laguerre_val(L, x, c)
-    assert isinstance(result, jnp.ndarray)
-    
-    # Test with two coefficients
-    c = jnp.array([1.0, 2.0])
-    result = _wig_laguerre_val(L, x, c)
-    assert isinstance(result, jnp.ndarray)
-    
-    # Test with L > 0
-    L = 1
-    result = _wig_laguerre_val(L, x, c)
-    assert isinstance(result, jnp.ndarray)
-
 
 #%% md
 # Tests with Known Analytical Solutions

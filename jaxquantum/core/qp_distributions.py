@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 from jax import vmap
 from jax.scipy.special import factorial
+from jax.lax import *
 
 
 def wigner(psi, xvec, yvec, method="clenshaw", g=2):
@@ -94,66 +95,88 @@ def _wigner_clenshaw(rho, xvec, yvec, g=jnp.sqrt(2)):
     :math:`W = e^(-0.5*x^2)/pi * \sum_{L} c_L (2x)^L / \sqrt(L!)` where
     :math:`c_L = \sum_n \rho_{n,L+n} LL_n^L` where
     :math:`LL_n^L = (-1)^n \sqrt(L!n!/(L+n)!) LaguerreL[n,L,x]`
+    Heavily inspired by Qutip and Dynamiqs
+    https://github.com/dynamiqs/dynamiqs
+    https://github.com/qutip/qutip
     """
 
     M = jnp.prod(rho.shape[0])
     X, Y = jnp.meshgrid(xvec, yvec)
-    # A = 0.5 * g * (X + 1.0j * Y)
-    A2 = g * (X + 1.0j * Y)  # this is A2 = 2*A
-
-    B = jnp.abs(A2)
+    A = 0.5 * g * (X + 1.0j * Y)
+    B = jnp.abs(2*A)
 
     B *= B
 
-    w0 = (2 * rho[0, -1]) * jnp.ones_like(A2)
+    w0 = (2 * rho[0, -1]) * jnp.ones_like(A)
 
-    L = M - 1
     # calculation of \sum_{L} c_L (2x)^L / \sqrt(L!)
     # using Horner's method
 
     rho = rho * (2 * jnp.ones((M, M)) - jnp.diag(jnp.ones(M)))
-    while L > 0:
-        L -= 1
-        # here c_L = _wig_laguerre_val(L, B, np.diag(rho, L))
-        w0 = _wig_laguerre_val(L, B, jnp.diag(rho, L)) + w0 * A2 * (L + 1) ** -0.5
+    def loop(i: int, w: jax.Array) -> jax.Array:
+        i = M - 2 - i
+        w = w * (2 * A * (i + 1) ** (-0.5))
+        return w + _wig_laguerre_val(i, B, rho, M)
 
-    return w0.real * jnp.exp(-B * 0.5) * (g * g * 0.5 / jnp.pi)
+    w = jax.lax.fori_loop(0, M - 1, loop, w0)
 
+    return w.real * jnp.exp(-B * 0.5) * (g * g * 0.5 / jnp.pi)
 
-def _wig_laguerre_val(L, x, c):
+def _extract_diag_element(rho: jnp.array, L: int, n:int):
+    """"
+    Extract element at index n from diagonal L of matrix rho.
+    Heavily inspired from https://github.com/dynamiqs/dynamiqs
+    """
+    N = rho.shape[0]
+    n = jax.lax.select(n < 0, N - jnp.abs(L) - jnp.abs(n), n)
+    row = jnp.maximum(-L, 0) + n
+    col = jnp.maximum(L, 0) + n
+    return rho[row, col]
+
+def _wig_laguerre_val(L, x, rho, N):
     r"""
-    this is evaluation of polynomial series inspired by hermval from numpy.
-    Returns polynomial series
-
-    .. math:
-        \sum_n b_n LL_n^L,
-
-    where
-
-    .. math:
-        LL_n^L = (-1)^n \sqrt(L!n!/(L+n)!) LaguerreL[n,L,x]
-
-    The evaluation uses Clenshaw recursion.
+    Evaluate Laguerre polynomials.
+    Implementation in Jax from https://github.com/dynamiqs/dynamiqs
     """
 
-    if len(c) == 1:
-        y0 = c[0]
-        y1 = 0
-    elif len(c) == 2:
-        y0 = c[0]
-        y1 = c[1]
-    else:
-        k = len(c)
-        y0 = c[-2]
-        y1 = c[-1]
-        for i in range(3, len(c) + 1):
-            k -= 1
-            y0, y1 = (
-                c[-i] - y1 * (float((k - 1) * (L + k - 1)) / ((L + k) * k)) ** 0.5,
-                y0 - y1 * ((L + 2 * k - 1) - x) * ((L + k) * k) ** -0.5,
-            )
+    def len_c_1():
+        return _extract_diag_element(rho, L, 0) * jnp.ones_like(x)
 
-    return y0 - y1 * ((L + 1) - x) * (L + 1) ** -0.5
+    def len_c_2():
+        c0 = _extract_diag_element(rho, L, 0)
+        c1 = _extract_diag_element(rho, L, 1)
+        return (c0 - c1 * (L + 1 - x) * (L + 1) ** (-0.5)) * jnp.ones_like(x)
+
+    def len_c_other():
+        cm2 = _extract_diag_element(rho, L, -2)
+        cm1 = _extract_diag_element(rho, L, -1)
+        y0 = cm2 * jnp.ones_like(x)
+        y1 = cm1 * jnp.ones_like(x)
+
+        def loop(j: int, args: tuple[jax.Array, jax.Array]) -> tuple[
+            jax.Array, jax.Array]:
+            def body() -> tuple[jax.Array, jax.Array]:
+                k = N + 1 - L - j
+                y0, y1 = args
+                ckm1 = _extract_diag_element(rho, L, -j)
+                y0, y1 = (
+                    ckm1 - y1 * (k * (L + k) / ((L + k + 1) * (k + 1))) ** 0.5,
+                    y0 - y1 * (L + 2 * k - x + 1) * (
+                                (L + k + 1) * (k + 1)) ** -0.5,
+                )
+
+                return y0, y1
+
+            return jax.lax.cond(j >= N + 1 - L, lambda: args, body)
+
+        y0, y1 = jax.lax.fori_loop(3, N + 1, loop, (y0, y1))
+
+        return y0 - y1 * (L + 1 - x) * (L + 1) ** (-0.5)
+
+
+    return jax.lax.cond(N - L == 1, len_c_1, lambda: jax.lax.cond(N - L == 2,
+                                                               len_c_2,
+                                                       len_c_other))
 
 
 def husimi(psi, xvec, yvec, g=2):
