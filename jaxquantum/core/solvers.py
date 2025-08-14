@@ -68,7 +68,10 @@ def solve(f, ρ0, tlist, saveat_tlist, args, solver_options: Optional[
 
     # f and ts
     term = ODETerm(f)
-    saveat = SaveAt(ts=saveat_tlist)
+    if saveat_tlist.shape[0] == 1 and saveat_tlist == tlist[-1]:
+        saveat = SaveAt(t1=True)
+    else:
+        saveat = SaveAt(ts=saveat_tlist)
 
     # solver
     solver_options = solver_options or SolverOptions.create()
