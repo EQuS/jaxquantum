@@ -1,8 +1,7 @@
 import jax.numpy as jnp
 from jax import vmap
 from jax.scipy.special import factorial
-from jax.lax import *
-
+import jax
 
 def wigner(psi, xvec, yvec, method="clenshaw", g=2):
     """Wigner function for a state vector or density matrix at points
