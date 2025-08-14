@@ -6,7 +6,7 @@ import pytest
 import jax.numpy as jnp
 from jaxquantum import basis
 from jaxquantum.core.qarray import Qarray
-from jaxquantum.core.qp_distributions import (wigner, husimi,
+from jaxquantum.core.qp_distributions import (wigner, qfunc,
                                               _wigner_clenshaw,
                                               _wig_laguerre_val)
 from jax.scipy.special import factorial
@@ -49,7 +49,7 @@ def test_husimi_coherent_state():
     xvec = jnp.linspace(-3, 3, 50)
     yvec = jnp.linspace(-3, 3, 50)
     
-    Q = husimi(state, xvec, yvec)
+    Q = qfunc(state, xvec, yvec)
     
     # Test properties of the Husimi Q-function
     assert Q.shape == (50, 50)  # Check output shape
@@ -131,7 +131,7 @@ def test_husimi_fock_state_zero():
     xvec = jnp.array([0.0, 1.0, -1.0])
     yvec = jnp.array([0.0, 1.0, -1.0])
 
-    Q = husimi(state, xvec, yvec, g=jnp.sqrt(2))
+    Q = qfunc(state, xvec, yvec, g=jnp.sqrt(2))
 
     # Calculate analytical values
     X, Y = jnp.meshgrid(xvec, yvec)
@@ -188,7 +188,7 @@ def test_husimi_coherent_state_value():
     xvec = jnp.array([-1.0, 0.0, 1.0])
     yvec = jnp.array([-1.0, 0.0, 1.0])
 
-    Q = husimi(state, xvec, yvec, g=jnp.sqrt(2))
+    Q = qfunc(state, xvec, yvec, g=jnp.sqrt(2))
 
     # Calculate analytical values
     X, Y = jnp.meshgrid(xvec, yvec)

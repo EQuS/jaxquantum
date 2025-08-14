@@ -179,7 +179,7 @@ def _wig_laguerre_val(L, x, rho, N):
                                                        len_c_other))
 
 
-def husimi(psi, xvec, yvec, g=2):
+def qfunc(psi, xvec, yvec, g=2):
     r"""
     Husimi-Q function of a given state vector or density matrix at phase-space
     points ``0.5 * g * (xvec + i*yvec)``.

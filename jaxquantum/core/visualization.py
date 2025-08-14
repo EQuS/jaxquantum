@@ -4,7 +4,7 @@ Visualization utils.
 
 import matplotlib.pyplot as plt
 
-from jaxquantum.core.qp_distributions import wigner, husimi
+from jaxquantum.core.qp_distributions import wigner, qfunc
 from jaxquantum.core.cfunctions import cf_wigner
 import jax.numpy as jnp
 import numpy as np
@@ -116,7 +116,7 @@ def plot_qp(
         scale = np.pi
         cmap = "jet"
         cbar_label = r"$\mathcal{Q}(\alpha)$"
-        QP = scale * husimi(state, pts_x, pts_y, g=g)
+        QP = scale * qfunc(state, pts_x, pts_y, g=g)
 
 
 
@@ -249,7 +249,7 @@ def plot_wigner(
     )
 
 
-def plot_husimi(
+def plot_qfunc(
     state,
     pts_x,
     pts_y=None,
