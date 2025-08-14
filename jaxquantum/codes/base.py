@@ -254,7 +254,7 @@ class BosonicQubit(metaclass=ABCMeta):
             _, ax = plt.subplots(1, figsize=(4, 3), dpi=200)
 
         return jqt.plot_qp(
-            state, self.wigner_pts, ax=ax, contour=contour, qp_type=qp_type
+            state, self.wigner_pts, axs=ax, contour=contour, qp_type=qp_type
         )
 
     def plot_code_states(self, qp_type: str = jqt.WIGNER, **kwargs):
