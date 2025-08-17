@@ -40,8 +40,8 @@ def plot_qp(
         pts_y: y points to evaluate quasi-probability distribution at
         g : float, default: 2
         Scaling factor for ``a = 0.5 * g * (x + iy)``.  The value of `g` is
-        related to the value of :math:`\hbar` in the commutation relation
-        :math:`[x,\,y] = i\hbar` via :math:`\hbar=2/g^2`.
+        related to the value of :math:`\\hbar` in the commutation relation
+        :math:`[x,\,y] = i\\hbar` via :math:`\\hbar=2/g^2`.
         axs: matplotlib axes to plot on
         contour: make the plot use contouring
         qp_type: type of quasi probability distribution ("wigner", "qfunc")
@@ -214,8 +214,8 @@ def plot_wigner(
         pts_y: y points to evaluate quasi-probability distribution at
         g : float, default: 2
         Scaling factor for ``a = 0.5 * g * (x + iy)``.  The value of `g` is
-        related to the value of :math:`\hbar` in the commutation relation
-        :math:`[x,\,y] = i\hbar` via :math:`\hbar=2/g^2`.
+        related to the value of :math:`\\hbar` in the commutation relation
+        :math:`[x,\,y] = i\\hbar` via :math:`\\hbar=2/g^2`.
         axs: matplotlib axes to plot on
         contour: make the plot use contouring
         cbar_label: label for the cbar
@@ -275,8 +275,8 @@ def plot_qfunc(
         pts_y: y points to evaluate quasi-probability distribution at
         g : float, default: 2
         Scaling factor for ``a = 0.5 * g * (x + iy)``.  The value of `g` is
-        related to the value of :math:`\hbar` in the commutation relation
-        :math:`[x,\,y] = i\hbar` via :math:`\hbar=2/g^2`.
+        related to the value of :math:`\\hbar` in the commutation relation
+        :math:`[x,\,y] = i\\hbar` via :math:`\\hbar=2/g^2`.
         axs: matplotlib axes to plot on
         contour: make the plot use contouring
         cbar_label: label for the cbar

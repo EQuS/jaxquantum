@@ -29,7 +29,7 @@ jobs:
           rm ./test-results/cov_html/.gitignore
           cd ./test-results
           
-      - name: Coverage Bagdge
+      - name: Coverage Badge
         uses: tj-actions/coverage-badge-py@v1.8
         with:
           output: test-results/coverage.svg
