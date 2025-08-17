@@ -208,7 +208,7 @@ class BosonicQubit(metaclass=ABCMeta):
 
     @property
     def maximally_mixed_state(self):
-        return (1 / 2.0) * self.projector()
+        return (1 / 2.0) * self.projector
 
     # Plotting
     # ======================================================
