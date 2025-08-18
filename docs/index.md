@@ -1,6 +1,6 @@
 # Welcome to jaxquantum
 
-[![License](https://img.shields.io/github/license/EQuS/jaxquantum.svg?style=popout-square)](https://opensource.org/license/apache-2-0) [![](https://img.shields.io/github/release/EQuS/jaxquantum.svg?style=popout-square)](https://github.com/EQuS/jaxquantum/releases) [![](https://img.shields.io/pypi/dm/jaxquantum.svg?style=popout-square)](https://pypi.org/project/jaxquantum/) 
+[![License](https://img.shields.io/github/license/EQuS/jaxquantum.svg)](https://opensource.org/license/apache-2-0) [![](https://img.shields.io/github/release/EQuS/jaxquantum.svg)](https://github.com/EQuS/jaxquantum/releases) [![](https://img.shields.io/pypi/dm/jaxquantum.svg)](https://pypi.org/project/jaxquantum/)
 
 [![code coverage](https://jaxquantum.org/test-results/coverage.svg?raw=true)](https://jaxquantum.org/test-results/cov_html/) [![tests](https://github.com/EQuS/jaxquantum/actions/workflows/pytest.yml/badge.svg)](https://github.com/EQuS/jaxquantum/actions/workflows/pytest.yml) [![ruff](https://github.com/EQuS/jaxquantum/actions/workflows/ruff.yml/badge.svg)](https://github.com/EQuS/jaxquantum/actions/workflows/ruff.yml) [![docs](https://github.com/EQuS/jaxquantum/actions/workflows/docs.yml/badge.svg)](https://github.com/EQuS/jaxquantum/actions/workflows/docs.yml) 
 

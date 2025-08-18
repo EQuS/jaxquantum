@@ -4,6 +4,7 @@ Setup
 import os
 
 from setuptools import setup, find_namespace_packages
+import json
 
 DIST_NAME = "jaxquantum"
 PACKAGE_NAME = "jaxquantum"
@@ -55,21 +56,21 @@ README_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), "README.m
 with open(README_PATH) as readme_file:
     README = readme_file.read()
 
-version_path = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), PACKAGE_NAME, "VERSION.txt")
+package_info_path = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), PACKAGE_NAME, "PACKAGE.json")
 )
 
-with open(version_path, "r") as fd:
-    version_str = fd.read().rstrip()
+with open(package_info_path, "r") as fd:
+    package_info = json.load(fd)
 
 setup(
     name=DIST_NAME,
-    version=version_str,
+    version=package_info["version"],
     description=DIST_NAME,
     long_description=README,
     long_description_content_type="text/markdown",
-    url="https://github.com/EQuS/jaxquantum",
-    author="Shantanu Jha, Shoumik Chowdhury, Max Hays",
+    url="https://jaxquantum.org",
+    author=package_info["authors"],
     author_email="shantanu.rajesh.jha@gmail.com",
     license="Apache-2.0",
     packages=find_namespace_packages(exclude=["experiments*"]),
@@ -88,7 +89,7 @@ setup(
     keywords="quantum computing",
     python_requires=">=3.7",
     project_urls={
-        "Documentation": "https://equs.github.io/jaxquantum",
+        "Documentation": "https://jaxquantum.org",
         "Source Code": "https://github.com/EQuS/jaxquantum",
         "Tutorials": "https://github.com/EQuS/jaxquantum/tree/main/tutorials",
     },
