@@ -30,7 +30,7 @@ def H():
     return Gate.create(2, name="H", gen_U=lambda params: hadamard(), num_modes=1)
 
 
-def Rx(theta, ts):
+def Rx(theta, ts=None):
 
     gen_Ht = None
     if ts is not None:
@@ -50,7 +50,7 @@ def Rx(theta, ts):
     )
 
 
-def Ry(theta, ts):
+def Ry(theta, ts=None):
     gen_Ht = None
     if ts is not None:
         delta_t = ts[-1] - ts[0]
@@ -68,7 +68,7 @@ def Ry(theta, ts):
     )
 
 
-def Rz(theta, ts):
+def Rz(theta, ts=None):
     gen_Ht = None
     if ts is not None:
         delta_t = ts[-1] - ts[0]
