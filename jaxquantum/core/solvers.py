@@ -148,7 +148,7 @@ def mesolve(
     if isinstance(H, Qarray):
         Ht_data = lambda t: H.data
     else:
-        Ht_data = lambda t: H(t).data if H is not None else None
+        Ht_data = lambda t: H(t).data
 
     ys = _mesolve_data(Ht_data, ρ0, tlist, saveat_tlist, c_ops,
                        solver_options=solver_options)
@@ -185,7 +185,7 @@ def _mesolve_data(
     #         "Consider using `jqt.sesolve()` instead, as `c_ops` is an empty list and the initial state is not a density matrix."
     #     )
 
-    ρ0 = rho0 + 0.0j
+    ρ0 = rho0
 
     if len(c_ops) == 0:
         test_data = H(0.0) @ ρ0
@@ -204,7 +204,6 @@ def _mesolve_data(
         c_ops_val: Array,
     ):
         H_val = H(t)  # type: ignore
-        H_val = H_val + 0.0j
 
         rho_dot = -1j * (H_val @ rho - rho @ H_val)
 
@@ -269,7 +268,7 @@ def sesolve(
     if isinstance(H, Qarray):
         Ht_data = lambda t: H.data
     else:
-        Ht_data = lambda t: H(t).data if H is not None else None
+        Ht_data = lambda t: H(t).data
 
     ys = _sesolve_data(Ht_data, ψ, tlist, saveat_tlist,
                        solver_options=solver_options)
@@ -297,11 +296,9 @@ def _sesolve_data(
     """
 
     ψ = rho0
-    ψ = ψ + 0.0j
 
     def f(t: float, ψₜ: Array, _):
         H_val = H(t)  # type: ignore
-        H_val = H_val + 0.0j
 
         ψₜ_dot = -1j * (H_val @ ψₜ)
 
