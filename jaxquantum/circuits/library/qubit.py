@@ -30,7 +30,7 @@ def H():
     return Gate.create(2, name="H", gen_U=lambda params: hadamard(), num_modes=1)
 
 
-def Rx(theta, ts):
+def Rx(theta, ts=None):
 
     gen_Ht = None
     if ts is not None:
@@ -50,7 +50,7 @@ def Rx(theta, ts):
     )
 
 
-def Ry(theta, ts):
+def Ry(theta, ts=None):
     gen_Ht = None
     if ts is not None:
         delta_t = ts[-1] - ts[0]
@@ -68,7 +68,7 @@ def Ry(theta, ts):
     )
 
 
-def Rz(theta, ts):
+def Rz(theta, ts=None):
     gen_Ht = None
     if ts is not None:
         delta_t = ts[-1] - ts[0]
@@ -86,19 +86,29 @@ def Rz(theta, ts):
     )
 
 
-def MZ():
+def MZ(measure=None):
     g = basis(2, 0)
     e = basis(2, 1)
 
     gg = g @ g.dag()
     ee = e @ e.dag()
 
-    kmap = Qarray.from_list([gg, ee])
+    if measure is None:
+        kmap = Qarray.from_list([gg, ee])
+        gate_name = "MZ"
+    elif measure == +1:
+        kmap = Qarray.from_list([gg])
+        gate_name = "MZ_plus"
+    elif measure == -1:
+        kmap = Qarray.from_list([ee])
+        gate_name = "MZ_minus"
+    else:
+        raise ValueError("measure should be None, +1 or -1")
 
-    return Gate.create(2, name="MZ", gen_KM=lambda params: kmap, num_modes=1)
+    return Gate.create(2, name=gate_name, gen_KM=lambda params: kmap, num_modes=1)
 
 
-def MX():
+def MX(measure=None):
     g = basis(2, 0)
     e = basis(2, 1)
 
@@ -108,29 +118,19 @@ def MX():
     pp = plus @ plus.dag()
     mm = minus @ minus.dag()
 
-    kmap = Qarray.from_list([pp, mm])
+    if measure is None:
+        kmap = Qarray.from_list([pp, mm])
+        gate_name = "MX"
+    elif measure == +1:
+        kmap = Qarray.from_list([pp])
+        gate_name = "MX_plus"
+    elif measure == -1:
+        kmap = Qarray.from_list([mm])
+        gate_name = "MX_minus"
+    else:
+        raise ValueError("measure should be None, +1 or -1")
 
-    return Gate.create(2, name="MX", gen_KM=lambda params: kmap, num_modes=1)
-
-
-def MX_plus():
-    g = basis(2, 0)
-    e = basis(2, 1)
-    plus = (g + e).unit()
-    pp = plus @ plus.dag()
-    kmap = Qarray.from_list([pp])
-
-    return Gate.create(2, name="MXplus", gen_KM=lambda params: kmap, num_modes=1)
-
-
-def MZ_plus():
-    g = basis(2, 0)
-    plus = g
-    pp = plus @ plus.dag()
-    kmap = Qarray.from_list([pp])
-
-    return Gate.create(2, name="MZplus", gen_KM=lambda params: kmap, num_modes=1)
-
+    return Gate.create(2, name=gate_name, gen_KM=lambda params: kmap, num_modes=1)
 
 def Reset():
     g = basis(2, 0)
