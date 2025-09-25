@@ -44,10 +44,10 @@ EXTRA_REQUIREMENTS = {
         "pytest-cov"
     ],
     "gpu": [
-        "jax[cuda12]"
+        "jax[cuda13]" # only officially supported on linux
     ],
     "tpu": [
-        "jax[tpu]"
+        "jax[tpu]" # only officially supported on linux
     ]
 }
 
