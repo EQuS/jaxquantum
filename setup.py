@@ -91,7 +91,7 @@ setup(
     project_urls={
         "Documentation": "https://jaxquantum.org",
         "Source Code": "https://github.com/EQuS/jaxquantum",
-        "Tutorials": "https://github.com/EQuS/jaxquantum/tree/main/tutorials",
+        "Tutorials": "https://github.com/EQuS/jaxquantum/tree/main/experiments",
     },
     include_package_data=True,
 )
