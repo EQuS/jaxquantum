@@ -138,7 +138,7 @@ def plot_qp(
     y_ticks = (
         jnp.linspace(jnp.min(pts_y), jnp.max(pts_y), 5) if y_ticks is None else y_ticks
     )
-    z_ticks = jnp.linspace(vmin, vmax, 11) if z_ticks is None else z_ticks
+    z_ticks = jnp.linspace(vmin, vmax, 3) if z_ticks is None else z_ticks
 
     for row in range(bdims[0]):
         for col in range(bdims[1]):

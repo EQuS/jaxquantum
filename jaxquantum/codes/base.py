@@ -248,7 +248,6 @@ class BosonicQubit(metaclass=ABCMeta):
         """
         Assumes state has same dims as initial_state.
         """
-        state = self.jqt2qt(state)
 
         if ax is None:
             _, ax = plt.subplots(1, figsize=(4, 3), dpi=200)
@@ -273,7 +272,7 @@ class BosonicQubit(metaclass=ABCMeta):
             cbar_title = r"$\frac{\pi}{2} W(\alpha)$"
             vmin = -1
             vmax = 1
-        elif qp_type == jqt.QFUNC:
+        elif qp_type == jqt.HUSIMI:
             cbar_title = r"$\pi Q(\alpha)$"
             vmin = 0
             vmax = 1
@@ -289,14 +288,8 @@ class BosonicQubit(metaclass=ABCMeta):
 
         fig.suptitle(self.name)
         fig.tight_layout()
-        fig.subplots_adjust(right=0.8, hspace=0.2, wspace=0.2)
         fig.align_xlabels(axs)
         fig.align_ylabels(axs)
-        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-
-        ticks = np.linspace(vmin, vmax, 5)
-        fig.colorbar(w_plt, cax=cbar_ax, ticks=ticks)
-
-        cbar_ax.set_title(cbar_title, pad=20)
+        
         fig.tight_layout()
         plt.show()
