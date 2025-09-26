@@ -318,6 +318,7 @@ def _sesolve_data(
 def propagator(
     H: Union[Qarray, Callable[[float], Qarray]],
     ts: Union[float, Array],
+    saveat_tlist: Optional[Array] = None,
     solver_options=None
 ):
     """ Generate the propagator for a time dependent Hamiltonian.
@@ -329,6 +330,7 @@ def propagator(
         ts (float or Array):
             A single time point or
             an Array of time points.
+        saveat_tlist: list of times at which to save the state. If None, save at all times in tlist. Default: None.
 
     Returns:
         Qarray or List[Qarray]:
@@ -354,7 +356,7 @@ def propagator(
             H_first = H(ts[0])
 
         basis_states = multi_mode_basis_set(H_first.space_dims)
-        results = sesolve(H, basis_states, ts)
+        results = sesolve(H, basis_states, ts, saveat_tlist=saveat_tlist)
         propagators_data = results.data.squeeze(-1)
         propagators = Qarray.create(propagators_data, dims=H_first.space_dims)
         
