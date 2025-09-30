@@ -5,6 +5,7 @@ from jaxquantum.circuits.gates import Gate
 from jax.scipy.special import factorial
 import jax.numpy as jnp
 from jaxquantum import Qarray
+from jaxquantum.utils import hermgauss
 
 
 def D(N, alpha, ts=None, c_ops=None):
@@ -135,6 +136,31 @@ def Thermal_Ch(N, err_prob, n_bar, max_l):
         num_modes=1,
     )
 
+
+def _Dephasing_Kraus_Op(N, w, phi):
+    """ " Returns the Kraus Operators for dephasing with weight w and phase phi
+     in a Hilbert Space of size N"""
+    return (
+        jnp.sqrt(w)*(1.j*phi*num(N)).expm()
+    )
+
+
+def Dephasing_Ch(N, err_prob, max_l):
+
+    xs, ws = hermgauss(max_l)
+    phis = jnp.sqrt(2*err_prob)*xs
+    ws = 1/jnp.sqrt(jnp.pi)*ws
+
+    kmap = lambda params: Qarray.from_list(
+        [_Dephasing_Kraus_Op(N, w, phi) for (w, phi) in zip(ws, phis)]
+    )
+    return Gate.create(
+        N,
+        name="Amp_Gain",
+        params={"err_prob": err_prob, "max_l": max_l},
+        gen_KM=kmap,
+        num_modes=1,
+    )
 
 def selfKerr(N, K):
     a = destroy(N)
