@@ -31,13 +31,11 @@ def H():
 
 
 def Rx(theta, ts=None):
-
     gen_Ht = None
     if ts is not None:
         delta_t = ts[-1] - ts[0]
         amp = theta / delta_t
-        gen_Ht = lambda params: (
-            lambda t: amp / 2 * sigmax())
+        gen_Ht = lambda params: (lambda t: amp / 2 * sigmax())
 
     return Gate.create(
         2,
@@ -55,8 +53,7 @@ def Ry(theta, ts=None):
     if ts is not None:
         delta_t = ts[-1] - ts[0]
         amp = theta / delta_t
-        gen_Ht = lambda params: (
-            lambda t: amp / 2 * sigmay())
+        gen_Ht = lambda params: (lambda t: amp / 2 * sigmay())
     return Gate.create(
         2,
         name="Ry",
@@ -73,8 +70,7 @@ def Rz(theta, ts=None):
     if ts is not None:
         delta_t = ts[-1] - ts[0]
         amp = theta / delta_t
-        gen_Ht = lambda params: (
-            lambda t: amp / 2 * sigmaz())
+        gen_Ht = lambda params: (lambda t: amp / 2 * sigmaz())
     return Gate.create(
         2,
         name="Rz",
@@ -132,6 +128,7 @@ def MX(measure=None):
 
     return Gate.create(2, name=gate_name, gen_KM=lambda params: kmap, num_modes=1)
 
+
 def Reset():
     g = basis(2, 0)
     e = basis(2, 1)
@@ -176,3 +173,28 @@ def CX():
     op = (gg ^ identity(2)) + (ee ^ sigmax())
 
     return Gate.create([2, 2], name="CX", gen_U=lambda params: op, num_modes=2)
+
+
+def _Thermal_Kraus_Ops(err_prob, n_bar):
+    """ " Returns the Kraus Operators for a thermal channel with probability
+    err_prob and average photon number n_bar in a Hilbert Space of size N"""
+    p = n_bar / (n_bar + 1)
+    return [
+        Qarray.create(
+            jnp.sqrt(1 - p) * jnp.array([[1, 0], [0, jnp.sqrt(1 - err_prob)]])
+        ),
+        Qarray.create(jnp.sqrt(1 - p) * jnp.array([[0, jnp.sqrt(err_prob)], [0, 0]])),
+        Qarray.create(jnp.sqrt(p) * jnp.array([[0, 0], [jnp.sqrt(err_prob), 0]])),
+        Qarray.create(jnp.sqrt(p) * jnp.array([[jnp.sqrt(1 - err_prob), 0], [0, 1]])),
+    ]
+
+
+def Thermal_Ch(err_prob, n_bar):
+    kmap = lambda params: Qarray.from_list(_Thermal_Kraus_Ops(err_prob, n_bar))
+    return Gate.create(
+        2,
+        name="Thermal_Ch",
+        params={"err_prob": err_prob, "n_bar": n_bar},
+        gen_KM=kmap,
+        num_modes=1,
+    )
