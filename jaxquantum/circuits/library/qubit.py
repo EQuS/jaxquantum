@@ -175,9 +175,9 @@ def CX():
     return Gate.create([2, 2], name="CX", gen_U=lambda params: op, num_modes=2)
 
 
-def _Thermal_Kraus_Ops(err_prob, n_bar):
+def _Thermal_Kraus_Ops_Qb(err_prob, n_bar):
     """ " Returns the Kraus Operators for a thermal channel with probability
-    err_prob and average photon number n_bar in a Hilbert Space of size N"""
+    err_prob and average photon number n_bar in a Hilbert Space of size 2"""
     p = n_bar / (n_bar + 1)
     return [
         Qarray.create(
@@ -189,8 +189,9 @@ def _Thermal_Kraus_Ops(err_prob, n_bar):
     ]
 
 
-def Thermal_Ch(err_prob, n_bar):
-    kmap = lambda params: Qarray.from_list(_Thermal_Kraus_Ops(err_prob, n_bar))
+def Thermal_Ch_Qb(err_prob, n_bar):
+    kmap = lambda params: Qarray.from_list(_Thermal_Kraus_Ops_Qb(err_prob,
+                                                               n_bar))
     return Gate.create(
         2,
         name="Thermal_Ch",
