@@ -194,8 +194,28 @@ def Thermal_Ch_Qb(err_prob, n_bar):
                                                                n_bar))
     return Gate.create(
         2,
-        name="Thermal_Ch",
+        name="Thermal_Ch_Qb",
         params={"err_prob": err_prob, "n_bar": n_bar},
+        gen_KM=kmap,
+        num_modes=1,
+    )
+
+
+def _Pure_Dephasing_Ops_Qb(err_prob):
+    """ " Returns the Kraus Operators for a thermal channel with probability
+    err_prob and average photon number n_bar in a Hilbert Space of size 2"""
+    return [
+        jnp.sqrt(1-err_prob)*identity(2),
+        jnp.sqrt(err_prob)*sigmaz()
+    ]
+
+
+def Dephasing_Ch_Qb(err_prob):
+    kmap = lambda params: Qarray.from_list(_Pure_Dephasing_Ops_Qb(err_prob))
+    return Gate.create(
+        2,
+        name="Dephasing_Ch_Qb",
+        params={"err_prob": err_prob},
         gen_KM=kmap,
         num_modes=1,
     )
