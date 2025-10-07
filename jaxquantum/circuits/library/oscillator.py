@@ -125,7 +125,7 @@ def Thermal_Ch(N, err_prob, n_bar, max_l):
         [
             _Thermal_Kraus_Op(N, err_prob, n_bar, l, k)
             for l in range(max_l + 1)
-            for k in range(l + 1)
+            for k in range(max_l + 1)
         ]
     )
     return Gate.create(
