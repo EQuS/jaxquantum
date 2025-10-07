@@ -57,6 +57,23 @@ def CD(N, beta, ts=None):
         num_modes=2,
     )
 
+def CR(N, theta):
+    g = basis(2, 0)
+    e = basis(2, 1)
+
+    gg = g @ g.dag()
+    ee = e @ e.dag()
+
+
+    return Gate.create(
+        [2, N],
+        name="CR",
+        params={"theta": theta},
+        gen_U=lambda params: (gg ^ (-1.j*theta/2*destroy(N)@create(N)).expm())
+        + (ee ^ (1.j*theta/2*destroy(N)@create(N)).expm()),
+        num_modes=2,
+    )
+
 
 def _Ph_Loss_Kraus_Op(N, err_prob, l):
     """ " Returns the Kraus Operators for l-photon loss with probability
