@@ -6,10 +6,9 @@ from typing import Tuple
 
 from jaxquantum.codes.base import BosonicQubit
 import jaxquantum as jqt
-from functools import partial
-from jax import jit, lax
-from jax.nn import one_hot
-from jax.scipy.special import gammaln
+
+from jax import jit, lax, vmap
+
 import jax.numpy as jnp
 
 
@@ -84,169 +83,84 @@ class GKPQubit(BosonicQubit):
             1.0j * self.params["l"] * y_axis
         )
 
-    def _log_hermite(self, n, xs):
-        float_dtype = xs.dtype
+    @staticmethod
+    def _q_quadrature(q_points, n):
+        q_points = q_points.T
 
-        def n_is_zero_branch(_xs):
-            return jnp.ones_like(_xs, dtype=jnp.int32), jnp.zeros_like(_xs,
-                                                                       dtype=float_dtype)
+        F_0_init = jnp.ones_like(q_points)
+        F_1_init = jnp.sqrt(2) * q_points
 
-        def n_is_not_zero_branch(_xs):
-            zeros = self.hermroots(n, n + 1).astype(float_dtype)
-            xs_minus_zeros = _xs[:, None] - zeros[None, :]
-            num_negative_factors = (xs_minus_zeros < 0).sum(axis=1)
-            signs = (1 - 2 * (num_negative_factors % 2))
-            abs_xs_minus_zeros = jnp.abs(xs_minus_zeros)
-            log_of_2 = jnp.log(jnp.array(2.0, dtype=float_dtype))
-            log_abs = n * log_of_2 + jnp.log(abs_xs_minus_zeros).sum(axis=1)
+        def scan_body(n, carry):
+            F_0, F_1 = carry
+            F_n = (jnp.sqrt(2 / n) * lax.mul(q_points, F_1) - jnp.sqrt(
+                (n - 1) / n) * F_0)
 
-            return signs.astype(jnp.int32), log_abs.astype(float_dtype)
+            new_carry = (F_1, F_n)
 
-        return lax.cond(n == 0, n_is_zero_branch, n_is_not_zero_branch,
-                            operand=xs)
+            return new_carry
 
-    def _log_ho_basis_prefactors(self, n, xs):
-        return (-n / 2.0 * jnp.log(2.0)
-                - 0.5 * gammaln(n + 1.0)
-                - 0.25 * jnp.log(jnp.pi)
-                - xs ** 2 / 2.0)
+        initial_carry = (F_0_init, F_1_init)
+        final_carry = lax.fori_loop(2, jnp.max(jnp.array([n + 1, 2])),
+                                    scan_body, initial_carry)
 
-    def _log_ho_basis_function(self, n, xs):
-        signs_herm, log_abs_herm = self._log_hermite(n, xs)
-        log_prefactors = self._log_ho_basis_prefactors(n, xs)
-        return signs_herm, log_abs_herm + log_prefactors
+        q_quad = lax.select(n == 0, F_0_init,
+                            lax.select(n == 1, F_1_init,
+                                       final_carry[1]))
 
+        q_quad = jnp.pi ** (-0.25) * lax.mul(
+            jnp.exp(-lax.pow(q_points, 2) / 2), q_quad)
 
-    def _calculate_single_amplitude(self, n, xs, delta):
-        logenv = -delta ** 2 * n
-        sgns, logamps = self._log_ho_basis_function(n, xs)
-        amps = sgns * jnp.exp(logenv + logamps)
-        return amps.sum()
+        return q_quad
 
-    def _finite_gkp(self, mu, delta, dim):
+    @staticmethod
+    def _compute_gkp_basis_z(delta, dim, mu):
         """
-        Constructs a finite-energy GKP state in the Fock basis.
+        Args:
+            mu: state index (0 or 1)
+
+        Returns:
+            GKP basis state
+
+        Adapted from code by Lev-Arcady Sellem <lev-arcady.sellem@inria.fr>
         """
-        l = 2.0 * jnp.sqrt(jnp.pi)
-        xs = l * (jnp.arange(-5000, 5001, dtype=jnp.float64) + mu / 2.0)
+        truncat_series = 100
 
-        amplitudes = []
-        for n in range(dim):
-            amp = self._calculate_single_amplitude(n, xs, delta)
-            amplitudes.append(amp)
+        
 
-        amplitudes = jnp.array(amplitudes)
+        q_points = jnp.sqrt(jnp.pi) * (2 * jnp.arange(truncat_series) + mu)
 
-        norm = jnp.linalg.norm(amplitudes)
-        normalized_amplitudes = amplitudes / (norm + 1e-10)
+        def compute_pop(n):
+            quadvals = GKPQubit._q_quadrature(q_points, n)
+            return jnp.exp(-(delta ** 2) * n) * (
+                    2 * jnp.sum(quadvals) - (1 - mu) * quadvals[0])
 
-        return jqt.Qarray.create(normalized_amplitudes)
+        psi_even = vmap(compute_pop)(jnp.arange(0, dim, 2))
 
-    def hermcompanion(self, c, dim):
-        """Return the scaled companion matrix of c.
+        psi = jnp.zeros(2 * psi_even.size, dtype=psi_even.dtype)
 
-        The basis polynomials are scaled so that the companion matrix is
-        symmetric when `c` is an Hermite basis polynomial. This provides
-        better eigenvalue estimates than the unscaled case and for basis
-        polynomials the eigenvalues are guaranteed to be real if
-        `jax.numpy.linalg.eigvalsh` is used to obtain them.
+        psi = psi.at[::2].set(psi_even)
 
-        Parameters
-        ----------
-        c : array_like
-            1-D array of Hermite series coefficients ordered from low to high
-            degree.
+        psi = jqt.Qarray.create(jnp.array(psi))
 
-        Returns
-        -------
-        mat : ndarray
-            Scaled companion matrix of dimensions (deg, deg).
+        return psi.unit()
 
-        """
-        n = dim - 1
-        mat = jnp.zeros((n, n), dtype=c.dtype)
-        scl = jnp.hstack((1.0, 1.0 / jnp.sqrt(2.0 * jnp.arange(n - 1, 0, -1))))
-        scl = jnp.cumprod(scl)[::-1]
-        shp = mat.shape
-        mat = mat.flatten()
-        mat = mat.at[1:: n + 1].set(jnp.sqrt(0.5 * jnp.arange(1, n)))
-        mat = mat.at[n:: n + 1].set(jnp.sqrt(0.5 * jnp.arange(1, n)))
-        mat = mat.reshape(shp)
-        mat = mat.at[:, -1].add(-scl * c[:-1] / (2.0 * c[-1]))
-        return mat
+    
 
-
-    def hermroots(self, n, dim):
-        r"""Compute the roots of a Hermite series.
-
-        Return the roots (a.k.a. "zeros") of the polynomial
-
-        .. math:: p(x) = \sum_i c[i] * H_i(x).
-
-        Parameters
-        ----------
-        c : 1-D array_like
-            1-D array of coefficients.
-
-        Returns
-        -------
-        out : ndarray
-            Array of the roots of the series. If all the roots are real,
-            then `out` is also real, otherwise it is complex.
-
-        See Also
-        --------
-        orthax.polynomial.polyroots
-        orthax.legendre.legroots
-        orthax.laguerre.lagroots
-        orthax.chebyshev.chebroots
-        orthax.hermite_e.hermeroots
-
-        Notes
-        -----
-        The root estimates are obtained as the eigenvalues of the companion
-        matrix, Roots far from the origin of the complex plane may have large
-        errors due to the numerical instability of the series for such
-        values. Roots with multiplicity greater than 1 will also show larger
-        errors as the value of the series near such points is relatively
-        insensitive to errors in the roots. Isolated roots near the origin can
-        be improved by a few iterations of Newton's method.
-
-        The Hermite series basis polynomials aren't powers of `x` so the
-        results of this function may seem unintuitive.
-
-        Examples
-        --------
-        from orthax.hermite import hermroots, hermfromroots
-        coef = hermfromroots([-1, 0, 1])
-        coef
-        array([0.   ,  0.25 ,  0.   ,  0.125])
-        hermroots(coef)
-        array([-1.00000000e+00, -1.38777878e-17,  1.00000000e+00])
-
-        """
-        if n + 1 <= 1:
-            return jnp.array([])
-        if n + 1 == 2:
-            return jnp.array([0])
-
-        c = one_hot(n, dim)
-
-        # rotated companion matrix reduces error
-        m = self.hermcompanion(c, dim)[::-1, ::-1]
-        r = jnp.linalg.eigvalsh(m)
-        r = jnp.sort(r)
-        return r
 
     def _get_basis_z(self) -> Tuple[jqt.Qarray, jqt.Qarray]:
         """
-        Construct basis states |+-x>, |+-y>, |+-z>.
+        Construct basis states |+-z>.
         """
 
-        plus_z = self._finite_gkp(0, self.params["delta"], self.params[
-            "N"])
-        minus_z = self._finite_gkp(1, self.params["delta"], self.params[
-            "N"])
+        delta = self.params["delta"]
+        dim = self.params["N"]
+        
+        jitted_compute_gkp_basis_z = jit(self._compute_gkp_basis_z, 
+                                         static_argnames=("dim",))
+        
+        plus_z = jitted_compute_gkp_basis_z(delta, dim, 0)
+        minus_z = jitted_compute_gkp_basis_z(delta, dim, 1)
+        
         return plus_z, minus_z
 
     # utils
