@@ -174,6 +174,27 @@ class DenseImpl(QarrayImpl):
     def dtype(self):
         return self._data.dtype
     
+    def frobenius_norm(self) -> float:
+        """Compute Frobenius norm."""
+        return jnp.sqrt(jnp.sum(jnp.abs(self._data) ** 2))
+    
+    def real(self) -> QarrayImpl:
+        """Element-wise real part."""
+        return DenseImpl(jnp.real(self._data))
+    
+    def imag(self) -> QarrayImpl:
+        """Element-wise imaginary part."""
+        return DenseImpl(jnp.imag(self._data))
+    
+    def conj(self) -> QarrayImpl:
+        """Element-wise complex conjugate."""
+        return DenseImpl(jnp.conj(self._data))
+    
+    def transpose(self) -> QarrayImpl:
+        """Transpose the matrix (last two dimensions only)."""
+        # Only transpose the last two dimensions (quantum dimensions), not batch dimensions
+        return DenseImpl(jnp.moveaxis(self._data, -1, -2))
+    
     def get_impl_type(self) -> QarrayImplType:
         return QarrayImplType.DENSE
 
@@ -189,8 +210,9 @@ class SparseImpl(QarrayImpl):
     def matmul(self, other: QarrayImpl) -> QarrayImpl:
         if isinstance(other, DenseImpl):
             # Convert dense to sparse for matmul
-            sparse_other = other.to_sparse()
-            return SparseImpl(self._data @ sparse_other._data)
+            dense_self = self.to_dense()
+            return DenseImpl(dense_self._data @ other._data)
+
         elif isinstance(other, SparseImpl):
             return SparseImpl(self._data @ other._data)
         else:
@@ -199,8 +221,8 @@ class SparseImpl(QarrayImpl):
     def add(self, other: QarrayImpl) -> QarrayImpl:
         if isinstance(other, DenseImpl):
             # Convert dense to sparse for addition
-            sparse_other = other.to_sparse()
-            return SparseImpl(self._data + sparse_other._data)
+            dense_self = self.to_dense()
+            return SparseImpl(dense_self._data + other._data)
         elif isinstance(other, SparseImpl):
             return SparseImpl(self._data + other._data)
         else:
@@ -209,8 +231,8 @@ class SparseImpl(QarrayImpl):
     def sub(self, other: QarrayImpl) -> QarrayImpl:
         if isinstance(other, DenseImpl):
             # Convert dense to sparse for subtraction
-            sparse_other = other.to_sparse()
-            return SparseImpl(self._data - sparse_other._data)
+            dense_self = self.to_dense()
+            return SparseImpl(dense_self._data - other._data)
         elif isinstance(other, SparseImpl):
             return SparseImpl(self._data - other._data)
         else:
@@ -220,9 +242,19 @@ class SparseImpl(QarrayImpl):
         return SparseImpl(scalar * self._data)
     
     def dag(self) -> QarrayImpl:
-        # For sparse, we need to convert to dense for dag, then back to sparse
-        dense_dag = DenseImpl(jnp.moveaxis(jnp.conj(self._data.todense()), -1, -2))
-        return dense_dag.to_sparse()
+        # Implement sparse conjugate transpose directly
+        # Transpose the sparse matrix (last two dimensions only) and conjugate the data
+        ndim = self._data.ndim
+        if ndim >= 2:
+            # Create permutation that swaps only the last two dimensions
+            permutation = tuple(range(ndim - 2)) + (ndim - 1, ndim - 2)
+            transposed_data = sparse.bcoo_transpose(self._data, permutation=permutation)
+        else:
+            transposed_data = self._data
+        
+        conjugated_data = sparse.BCOO((jnp.conj(transposed_data.data), transposed_data.indices), 
+                                      shape=transposed_data.shape)
+        return SparseImpl(conjugated_data)
     
     def to_dense(self) -> "DenseImpl":
         return DenseImpl(self._data.todense())
@@ -235,6 +267,39 @@ class SparseImpl(QarrayImpl):
     
     def dtype(self):
         return self._data.dtype
+    
+    def frobenius_norm(self) -> float:
+        """Compute Frobenius norm directly from sparse data."""
+        # For sparse matrices, we can compute the Frobenius norm as sqrt(sum(|data|^2))
+        # This avoids converting to dense
+        return jnp.sqrt(jnp.sum(jnp.abs(self._data.data) ** 2))
+    
+    def real(self) -> QarrayImpl:
+        """Element-wise real part."""
+        return SparseImpl(sparse.BCOO((jnp.real(self._data.data), self._data.indices), 
+                                      shape=self._data.shape))
+    
+    def imag(self) -> QarrayImpl:
+        """Element-wise imaginary part."""
+        return SparseImpl(sparse.BCOO((jnp.imag(self._data.data), self._data.indices), 
+                                      shape=self._data.shape))
+    
+    def conj(self) -> QarrayImpl:
+        """Element-wise complex conjugate."""
+        return SparseImpl(sparse.BCOO((jnp.conj(self._data.data), self._data.indices), 
+                                      shape=self._data.shape))
+    
+    def transpose(self) -> QarrayImpl:
+        """Transpose the sparse matrix (last two dimensions only)."""
+        # For sparse matrices, we need to handle batch dimensions properly
+        # sparse.bcoo_transpose with permutation swaps the last two dimensions
+        ndim = self._data.ndim
+        if ndim >= 2:
+            # Create permutation that swaps only the last two dimensions
+            permutation = tuple(range(ndim - 2)) + (ndim - 1, ndim - 2)
+            return SparseImpl(sparse.bcoo_transpose(self._data, permutation=permutation))
+        else:
+            return SparseImpl(self._data)
     
     def get_impl_type(self) -> QarrayImplType:
         return QarrayImplType.SPARSE
@@ -775,6 +840,35 @@ class Qarray:
 
     def norm(self):
         return norm(self)
+    
+    def frobenius_norm(self):
+        """Compute Frobenius norm directly from implementation."""
+        return self._impl.frobenius_norm()
+    
+    def real(self):
+        """Element-wise real part."""
+        new_impl = self._impl.real()
+        return Qarray(new_impl, self._qdims, self._bdims)
+    
+    def imag(self):
+        """Element-wise imaginary part."""
+        new_impl = self._impl.imag()
+        return Qarray(new_impl, self._qdims, self._bdims)
+    
+    def conj(self):
+        """Element-wise complex conjugate."""
+        new_impl = self._impl.conj()
+        return Qarray(new_impl, self._qdims, self._bdims)
+    
+    def transpose(self, *args):
+        """Transpose the matrix."""
+        if len(args) > 0:
+            # If indices are provided, use the standalone transpose function
+            return transpose(self, *args)
+        else:
+            # Otherwise, use the simple transpose that swaps last two dimensions
+            new_impl = self._impl.transpose()
+            return Qarray(new_impl, self._qdims, self._bdims)
 
     def expm(self):
         return expm(self)
@@ -801,6 +895,9 @@ class Qarray:
         return eigenstates(self)
 
     def eigenenergies(self):
+        return eigenenergies(self)
+
+    def eigenvalues(self):
         return eigenenergies(self)
 
     def collapse(self, mode="sum"):

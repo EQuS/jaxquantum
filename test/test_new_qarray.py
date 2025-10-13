@@ -384,6 +384,100 @@ def test_sparse_error_handling():
     except Exception as e:
         pytest.fail(f"sparse expm should fallback to dense, but got: {e}")
 
+def test_sparse_new_operations():
+    """Test the new sparse operations that stay sparse."""
+    
+    # Create a complex sparse matrix
+    dense_data = jnp.array([[1+2j, 0, 3+4j], [0, 5+6j, 0], [7+8j, 0, 9+10j]])
+    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE)
+    a_dense = a_sparse.to_dense()
+    
+    # Test frobenius_norm
+    sparse_norm = a_sparse.frobenius_norm()
+    dense_norm = a_dense.frobenius_norm()
+    assert jnp.allclose(sparse_norm, dense_norm), f"Sparse norm {sparse_norm} != dense norm {dense_norm}"
+    
+    # Test real part
+    real_sparse = a_sparse.real()
+    real_dense = a_dense.real()
+    assert real_sparse.is_sparse, "Real part should stay sparse"
+    assert jnp.allclose(real_sparse.data.todense(), real_dense.data), "Real parts should match"
+    
+    # Test imaginary part
+    imag_sparse = a_sparse.imag()
+    imag_dense = a_dense.imag()
+    assert imag_sparse.is_sparse, "Imaginary part should stay sparse"
+    assert jnp.allclose(imag_sparse.data.todense(), imag_dense.data), "Imaginary parts should match"
+    
+    # Test conjugate
+    conj_sparse = a_sparse.conj()
+    conj_dense = a_dense.conj()
+    assert conj_sparse.is_sparse, "Conjugate should stay sparse"
+    assert jnp.allclose(conj_sparse.data.todense(), conj_dense.data), "Conjugates should match"
+    
+    # Test transpose
+    trans_sparse = a_sparse.transpose()
+    trans_dense = a_dense.transpose()
+    assert trans_sparse.is_sparse, "Transpose should stay sparse"
+    assert jnp.allclose(trans_sparse.data.todense(), trans_dense.data), "Transposes should match"
+    
+    # Test dag (should now stay sparse)
+    dag_sparse = a_sparse.dag()
+    dag_dense = a_dense.dag()
+    assert dag_sparse.is_sparse, "Dag should stay sparse"
+    assert jnp.allclose(dag_sparse.data.todense(), dag_dense.data), "Dags should match"
+
+def test_sparse_dag_performance():
+    """Test that sparse dag is more efficient than dense conversion."""
+    
+    # Create a large sparse matrix
+    size = 50
+    dense_data = jnp.zeros((size, size))
+    # Make it sparse by setting only diagonal and a few off-diagonal elements
+    dense_data = dense_data.at[jnp.diag_indices(size)].set(jnp.arange(size) + 1j * jnp.arange(size))
+    dense_data = dense_data.at[0, 1].set(1+2j)
+    dense_data = dense_data.at[1, 0].set(3+4j)
+    
+    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE)
+    
+    # Test that dag stays sparse
+    dag_sparse = a_sparse.dag()
+    assert dag_sparse.is_sparse, "Dag should stay sparse"
+    
+    # Verify correctness
+    dag_dense = a_sparse.to_dense().dag()
+    assert jnp.allclose(dag_sparse.data.todense(), dag_dense.data), "Sparse and dense dag should match"
+
+def test_sparse_batched_operations():
+    """Test sparse operations with batched data."""
+    
+    # Create batched data
+    batched_data = jnp.array([[[1+2j, 3+4j], [5+6j, 7+8j]], 
+                              [[9+10j, 11+12j], [13+14j, 15+16j]]])
+    
+    sparse_batched = jqt.Qarray.create(batched_data, implementation=jqt.QarrayImplType.SPARSE)
+    dense_batched = sparse_batched.to_dense()
+    
+    # Test transpose with batched data
+    sparse_trans = sparse_batched.transpose()
+    dense_trans = dense_batched.transpose()
+    
+    assert sparse_trans.is_sparse, "Batched transpose should stay sparse"
+    assert sparse_trans.shape == dense_trans.shape, "Shapes should match"
+    assert jnp.allclose(sparse_trans.data.todense(), dense_trans.data), "Batched transpose results should match"
+    
+    # Test dag with batched data
+    sparse_dag = sparse_batched.dag()
+    dense_dag = dense_batched.dag()
+    
+    assert sparse_dag.is_sparse, "Batched dag should stay sparse"
+    assert sparse_dag.shape == dense_dag.shape, "Shapes should match"
+    assert jnp.allclose(sparse_dag.data.todense(), dense_dag.data), "Batched dag results should match"
+    
+    # Test that batch dimensions are preserved
+    assert sparse_trans.bdims == dense_trans.bdims, "Batch dimensions should be preserved in transpose"
+    assert sparse_dag.bdims == dense_dag.bdims, "Batch dimensions should be preserved in dag"
+
 # ========================================
 
 # Performance Tests (Basic)
