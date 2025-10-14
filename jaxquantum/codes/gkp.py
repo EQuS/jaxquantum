@@ -3,6 +3,7 @@ Cat Code Qubit
 """
 
 from typing import Tuple
+import warnings
 
 from jaxquantum.codes.base import BosonicQubit
 import jaxquantum as jqt
@@ -113,7 +114,7 @@ class GKPQubit(BosonicQubit):
         return q_quad
 
     @staticmethod
-    def _compute_gkp_basis_z(delta, dim, mu):
+    def _compute_gkp_basis_z(delta, dim, mu, series_trunc=100):
         """
         Args:
             mu: state index (0 or 1)
@@ -125,13 +126,13 @@ class GKPQubit(BosonicQubit):
         """
 
         # We choose the truncation of our series summation such that we
-        # capture 6 sigmas of the envelope.
+        # capture 6 sigmas of the envelope for a value of delta of 0.02.
         # delta * (truncat_series*2*sqrt(pi)) = 6
 
+        
 
-        truncat_series = max(3, int(6 / delta / 2 / jnp.sqrt(jnp.pi)))
 
-        q_points = jnp.sqrt(jnp.pi) * (2 * jnp.arange(truncat_series) + mu)
+        q_points = jnp.sqrt(jnp.pi) * (2 * jnp.arange(series_trunc) + mu)
 
         def compute_pop(n):
             quadvals = GKPQubit._q_quadrature(q_points, n)
@@ -158,6 +159,9 @@ class GKPQubit(BosonicQubit):
 
         delta = self.params["delta"]
         dim = self.params["N"]
+
+        if delta<0.02:
+            warnings.warn("State preparation with delta values lower than 0.02 might lead to loss of accuracy.")
         
         jitted_compute_gkp_basis_z = jit(self._compute_gkp_basis_z, 
                                          static_argnames=("dim",))
