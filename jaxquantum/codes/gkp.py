@@ -3,9 +3,12 @@ Cat Code Qubit
 """
 
 from typing import Tuple
+import warnings
 
 from jaxquantum.codes.base import BosonicQubit
 import jaxquantum as jqt
+
+from jax import jit, lax, vmap
 
 import jax.numpy as jnp
 
@@ -81,41 +84,91 @@ class GKPQubit(BosonicQubit):
             1.0j * self.params["l"] * y_axis
         )
 
+    @staticmethod
+    def _q_quadrature(q_points, n):
+        q_points = q_points.T
+
+        F_0_init = jnp.ones_like(q_points)
+        F_1_init = jnp.sqrt(2) * q_points
+
+        def scan_body(n, carry):
+            F_0, F_1 = carry
+            F_n = (jnp.sqrt(2 / n) * lax.mul(q_points, F_1) - jnp.sqrt(
+                (n - 1) / n) * F_0)
+
+            new_carry = (F_1, F_n)
+
+            return new_carry
+
+        initial_carry = (F_0_init, F_1_init)
+        final_carry = lax.fori_loop(2, jnp.max(jnp.array([n + 1, 2])),
+                                    scan_body, initial_carry)
+
+        q_quad = lax.select(n == 0, F_0_init,
+                            lax.select(n == 1, F_1_init,
+                                       final_carry[1]))
+
+        q_quad = jnp.pi ** (-0.25) * lax.mul(
+            jnp.exp(-lax.pow(q_points, 2) / 2), q_quad)
+
+        return q_quad
+
+    @staticmethod
+    def _compute_gkp_basis_z(delta, dim, mu, series_trunc=100):
+        """
+        Args:
+            mu: state index (0 or 1)
+
+        Returns:
+            GKP basis state
+
+        Adapted from code by Lev-Arcady Sellem <lev-arcady.sellem@inria.fr>
+        """
+
+        # We choose the truncation of our series summation such that we
+        # capture 6 sigmas of the envelope for a value of delta of 0.02.
+        # delta * (truncat_series*2*sqrt(pi)) = 6
+
+        
+
+
+        q_points = jnp.sqrt(jnp.pi) * (2 * jnp.arange(series_trunc) + mu)
+
+        def compute_pop(n):
+            quadvals = GKPQubit._q_quadrature(q_points, n)
+            return jnp.exp(-(delta ** 2) * n) * (
+                    2 * jnp.sum(quadvals) - (1 - mu) * quadvals[0])
+
+        psi_even = vmap(compute_pop)(jnp.arange(0, dim, 2))
+
+        psi = jnp.zeros(2 * psi_even.size, dtype=psi_even.dtype)
+
+        psi = psi.at[::2].set(psi_even)
+
+        psi = jqt.Qarray.create(jnp.array(psi))
+
+        return psi.unit()
+
+    
+
+
     def _get_basis_z(self) -> Tuple[jqt.Qarray, jqt.Qarray]:
         """
-        Construct basis states |+-x>, |+-y>, |+-z>.
-        step 1: use ideal GKP stabilizers to find ideal GKP |+z> state
-        step 2: make ideal eigenvector finite energy
-            We want the groundstate of H = E H_0 E⁻¹.
-            So, we can begin by find the groundstate of H_0 -> |λ₀⟩
-            Then, we know that E|λ₀⟩ = |λ⟩ is the groundstate of H.
-            pf. H|λ⟩ = (E H_0 E⁻¹)(E|λ₀⟩) = E H_0 |λ₀⟩ = λ₀ (E|λ₀⟩) = λ₀|λ⟩
-
-        TODO (if necessary):
-            Alternatively, we could construct a hamiltonian using
-            finite energy stabilizers S_x, S_y, S_z, Z_s. However,
-            this would make H = - S_x - S_y - S_z - Z_s non-hermitian.
-            Currently, JAX does not support derivatives of jnp.linalg.eig,
-            while it does support derivatives of jnp.linalg.eigh.
-            Discussion: https://github.com/google/jax/issues/2748
+        Construct basis states |+-z>.
         """
 
-        # step 1: use ideal GKP stabilizers to find ideal GKP |+z> state
-        H_0 = (
-            -self.common_gates["S_x_0"]
-            - self.common_gates["S_y_0"]
-            - self.common_gates["S_z_0"]
-            - self.common_gates["Z_s_0"]  # bosonic |+z> state
-        )
+        delta = self.params["delta"]
+        dim = self.params["N"]
 
-        _, vecs = jnp.linalg.eigh(H_0.data)
-        gstate_ideal = jqt.Qarray.create(vecs[:, 0])
-
-        # step 2: make ideal eigenvector finite energy
-        gstate = self.common_gates["E"] @ gstate_ideal
-
-        plus_z = jqt.unit(gstate)
-        minus_z = jqt.unit(self.common_gates["X"] @ plus_z)
+        if delta<0.02:
+            warnings.warn("State preparation with delta values lower than 0.02 might lead to loss of accuracy.")
+        
+        jitted_compute_gkp_basis_z = jit(self._compute_gkp_basis_z, 
+                                         static_argnames=("dim",))
+        
+        plus_z = jitted_compute_gkp_basis_z(delta, dim, 0)
+        minus_z = jitted_compute_gkp_basis_z(delta, dim, 1)
+        
         return plus_z, minus_z
 
     # utils

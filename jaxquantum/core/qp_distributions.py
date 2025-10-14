@@ -1,7 +1,9 @@
 import jax.numpy as jnp
-from jax import vmap
+from jax import vmap, config
 from jax.scipy.special import factorial
 import jax
+
+config.update("jax_enable_x64", True)
 
 def wigner(psi, xvec, yvec, method="clenshaw", g=2):
     """Wigner function for a state vector or density matrix at points
@@ -85,7 +87,7 @@ def wigner(psi, xvec, yvec, method="clenshaw", g=2):
         raise TypeError("method must be either 'iterative', 'laguerre', or 'fft'.")
 
 
-def _wigner_clenshaw(rho, xvec, yvec, g=jnp.sqrt(2)):
+def _wigner_clenshaw(rho, xvec, yvec, g):
     r"""
     Using Clenshaw summation - numerically stable and efficient
     iterative algorithm to evaluate polynomial series.
