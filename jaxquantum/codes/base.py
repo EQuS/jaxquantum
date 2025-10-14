@@ -268,14 +268,6 @@ class BosonicQubit(metaclass=ABCMeta):
             axs: Axes
         """
         fig, axs = plt.subplots(2, 3, figsize=(12, 6), dpi=200)
-        if qp_type == jqt.WIGNER:
-            cbar_title = r"$\frac{\pi}{2} W(\alpha)$"
-            vmin = -1
-            vmax = 1
-        elif qp_type == jqt.HUSIMI:
-            cbar_title = r"$\pi Q(\alpha)$"
-            vmin = 0
-            vmax = 1
 
         for i, label in enumerate(["+z", "+x", "+y", "-z", "-x", "-y"]):
             state = self._prepare_state_plot(self.basis[label])
