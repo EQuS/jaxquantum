@@ -123,9 +123,13 @@ class GKPQubit(BosonicQubit):
 
         Adapted from code by Lev-Arcady Sellem <lev-arcady.sellem@inria.fr>
         """
-        truncat_series = 100
 
-        
+        # We choose the truncation of our series summation such that we
+        # capture 6 sigmas of the envelope.
+        # delta * (truncat_series*2*sqrt(pi)) = 6
+
+
+        truncat_series = max(3, int(6 / delta / 2 / jnp.sqrt(jnp.pi)))
 
         q_points = jnp.sqrt(jnp.pi) * (2 * jnp.arange(truncat_series) + mu)
 
