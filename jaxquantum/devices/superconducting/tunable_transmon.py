@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 from jaxquantum.devices.superconducting.transmon import Transmon
 
-config.update("jax_enable_x64", True)
+
 
 
 @struct.dataclass

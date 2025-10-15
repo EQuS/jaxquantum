@@ -3,7 +3,7 @@ from jax import vmap, config
 from jax.scipy.special import factorial
 import jax
 
-config.update("jax_enable_x64", True)
+
 
 def wigner(psi, xvec, yvec, method="clenshaw", g=2):
     """Wigner function for a state vector or density matrix at points

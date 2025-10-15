@@ -12,7 +12,7 @@ from jaxquantum.circuits.constants import SimulateMode
 from jaxquantum.core.solvers import mesolve, sesolve, SolverOptions
 
 
-config.update("jax_enable_x64", True)
+
 
 
 @struct.dataclass

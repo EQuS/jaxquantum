@@ -7,7 +7,7 @@ from jax import config
 from jaxquantum.devices.base.base import Device, BasisTypes, HamiltonianTypes
 from jaxquantum.core.operators import identity, sigmaz, sigmax, sigmay, sigmam, sigmap
 
-config.update("jax_enable_x64", True)
+
 
 
 @struct.dataclass

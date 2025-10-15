@@ -8,7 +8,7 @@ import jax.numpy as jnp
 from jaxquantum.devices.base.base import Device, BasisTypes, HamiltonianTypes
 from jaxquantum.core.operators import identity, destroy, create
 
-config.update("jax_enable_x64", True)
+
 
 
 @struct.dataclass

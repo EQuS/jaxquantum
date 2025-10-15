@@ -9,7 +9,7 @@ from jaxquantum.devices.superconducting.flux_base import FluxDevice
 from jaxquantum.core.operators import identity, destroy, create
 from jaxquantum.core.qarray import cosm, sinm
 
-config.update("jax_enable_x64", True)
+
 
 
 @struct.dataclass

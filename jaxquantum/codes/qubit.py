@@ -12,7 +12,7 @@ from jax import config
 import matplotlib.pyplot as plt
 import qutip as qt
 
-config.update("jax_enable_x64", True)
+
 
 
 class Qubit(BosonicQubit):

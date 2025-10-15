@@ -9,7 +9,7 @@ import jax.numpy as jnp
 
 from jaxquantum.core.qarray import Qarray, concatenate
 
-config.update("jax_enable_x64", True)
+
 
 
 @struct.dataclass

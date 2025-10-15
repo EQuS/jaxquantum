@@ -13,7 +13,7 @@ import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-config.update("jax_enable_x64", True)
+
 
 
 class BosonicQubit(metaclass=ABCMeta):

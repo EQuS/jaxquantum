@@ -14,7 +14,7 @@ from jaxquantum.devices.superconducting.drive import Drive
 from jaxquantum.core.qarray import Qarray, tensor
 from jaxquantum.core.operators import identity
 
-config.update("jax_enable_x64", True)
+
 
 
 def calculate_eig(Ns, H: Qarray):

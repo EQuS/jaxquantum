@@ -9,7 +9,7 @@ from jaxquantum.devices.base.base import HamiltonianTypes
 from jaxquantum.core.operators import identity, destroy, create
 from jaxquantum.core import cosm, sinm
 
-config.update("jax_enable_x64", True)
+
 
 
 @struct.dataclass

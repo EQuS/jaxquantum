@@ -17,7 +17,7 @@ from jaxquantum.core.settings import SETTINGS
 from jaxquantum.utils.utils import robust_isscalar
 from jaxquantum.core.dims import Qtypes, Qdims, check_dims, ket_from_op_dims
 
-config.update("jax_enable_x64", True)
+
 
 
 def tidy_up(data, atol):

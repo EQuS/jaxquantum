@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from jaxquantum.devices.common.utils import harm_osc_wavefunction
 from jaxquantum.devices.base.base import Device, BasisTypes
 
-config.update("jax_enable_x64", True)
+
 
 
 @struct.dataclass

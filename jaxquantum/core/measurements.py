@@ -16,7 +16,7 @@ from jaxquantum.core.operators import identity
 
 from jax_tqdm import scan_tqdm
 
-config.update("jax_enable_x64", True)
+
 
 
 # Calculations ----------------------------------------------------------------

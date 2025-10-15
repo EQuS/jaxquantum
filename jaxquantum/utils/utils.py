@@ -10,7 +10,7 @@ from jax._src.scipy.special import gammaln
 import jax.numpy as jnp
 import numpy as np
 
-config.update("jax_enable_x64", True)
+
 
 
 def device_put_params(params: Dict, non_device_params=None):
@@ -89,3 +89,25 @@ def robust_isscalar(val):
     if isinstance(val, Array):
         is_scalar = is_scalar or (len(val.shape) == 0)
     return is_scalar
+
+
+# =====================================================
+
+# Precision
+
+def set_precision(precision: Literal["single", "double"]):
+    """
+    Set the precision of JAX operations.
+
+    Args:
+        precision: 'single' or 'double'
+
+    Raises:
+        ValueError: if precision is not 'single' or 'double'
+    """
+    if precision == "single":
+        config.update("jax_enable_x64", False)
+    elif precision == "double":
+        config.update("jax_enable_x64", True)
+    else:
+        raise ValueError("precision must be 'single' or 'double'")

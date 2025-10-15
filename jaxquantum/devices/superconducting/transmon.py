@@ -10,7 +10,7 @@ from jaxquantum.devices.superconducting.flux_base import FluxDevice
 from jaxquantum.core.operators import identity, destroy, create
 from jaxquantum.core.conversions import jnp2jqt
 
-config.update("jax_enable_x64", True)
+
 
 
 @struct.dataclass

@@ -11,7 +11,7 @@ import jax.numpy as jnp
 from jaxquantum.core.qarray import Qarray
 from jaxquantum.core.dims import Qtypes
 
-config.update("jax_enable_x64", True)
+
 
 
 class BasisTypes(str, Enum):
