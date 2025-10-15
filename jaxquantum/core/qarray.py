@@ -9,6 +9,7 @@ from typing import List, Union, TypeVar, Generic
 import jax.numpy as jnp
 import jax.scipy as jsp
 from jax.experimental import sparse
+from numpy import ndarray
 from copy import deepcopy
 from math import prod
 from enum import Enum
@@ -190,11 +191,6 @@ class DenseImpl(QarrayImpl):
         """Element-wise complex conjugate."""
         return DenseImpl(jnp.conj(self._data))
     
-    def transpose(self) -> QarrayImpl:
-        """Transpose the matrix (last two dimensions only)."""
-        # Only transpose the last two dimensions (quantum dimensions), not batch dimensions
-        return DenseImpl(jnp.moveaxis(self._data, -1, -2))
-    
     def get_impl_type(self) -> QarrayImplType:
         return QarrayImplType.DENSE
 
@@ -209,7 +205,7 @@ class SparseImpl(QarrayImpl):
     
     def matmul(self, other: QarrayImpl) -> QarrayImpl:
         if isinstance(other, DenseImpl):
-            # Convert dense to sparse for matmul
+            # Convert sparse to dense for matmul
             dense_self = self.to_dense()
             return DenseImpl(dense_self._data @ other._data)
 
@@ -220,9 +216,9 @@ class SparseImpl(QarrayImpl):
     
     def add(self, other: QarrayImpl) -> QarrayImpl:
         if isinstance(other, DenseImpl):
-            # Convert dense to sparse for addition
+            # Convert sparse to dense for addition
             dense_self = self.to_dense()
-            return SparseImpl(dense_self._data + other._data)
+            return DenseImpl(dense_self._data + other._data)
         elif isinstance(other, SparseImpl):
             return SparseImpl(self._data + other._data)
         else:
@@ -230,9 +226,9 @@ class SparseImpl(QarrayImpl):
     
     def sub(self, other: QarrayImpl) -> QarrayImpl:
         if isinstance(other, DenseImpl):
-            # Convert dense to sparse for subtraction
+            # Convert sparse to dense for subtraction
             dense_self = self.to_dense()
-            return SparseImpl(dense_self._data - other._data)
+            return DenseImpl(dense_self._data - other._data)
         elif isinstance(other, SparseImpl):
             return SparseImpl(self._data - other._data)
         else:
@@ -288,18 +284,6 @@ class SparseImpl(QarrayImpl):
         """Element-wise complex conjugate."""
         return SparseImpl(sparse.BCOO((jnp.conj(self._data.data), self._data.indices), 
                                       shape=self._data.shape))
-    
-    def transpose(self) -> QarrayImpl:
-        """Transpose the sparse matrix (last two dimensions only)."""
-        # For sparse matrices, we need to handle batch dimensions properly
-        # sparse.bcoo_transpose with permutation swaps the last two dimensions
-        ndim = self._data.ndim
-        if ndim >= 2:
-            # Create permutation that swaps only the last two dimensions
-            permutation = tuple(range(ndim - 2)) + (ndim - 1, ndim - 2)
-            return SparseImpl(sparse.bcoo_transpose(self._data, permutation=permutation))
-        else:
-            return SparseImpl(self._data)
     
     def get_impl_type(self) -> QarrayImplType:
         return QarrayImplType.SPARSE
@@ -859,16 +843,6 @@ class Qarray:
         """Element-wise complex conjugate."""
         new_impl = self._impl.conj()
         return Qarray(new_impl, self._qdims, self._bdims)
-    
-    def transpose(self, *args):
-        """Transpose the matrix."""
-        if len(args) > 0:
-            # If indices are provided, use the standalone transpose function
-            return transpose(self, *args)
-        else:
-            # Otherwise, use the simple transpose that swaps last two dimensions
-            new_impl = self._impl.transpose()
-            return Qarray(new_impl, self._qdims, self._bdims)
 
     def expm(self):
         return expm(self)
@@ -904,18 +878,19 @@ class Qarray:
         return collapse(self, mode=mode)
 
 
-# Import all the operation functions from the old implementation
-# These will work with the new Qarray class since we maintain the same interface
-
-# We'll need to import these functions - for now, let's import them from the old qarray
-# In the actual implementation, we'll need to move these functions here or import them properly
-
-# For now, let's create placeholder functions that delegate to the old implementation
-# This ensures backward compatibility while we implement the new architecture
+# Qarray operations ---------------------------------------------------------------------
 
 def concatenate(qarr_list: List[Qarray], axis: int = 0) -> Qarray:
-    """Concatenate a list of Qarrays along a specified axis."""
-    # For now, implement concatenate directly to avoid circular imports
+    """Concatenate a list of Qarrays along a specified axis.
+
+    Args:
+        qarr_list (List[Qarray]): List of Qarrays to concatenate.
+        axis (int): Axis along which to concatenate. Default is 0.
+
+    Returns:
+        Qarray: Concatenated Qarray.
+    """
+
     non_empty_qarr_list = [qarr for qarr in qarr_list if len(qarr.data) != 0]
 
     if len(non_empty_qarr_list) == 0:
@@ -929,12 +904,21 @@ def concatenate(qarr_list: List[Qarray], axis: int = 0) -> Qarray:
     return Qarray.create(concatenated_data, dims=dims)
 
 def collapse(qarr: Qarray, mode="sum") -> Qarray:
-    """Collapse the Qarray."""
+    """Collapse the Qarray.
+
+    Args:
+        qarr (Qarray): quantum array array
+
+    Returns:
+        Collapsed quantum array
+    """
+
     if mode == "sum":
         if len(qarr.bdims) == 0:
             return qarr
 
         batch_axes = list(range(len(qarr.bdims)))
+        
         # Preserve implementation type
         implementation = qarr.impl_type
         return Qarray.create(jnp.sum(qarr.data, axis=batch_axes), dims=qarr.dims, implementation=implementation)
@@ -960,7 +944,7 @@ def transpose(qarr: Qarray, indices: List[int]) -> Qarray:
     full_data = shaped_data.reshape(*qarr.bdims, full_dims, -1)
     
     # Preserve implementation type
-    implementation = "sparse" if qarr.is_sparse else "dense"
+    implementation = qarr.impl_type
     return Qarray.create(full_data, dims=new_dims, implementation=implementation)
 
 def unit(qarr: Qarray) -> Qarray:
@@ -968,7 +952,7 @@ def unit(qarr: Qarray) -> Qarray:
     data = qarr.data
     data = data / qarr.norm()
     # Preserve implementation type
-    implementation = "sparse" if qarr.is_sparse else "dense"
+    implementation = qarr.impl_type
     return Qarray.create(data, dims=qarr.dims, implementation=implementation)
 
 def norm(qarr: Qarray) -> float:
@@ -1097,7 +1081,7 @@ def keep_only_diag_elements(qarr: Qarray) -> Qarray:
     dims = qarr.dims
     data = jnp.diag(jnp.diag(qarr.data))
     # Preserve implementation type
-    implementation = "sparse" if qarr.is_sparse else "dense"
+    implementation = qarr.impl_type
     return Qarray.create(data, dims=dims, implementation=implementation)
 
 def to_ket(qarr: Qarray) -> Qarray:
@@ -1141,6 +1125,7 @@ def ptrace(qarr: Qarray, indx) -> Qarray:
     """Partial Trace."""
     # Convert to dense for ptrace
     dense_qarr = qarr.to_dense()
+    dense_qarr = ket2dm(dense_qarr)
     rho = dense_qarr.shaped_data
     dims = dense_qarr.dims
 
@@ -1207,4 +1192,4 @@ def powm_data(data: Array, n: int) -> Array:
     return jnp.linalg.matrix_power(data, n)
 
 
-ARRAY_TYPES = (Array, Qarray)
+ARRAY_TYPES = (Array, ndarray, Qarray)
