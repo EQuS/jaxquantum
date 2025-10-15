@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from flax import struct
 from jax import Array, config
-from typing import List, Union, TypeVar, Generic
+from typing import List, Union, TypeVar, Generic, overload, Literal, Any
 import jax.numpy as jnp
 import jax.scipy as jsp
 from jax.experimental import sparse
@@ -290,13 +290,29 @@ class SparseImpl(QarrayImpl):
 
 
 @struct.dataclass
-class Qarray:
+class Qarray(Generic[ImplT]):
     """Quantum array with implementation-based architecture."""
-    _impl: QarrayImpl
+    _impl: ImplT
     _qdims: Qdims = struct.field(pytree_node=False)
     _bdims: tuple[int] = struct.field(pytree_node=False)
 
     # Initialization ----
+    @classmethod
+    @classmethod
+    @overload
+    def create(cls, data, dims=None, bdims=None, implementation: Literal[QarrayImplType.DENSE] = QarrayImplType.DENSE) -> "Qarray[DenseImpl]":
+        ...
+
+    @classmethod
+    @overload
+    def create(cls, data, dims=None, bdims=None, implementation: Literal[QarrayImplType.SPARSE] = ...) -> "Qarray[SparseImpl]":
+        ...
+
+    @classmethod
+    @overload
+    def create(cls, data, dims=None, bdims=None, implementation=...) -> "Qarray[DenseImpl]":
+        ...
+
     @classmethod
     def create(cls, data, dims=None, bdims=None, implementation=QarrayImplType.DENSE):
         """Create a Qarray from data.
@@ -352,6 +368,13 @@ class Qarray:
         # We could instead use this tidy_up where we think we need it.
         data = tidy_up(data, SETTINGS["auto_tidyup_atol"])
 
+        # Normalize implementation argument to enum (accept string aliases)
+        if isinstance(implementation, str):
+            impl_lower = implementation.lower()
+            if impl_lower == "sparse":
+                implementation = QarrayImplType.SPARSE
+            elif impl_lower == "dense":
+                implementation = QarrayImplType.DENSE
         # Create implementation
         if implementation == QarrayImplType.SPARSE:
             impl = SparseImpl(sparse.BCOO.fromdense(data))
@@ -361,9 +384,26 @@ class Qarray:
         return cls(impl, qdims, bdims)
 
     @classmethod
+    @classmethod
+    @overload
+    def from_sparse(cls, data, dims=None, bdims=None) -> "Qarray[SparseImpl]":
+        ...
+
+    @classmethod
     def from_sparse(cls, data, dims=None, bdims=None):
         """Create a Qarray from sparse data."""
         return cls.create(data.todense(), dims=dims, bdims=bdims, implementation=QarrayImplType.SPARSE)
+
+    @classmethod
+    @classmethod
+    @overload
+    def from_list(cls, qarr_list: List["Qarray[DenseImpl]"]) -> "Qarray[DenseImpl]":
+        ...
+
+    @classmethod
+    @overload
+    def from_list(cls, qarr_list: List["Qarray[SparseImpl]"]) -> "Qarray[SparseImpl]":
+        ...
 
     @classmethod
     def from_list(cls, qarr_list: List[Qarray]) -> Qarray:
@@ -393,6 +433,17 @@ class Qarray:
             implementation = QarrayImplType.DENSE
 
         return cls.create(data, dims=dims, bdims=bdims, implementation=implementation)
+
+    @classmethod
+    @classmethod
+    @overload
+    def from_array(cls, qarr_arr: "Qarray[DenseImpl]") -> "Qarray[DenseImpl]":
+        ...
+
+    @classmethod
+    @overload
+    def from_array(cls, qarr_arr: "Qarray[SparseImpl]") -> "Qarray[SparseImpl]":
+        ...
 
     @classmethod
     def from_array(cls, qarr_arr) -> Qarray:
@@ -490,14 +541,14 @@ class Qarray:
         """Get the implementation type."""
         return self._impl.get_impl_type()
 
-    def to_sparse(self):
+    def to_sparse(self) -> "Qarray[SparseImpl]":
         """Convert to sparse implementation."""
         if self.is_sparse:
             return self
         new_impl = self._impl.to_sparse()
         return Qarray(new_impl, self._qdims, self._bdims)
 
-    def to_dense(self):
+    def to_dense(self) -> "Qarray[DenseImpl]":
         """Convert to dense implementation."""
         if self.is_dense:
             return self
@@ -925,6 +976,9 @@ def collapse(qarr: Qarray, mode="sum") -> Qarray:
 
 def transpose(qarr: Qarray, indices: List[int]) -> Qarray:
     """Transpose the quantum array."""
+
+    qarr = qarr.to_dense()
+    
     indices = list(indices)
 
     shaped_data = qarr.shaped_data
@@ -1191,5 +1245,9 @@ def powm_data(data: Array, n: int) -> Array:
     """Matrix power."""
     return jnp.linalg.matrix_power(data, n)
 
+
+# Type aliases for readability
+DenseQarray = Qarray[DenseImpl]
+SparseQarray = Qarray[SparseImpl]
 
 ARRAY_TYPES = (Array, ndarray, Qarray)
