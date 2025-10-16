@@ -10,6 +10,8 @@ from jax._src.scipy.special import gammaln
 import jax.numpy as jnp
 import numpy as np
 
+from typing import Literal
+
 config.update("jax_enable_x64", True)
 
 
