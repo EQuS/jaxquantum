@@ -1,6 +1,7 @@
 """Oscillator gates."""
 
-from jaxquantum.core.operators import displace, basis, destroy, create, num
+from jaxquantum.core.operators import (displace, basis, destroy, create, num,
+                                       identity)
 from jaxquantum.circuits.gates import Gate
 from jax.scipy.special import factorial
 import jax.numpy as jnp
@@ -187,4 +188,45 @@ def selfKerr(N, K):
         params={"Kerr": K},
         gen_U=lambda params: (-1.0j * K / 2 * (a.dag() @ a.dag() @ a @ a)).expm(),
         num_modes=1,
+    )
+
+
+def _Reset_Deph_Kraus_Op(N, p, t_rst, chi, l, max_l):
+
+    if l == 0:
+        K_0 = (basis(2, 0) @ basis(2, 0).dag()) ^ identity(N)
+        return K_0
+    if l == 1:
+        K_1 = jnp.sqrt(p) * (basis(2, 1) @ basis(2, 1).dag()) ^ (
+                    -1.j * chi * t_rst * num(N)).expm()
+        return K_1
+
+    ls = jnp.arange(2, max_l, 1)
+
+    normalization_factor = (1 - p) / jnp.sum(
+        -(jnp.log(p) * p ** ((ls - 2) / (max_l - 1))) / ((max_l - 1)))
+
+    prefactor = (jnp.sqrt(-(jnp.log(p) * p ** ((l - 2) / (max_l - 1))) / (
+    (max_l - 1))) * jnp.sqrt(normalization_factor))
+
+    K_i = (
+            prefactor *
+            ((basis(2, 0) @ basis(2, 1).dag()) ^
+             (-1.j * chi * t_rst * (l - 2) / (max_l - 1) * num(N)).expm())
+    )
+
+    return K_i
+
+
+def Dephasing_Reset(N, p, t_rst, chi, max_l):
+    kmap = lambda params: Qarray.from_list(
+        [_Reset_Deph_Kraus_Op(N, p, t_rst, chi, l, max_l) for l in
+         range(max_l)]
+    )
+    return Gate.create(
+        [2, N],
+        name="Dephasing_Reset",
+        params={"p": p, "t_rst": t_rst, "chi": chi, "max_l": max_l},
+        gen_KM=kmap,
+        num_modes=2,
     )
