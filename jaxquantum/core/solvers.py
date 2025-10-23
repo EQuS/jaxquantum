@@ -60,6 +60,12 @@ def solve(f, ρ0, tlist, saveat_tlist, args, solver_options: Optional[
     """Gets teh desired solver from diffrax.
 
     Args:
+        f: function defining the ODE
+        ρ0: initial state
+        tlist: time list
+        saveat_tlist: list of times at which to save the state
+            pass in [-1] to save only at final time
+        args: additional arguments to f
         solver_options: dictionary with solver options
 
     Returns:
@@ -119,7 +125,9 @@ def mesolve(
         H: time dependent Hamiltonian function or time-independent Qarray.
         rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
         tlist: time list
-        saveat_tlist: list of times at which to save the state. If None, save at all times in tlist. Default: None.
+        saveat_tlist: list of times at which to save the state.
+            If -1 or [-1], save only at final time.
+            If None, save at all times in tlist. Default: None.
         c_ops: qarray list of collapse operators
         solver_options: SolverOptions with solver options
 
@@ -171,6 +179,9 @@ def _mesolve_data(
         H: time dependent Hamiltonian function or time-independent Array.
         rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
         tlist: time list
+        saveat_tlist: list of times at which to save the state
+            If -1 or [-1], save only at final time.
+            If None, save at all times in tlist. Default: None.
         c_ops: qarray list of collapse operators
         solver_options: SolverOptions with solver options
 
@@ -244,7 +255,9 @@ def sesolve(
         H: time dependent Hamiltonian function or time-independent Qarray.
         rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
         tlist: time list
-        saveat_tlist: list of times at which to save the state. If None, save at all times in tlist. Default: None.
+        saveat_tlist: list of times at which to save the state.
+            If -1 or [-1], save only at final time.
+            If None, save at all times in tlist. Default: None.
         solver_options: SolverOptions with solver options
 
     Returns:
@@ -290,6 +303,9 @@ def _sesolve_data(
         H: time dependent Hamiltonian function or time-independent Array.
         rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
         tlist: time list
+        saveat_tlist: list of times at which to save the state.
+            If -1 or [-1], save only at final time.
+            If None, save at all times in tlist. Default: None.
         solver_options: SolverOptions with solver options
 
     Returns:
@@ -331,7 +347,9 @@ def propagator(
         ts (float or Array):
             A single time point or
             an Array of time points.
-        saveat_tlist: list of times at which to save the state. If None, save at all times in tlist. Default: None.
+        saveat_tlist: list of times at which to save the state.
+            If -1 or [-1], save only at final time.
+            If None, save at all times in tlist. Default: None.
 
     Returns:
         Qarray or List[Qarray]:
