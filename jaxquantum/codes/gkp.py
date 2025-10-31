@@ -129,8 +129,6 @@ class GKPQubit(BosonicQubit):
         # capture 6 sigmas of the envelope for a value of delta of 0.02.
         # delta * (truncat_series*2*sqrt(pi)) = 6
 
-        
-
 
         q_points = jnp.sqrt(jnp.pi) * (2 * jnp.arange(series_trunc) + mu)
 
@@ -145,7 +143,7 @@ class GKPQubit(BosonicQubit):
 
         psi = psi.at[::2].set(psi_even)
 
-        psi = jqt.Qarray.create(jnp.array(psi))
+        psi = jqt.Qarray.create(jnp.array(psi)[:dim])
 
         return psi.unit()
 
