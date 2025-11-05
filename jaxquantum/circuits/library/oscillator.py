@@ -100,8 +100,8 @@ def CR(N, theta):
         [2, N],
         name="CR",
         params={"theta": theta},
-        gen_U=lambda params: (gg ^ (-1.j*theta/2*destroy(N)@create(N)).expm())
-        + (ee ^ (1.j*theta/2*destroy(N)@create(N)).expm()),
+        gen_U=lambda params: (gg ^ (-1.j*theta/2*create(N)@destroy(N)).expm())
+        + (ee ^ (1.j*theta/2*create(N)@destroy(N)).expm()),
         num_modes=2,
     )
 
