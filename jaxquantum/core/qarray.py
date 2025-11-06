@@ -1131,6 +1131,8 @@ def unit(qarr: Qarray) -> Qarray:
 
 
 def norm(qarr: Qarray) -> float:
+    qarr = qarr.to_dense() # TODO: support sparse norm!
+
     qdata = qarr.data
     bdims = qarr.bdims
 
