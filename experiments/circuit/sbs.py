@@ -53,8 +53,6 @@ def CD_Ancilla_Decay(N, beta, gamma_t, max_l):
 
 
 
-
-
 def sbs(initial_state,
         delta,
         sd_ratio,
@@ -80,7 +78,7 @@ def sbs(initial_state,
         return jax.lax.max(t_CD_floor, jnp.polyval(t_CD_p, beta)) #ns
 
     t_CDs = jax.vmap(t_CD)(jnp.abs(alphas))
-    t_CDs = jnp.array([456, 1344, 456, 456, 1344, 456])
+    t_CDs = jnp.array([456, 1344, 456, 456, 1344, 456]) / error_channels["resonator"]["chi"] * 34e-6*2*jnp.pi
     t_round = t_CDs.sum()+t_sqg*8+t_rst*2
     
     exp = jnp.array([jqt.overlap(observable, initial_state.ptrace(1))])
@@ -131,7 +129,7 @@ def sBs_half_round_circuit(N,
 
     n_bar_qb = error_channels["fluxonium"]["n_bar"]
     n_bar_osc = error_channels["resonator"]["n_bar"]
-    max_l = 5
+    max_l = 16
     
     cirq.append(jqtc.Ry(jnp.pi / 2), 0)
     cirq.append(jqtc.Thermal_Ch_Qb(1-jnp.exp(-t_sqg/error_channels["fluxonium"]["T1"]), n_bar_qb), 0, default_simulate_mode="kraus")
@@ -178,8 +176,7 @@ def sBs_half_round_circuit(N,
     cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_CD[2]/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
     cirq.append(jqtc.Dephasing_Ch(N, 1-jnp.exp(-t_CD[2]/error_channels["resonator"]["Tphi"]), max_l), 1, default_simulate_mode="kraus")
     
-    cirq.append(jqtc.IP_Reset(error_channels["fluxonium"]["reset_p_eg"], error_channels["fluxonium"]["reset_p_ee"]), 0, default_simulate_mode="kraus")
-    # cirq.append(jqtc.CR(N, error_channels["resonator"]["chi"]*t_rst), [0, 1], default_simulate_mode="unitary")
+    cirq.append(jqtc.Dephasing_Reset(N, error_channels["fluxonium"]["reset_p_ee"], error_channels["fluxonium"]["t_rst"], error_channels["resonator"]["chi"], max_l), [0, 1], default_simulate_mode="kraus")
     cirq.append(jqtc.Thermal_Ch_Qb(1-jnp.exp(-t_rst/error_channels["fluxonium"]["T1"]), n_bar_qb), 0, default_simulate_mode="kraus")
     cirq.append(jqtc.Dephasing_Ch_Qb(1-jnp.exp(-t_rst/error_channels["fluxonium"]["Tphi"])), 0, default_simulate_mode="kraus")
     cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_rst/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")

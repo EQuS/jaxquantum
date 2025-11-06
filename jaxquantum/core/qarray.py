@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from flax import struct
-from jax import Array, config
+from jax import Array, config, vmap
 from typing import List, Union, TypeVar, Generic, overload, Literal, Any
 import jax.numpy as jnp
 import jax.scipy as jsp
@@ -28,6 +28,29 @@ class QarrayImplType(Enum):
     """Enumeration of available Qarray implementation types."""
     DENSE = "dense"
     SPARSE = "sparse"
+
+    @classmethod
+    def has(cls, x) -> bool:
+        """Return True if x corresponds to a member of QarrayImplType.
+
+        Accepts:
+        - an existing QarrayImplType member
+        - a string equal to the member name or value (case-insensitive)
+        - an implementation class (e.g. DenseImpl, SparseImpl) if available
+        """
+        if isinstance(x, cls):
+            return True
+
+        if isinstance(x, str):
+            xl = x.lower()
+            return any(xl == member.value or xl == member.name.lower() for member in cls)
+
+        # Try mapping from an implementation class to an enum member
+        try:
+            cls.from_impl_class(x)
+            return True
+        except Exception:
+            return False
     
     @classmethod
     def from_impl_class(cls, impl_class) -> "QarrayImplType":
@@ -49,15 +72,13 @@ class QarrayImplType(Enum):
             raise ValueError(f"No implementation class for type: {self}")
 
 
-def tidy_up(data, atol):
-    """Tidy up small values in data."""
-    data_re = jnp.real(data)
-    data_im = jnp.imag(data)
-    data_re_mask = jnp.abs(data_re) > atol
-    data_im_mask = jnp.abs(data_im) > atol
-    data_new = data_re * data_re_mask + 1j * data_im * data_im_mask
-    return data_new
 
+
+def robust_asarray(data) -> Union[Array, sparse.BCOO]:
+    """Convert data to JAX array or sparse BCOO array."""
+    if isinstance(data, sparse.BCOO):
+        return data
+    return jnp.asarray(data)
 
 class QarrayImpl(ABC):
     """Abstract base class for Qarray implementations."""
@@ -66,6 +87,14 @@ class QarrayImpl(ABC):
     def get_data(self) -> Array:
         """Get the underlying data array."""
         pass
+
+    @property 
+    def data(self) -> Array:
+        return self.get_data()
+
+    @property
+    def impl_type(self) -> QarrayImplType:
+        return QarrayImplType.from_impl_class(type(self))
     
     @abstractmethod
     def matmul(self, other: "QarrayImpl") -> "QarrayImpl":
@@ -111,12 +140,15 @@ class QarrayImpl(ABC):
     def dtype(self):
         """Get dtype of data."""
         pass
-    
+
     @abstractmethod
-    def get_impl_type(self) -> QarrayImplType:
-        """Get the implementation type."""
+    def __deepcopy__(self, memo=None):
         pass
 
+    @abstractmethod
+    def tidy_up(self, atol):
+        """Tidy up small values in data."""
+        pass
 
 @struct.dataclass
 class DenseImpl(QarrayImpl):
@@ -191,9 +223,24 @@ class DenseImpl(QarrayImpl):
         """Element-wise complex conjugate."""
         return DenseImpl(jnp.conj(self._data))
     
-    def get_impl_type(self) -> QarrayImplType:
-        return QarrayImplType.DENSE
+    def __deepcopy__(self, memo=None):
+        return DenseImpl(
+            _data=deepcopy(self._data, memo)
+        )
 
+    def tidy_up(self, atol):
+        """Tidy up small values in data."""
+
+        data = self._data
+        data_re = jnp.real(data)
+        data_im = jnp.imag(data)
+        data_re_mask = jnp.abs(data_re) > atol
+        data_im_mask = jnp.abs(data_im) > atol
+        data_new = data_re * data_re_mask + 1j * data_im * data_im_mask
+
+        return DenseImpl(
+            _data=data_new
+        )
 
 @struct.dataclass
 class SparseImpl(QarrayImpl):
@@ -255,6 +302,12 @@ class SparseImpl(QarrayImpl):
     def to_dense(self) -> "DenseImpl":
         return DenseImpl(self._data.todense())
     
+    @classmethod
+    def _to_sparse(cls, data) -> sparse.BCOO:
+        if isinstance(data, sparse.BCOO):
+            return data
+        return sparse.BCOO.fromdense(data)
+
     def to_sparse(self) -> "SparseImpl":
         return self
     
@@ -270,24 +323,66 @@ class SparseImpl(QarrayImpl):
         # This avoids converting to dense
         return jnp.sqrt(jnp.sum(jnp.abs(self._data.data) ** 2))
     
+    @classmethod
+    def _real(cls, data):
+        return sparse.BCOO(
+            (jnp.real(data.data), data.indices), 
+            shape=data.shape
+        )
+
     def real(self) -> QarrayImpl:
         """Element-wise real part."""
-        return SparseImpl(sparse.BCOO((jnp.real(self._data.data), self._data.indices), 
-                                      shape=self._data.shape))
+        return SparseImpl(SparseImpl._real(self._data))
     
+    @classmethod
+    def _imag(cls, data):
+        return sparse.BCOO(
+            (jnp.imag(data.data), data.indices), 
+            shape=data.shape
+        )
+
     def imag(self) -> QarrayImpl:
         """Element-wise imaginary part."""
-        return SparseImpl(sparse.BCOO((jnp.imag(self._data.data), self._data.indices), 
-                                      shape=self._data.shape))
+        return SparseImpl(SparseImpl._imag(self._data))
     
+    @classmethod
+    def _conj(cls, data):
+        return sparse.BCOO(
+            (jnp.conj(data.data), data.indices), 
+            shape=data.shape
+        )
+
     def conj(self) -> QarrayImpl:
         """Element-wise complex conjugate."""
-        return SparseImpl(sparse.BCOO((jnp.conj(self._data.data), self._data.indices), 
-                                      shape=self._data.shape))
-    
-    def get_impl_type(self) -> QarrayImplType:
-        return QarrayImplType.SPARSE
+        return SparseImpl(SparseImpl._conj(self._data))
 
+    @classmethod
+    def _abs(cls, data):
+        return sparse.sparsify(jnp.abs)(data)
+
+    def abs(self) -> QarrayImpl:
+        """Element-wise absolute value."""
+        return SparseImpl(SparseImpl._abs(self._data))
+    
+    def __deepcopy__(self, memo=None):
+        return SparseImpl(
+            _data=deepcopy(self._data, memo)
+        )
+
+    def tidy_up(self, atol):
+    #     """Tidy up small values in data."""
+
+    #     data = self._data
+    #     data_re = SparseImpl._real(data)
+    #     data_im = SparseImpl._imag(data)
+    #     data_re_mask = SparseImpl._abs(data_re) > atol
+    #     data_im_mask = SparseImpl._abs(data_im) > atol # NOTE: This does not work for sparse arrays
+    #     data_new = data_re * data_re_mask + 1j * data_im * data_im_mask
+
+    #     return SparseImpl(
+    #         _data=data_new
+    #     )
+        pass
 
 @struct.dataclass
 class Qarray(Generic[ImplT]):
@@ -316,7 +411,7 @@ class Qarray(Generic[ImplT]):
     @classmethod
     def create(cls, data, dims=None, bdims=None, implementation=QarrayImplType.DENSE):
         """Create a Qarray from data.
-        
+
         Args:
             data: Input data array
             dims: Quantum dimensions
@@ -324,7 +419,7 @@ class Qarray(Generic[ImplT]):
             implementation: QarrayImplType.DENSE or QarrayImplType.SPARSE
         """
         # Step 1: Prepare data ----
-        data = jnp.asarray(data)
+        data = robust_asarray(data)
 
         if len(data.shape) == 1 and data.shape[0] > 0:
             data = data.reshape(data.shape[0], 1)
@@ -365,21 +460,17 @@ class Qarray(Generic[ImplT]):
         # NOTE: Constantly tidying up on Qarray creation might be a bit overkill.
         # It increases the compilation time, but only very slightly
         # increased the runtime of the jit compiled function.
-        # We could instead use this tidy_up where we think we need it.
-        data = tidy_up(data, SETTINGS["auto_tidyup_atol"])
-
-        # Normalize implementation argument to enum (accept string aliases)
-        if isinstance(implementation, str):
-            impl_lower = implementation.lower()
-            if impl_lower == "sparse":
-                implementation = QarrayImplType.SPARSE
-            elif impl_lower == "dense":
-                implementation = QarrayImplType.DENSE
-        # Create implementation
+        # We could instead use this tidy up where we think we need it.
+        
+        implementation = QarrayImplType(implementation)
         if implementation == QarrayImplType.SPARSE:
-            impl = SparseImpl(sparse.BCOO.fromdense(data))
-        else:
+            impl = SparseImpl(SparseImpl._to_sparse(data))
+            # impl = impl.tidy_up(SETTINGS["auto_tidyup_atol"])
+            # Sparse tidy up is currently not implemented.
+
+        elif implementation == QarrayImplType.DENSE:
             impl = DenseImpl(data)
+            impl = impl.tidy_up(SETTINGS["auto_tidyup_atol"])
 
         return cls(impl, qdims, bdims)
 
@@ -514,7 +605,7 @@ class Qarray(Generic[ImplT]):
 
     @property
     def data(self):
-        return self._impl.get_data()
+        return self._impl.data
 
     @property
     def shaped_data(self):
@@ -530,16 +621,16 @@ class Qarray(Generic[ImplT]):
 
     @property
     def is_sparse(self):
-        return self._impl.get_impl_type() == QarrayImplType.SPARSE
+        return self._impl.impl_type == QarrayImplType.SPARSE
 
     @property
     def is_dense(self):
-        return self._impl.get_impl_type() == QarrayImplType.DENSE
+        return self._impl.impl_type == QarrayImplType.DENSE
     
     @property
     def impl_type(self):
         """Get the implementation type."""
-        return self._impl.get_impl_type()
+        return self._impl.impl_type
 
     def to_sparse(self) -> "Qarray[SparseImpl]":
         """Convert to sparse implementation."""
@@ -661,9 +752,16 @@ class Qarray(Generic[ImplT]):
     def __matmul__(self, other):
         if not isinstance(other, Qarray):
             return NotImplemented
+        
         _qdims_new = self._qdims @ other._qdims
         new_impl = self._impl.matmul(other._impl)
-        return Qarray(new_impl, _qdims_new, self._bdims)
+        
+        return Qarray.create(
+            new_impl.data, 
+            dims=_qdims_new.dims,
+            implementation=new_impl.impl_type,
+        )
+
 
     def __mul__(self, other):
         if isinstance(other, Qarray):
@@ -672,14 +770,26 @@ class Qarray(Generic[ImplT]):
         other = other + 0.0j
         if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
             other = other.reshape(other.shape + (1, 1))
-            # Update batch dimensions if we're multiplying by a batched scalar
-            if len(other.shape) > 2:  # other has batch dimensions
-                new_bdims = other.shape[:-2] + self._bdims
-                new_impl = self._impl.mul(other)
-                return Qarray(new_impl, self._qdims, new_bdims)
+
+        return Qarray.create(
+            other * self.data,
+            dims=self._qdims.dims,
+        )
+
+    def __mul__(self, other):
+        if isinstance(other, Qarray):
+            return self.__matmul__(other)
+
+        other = other + 0.0j
+        if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
+            other = other.reshape(other.shape + (1, 1))
 
         new_impl = self._impl.mul(other)
-        return Qarray(new_impl, self._qdims, self._bdims)
+        return Qarray.create(
+            new_impl.data, 
+            dims=self._qdims.dims,
+            implementation=new_impl.impl_type,
+        )
 
     def __rmul__(self, other):
         return self.__mul__(other)
@@ -706,7 +816,11 @@ class Qarray(Generic[ImplT]):
                 )
                 raise ValueError(msg)
             new_impl = self._impl.add(other._impl)
-            return Qarray(new_impl, self._qdims, self._bdims)
+            return Qarray.create(
+                new_impl.data, 
+                dims=self.dims, 
+                implementation=new_impl.impl_type,
+            )
 
         if robust_isscalar(other) and other == 0:
             return self.copy()
@@ -719,6 +833,7 @@ class Qarray(Generic[ImplT]):
                 other * jnp.eye(self.data.shape[-2], dtype=self.data.dtype),
                 dims=self.dims,
             )
+            # TODO: move this math into implementaiton to support sparse!
             return self.__add__(other)
 
         return NotImplemented
@@ -737,7 +852,11 @@ class Qarray(Generic[ImplT]):
                 )
                 raise ValueError(msg)
             new_impl = self._impl.sub(other._impl)
-            return Qarray(new_impl, self._qdims, self._bdims)
+            return Qarray.create(
+                new_impl.data, 
+                dims=self.dims, 
+                implementation=new_impl.impl_type,
+            )
 
         if robust_isscalar(other) and other == 0:
             return self.copy()
@@ -750,6 +869,7 @@ class Qarray(Generic[ImplT]):
                 other * jnp.eye(self.data.shape[-2], dtype=self.data.dtype),
                 dims=self.dims,
             )
+            # TODO: move this math into implementaiton to support sparse!
             return self.__sub__(other)
 
         return NotImplemented
@@ -847,9 +967,7 @@ class Qarray(Generic[ImplT]):
 
     # Conversions / Reshaping ----
     def dag(self):
-        new_impl = self._impl.dag()
-        dims = self.dims[::-1]
-        return Qarray(new_impl, Qdims(dims), self._bdims)
+        return dag(self)
 
     def to_dm(self):
         return ket2dm(self)
@@ -883,17 +1001,30 @@ class Qarray(Generic[ImplT]):
     def real(self):
         """Element-wise real part."""
         new_impl = self._impl.real()
-        return Qarray(new_impl, self._qdims, self._bdims)
+        return Qarray.create(
+            new_impl.data, 
+            dims=self.dims,
+            implementation=new_impl.impl_type,
+        )
     
     def imag(self):
         """Element-wise imaginary part."""
         new_impl = self._impl.imag()
-        return Qarray(new_impl, self._qdims, self._bdims)
+        
+        return Qarray.create(
+            new_impl.data, 
+            dims=self.dims,
+            implementation=new_impl.impl_type,
+        )
     
     def conj(self):
         """Element-wise complex conjugate."""
         new_impl = self._impl.conj()
-        return Qarray(new_impl, self._qdims, self._bdims)
+        return Qarray.create(
+            new_impl.data, 
+            dims=self.dims, 
+            implementation=new_impl.impl_type,
+        )
 
     def expm(self):
         return expm(self)
@@ -1002,23 +1133,44 @@ def transpose(qarr: Qarray, indices: List[int]) -> Qarray:
     return Qarray.create(full_data, dims=new_dims, implementation=implementation)
 
 def unit(qarr: Qarray) -> Qarray:
-    """Normalize the quantum array."""
-    data = qarr.data
-    data = data / qarr.norm()
-    # Preserve implementation type
-    implementation = qarr.impl_type
-    return Qarray.create(data, dims=qarr.dims, implementation=implementation)
+    """Normalize the quantum array.
+
+    Args:
+        qarr (Qarray): quantum array
+
+    Returns:
+        Normalized quantum array
+    """
+    return qarr / qarr.norm()
+
 
 def norm(qarr: Qarray) -> float:
-    data = qarr.data
-    data_dag = qarr.dag().data
+    qdata = qarr.data
+    bdims = qarr.bdims
 
     if qarr.qtype == Qtypes.oper:
-        evals, _ = jnp.linalg.eigh(data @ data_dag)
-        rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)))
-        return rho_norm
+        qdata_dag = qarr.dag().data
+
+        if len(bdims) > 0:
+            qdata = qdata.reshape(-1, qdata.shape[-2], qdata.shape[-1])
+            qdata_dag = qdata_dag.reshape(-1, qdata_dag.shape[-2], qdata_dag.shape[-1])
+
+            evals, _ = vmap(jnp.linalg.eigh)(qdata @ qdata_dag)
+            rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)), axis=-1)
+            rho_norm = rho_norm.reshape(*bdims)
+            return rho_norm
+        else:
+            evals, _ = jnp.linalg.eigh(qdata @ qdata_dag)
+            rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)))
+            return rho_norm
+        
     elif qarr.qtype in [Qtypes.ket, Qtypes.bra]:
-        return jnp.linalg.norm(data)
+        if len(bdims) > 0:
+            qdata = qdata.reshape(-1, qdata.shape[-2], qdata.shape[-1])
+            return vmap(jnp.linalg.norm)(qdata).reshape(*bdims)
+        else:
+            return jnp.linalg.norm(qdata)
+
 
 def tensor(*args, **kwargs) -> Qarray:
     """Tensor product."""
@@ -1207,7 +1359,11 @@ def dag(qarr: Qarray) -> Qarray:
     """Conjugate transpose."""
     dims = qarr.dims[::-1]
     new_impl = qarr._impl.dag()
-    return Qarray(new_impl, Qdims(dims), qarr._bdims)
+    return Qarray.create(
+        new_impl.data, 
+        dims=dims, 
+        implementation=new_impl.impl_type,
+    )
 
 def dag_data(arr: Array) -> Array:
     """Conjugate transpose.

@@ -417,6 +417,49 @@ def test_eigh():
     assert jnp.isclose(evals[0,1,1], 3.4, rtol=0, atol=1e-9)
 
 
+def test_norm_unit():
+
+    norm_test_array = jnp.array([[1.0, 2.0, 3.0],[4.0, 5.0, 6.0]])
+    ones_test_array = jnp.ones_like(norm_test_array)
+
+    qarr = jqt.coherent(5, jnp.array([[1.0, 2.0, 3.0],[4.0, 5.0, 6.0]]))
+    qarr = qarr / norm_test_array
+    
+    qarr_dm = qarr.to_dm()
+
+
+    # NORM TESTS ----
+
+    # Case 1: batched dm/operator
+    assert jnp.allclose(qarr_dm.norm(), norm_test_array**(-2), rtol=0, atol=1e-6).all()
+
+    # Case 2: batched ket
+    assert jnp.allclose(qarr.norm(), norm_test_array**(-1), rtol=0, atol=1e-6).all()
+
+    # Case 3: single dm/operator
+    assert jnp.isclose(qarr_dm[0,1].norm(), (1/norm_test_array[0,1])**2, rtol=0, atol=1e-6)
+
+    # Case 4: single ket
+    assert jnp.isclose(qarr[0,1].norm(), 1/norm_test_array[0,1], rtol=0, atol=1e-6)
+
+    # ----
+
+
+    # UNIT TESTS ----
+
+    # Case 1: batched dm/operator
+    assert jnp.allclose(qarr_dm.unit().norm(), ones_test_array, rtol=0, atol=1e-6).all()
+
+    # Case 2: batched ket
+    assert jnp.allclose(qarr.unit().norm(), ones_test_array, rtol=0, atol=1e-6).all()
+
+    # Case 3: single dm/operator
+    assert jnp.isclose(qarr_dm[0,1].unit().norm(), 1.0, rtol=0, atol=1e-6)
+
+    # Case 4: single ket
+    assert jnp.isclose(qarr[0,1].unit().norm(), 1.0, rtol=0, atol=1e-6)
+    # ----
+
 
 # =========================================
 
