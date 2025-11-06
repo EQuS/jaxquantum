@@ -90,33 +90,28 @@ def test_sesolve_edge_cases():
 
 def test_mesolve_batch():
     N = 100
+    a = jqt.destroy(N); n = a.dag() @ a
 
-    omega_a = 2.0*jnp.pi*5.0
-    kappa = 2*jnp.pi*jnp.array([1,2]) # Batching to explore two different kappa values!
-    initial_state = jqt.displace(N, 0.1) @ jqt.basis(N,0)
-    initial_state_dm = initial_state.to_dm()
-    ts = jnp.linspace(0, 4*2*jnp.pi/omega_a, 101)
+    omega_a = 2.0*jnp.pi*5.0; H0 = omega_a*n # Hamiltonian
 
-    a = jqt.destroy(N)
-    n = a.dag() @ a
+    kappa = 2*jnp.pi*jnp.array([1,2]); batched_loss_op = jnp.sqrt(kappa)*a; 
+    c_ops = jqt.Qarray.from_list([batched_loss_op]) # collapse operators
 
-    c_ops = jqt.Qarray.from_list([jnp.sqrt(kappa)*a])
+    initial_state = (jqt.displace(N, 0.1) @ jqt.basis(N,0)).to_dm() # initial state
 
-    @jit
-    def Ht(t):
-        H0 = omega_a*n
-        return H0
+    ts = jnp.linspace(0, 4*2*jnp.pi/omega_a, 101) # Time points
 
-    solver_options = jqt.SolverOptions.create(progress_meter=True)
-    states = jqt.mesolve(Ht, initial_state_dm, ts, c_ops=c_ops, solver_options=solver_options) 
-    nt = jnp.real(jqt.overlap(n, states))
-    a_real = jnp.real(jqt.overlap(a, states))
-    a_imag = jnp.imag(jqt.overlap(a, states))
+    solver_options = jqt.SolverOptions.create(progress_meter=True) 
+    states = jqt.mesolve(
+        H0, initial_state, ts, c_ops=c_ops, solver_options=solver_options) # solve
+        
+    n_exp = jnp.real(jqt.overlap(n, states)); a_exp = jqt.overlap(a, states) # expectation values
+
 
     for j in range(2):
         test_time = ts[50]
-        test_nt = nt[50,j]
-        expected_nt = jnp.exp(-kappa[j]*test_time) * jnp.abs(jqt.overlap(n, initial_state_dm))  # Expectation value of n at time t
+        test_nt = n_exp[50,j]
+        expected_nt = jnp.exp(-kappa[j]*test_time) * jnp.abs(jqt.overlap(n, initial_state))  # Expectation value of n at time t
         assert jnp.isclose(test_nt, expected_nt, atol=1e-8), f"Expected {expected_nt}, got {test_nt}"
 
 def test_mesolve():
