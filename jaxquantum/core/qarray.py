@@ -762,20 +762,6 @@ class Qarray(Generic[ImplT]):
             implementation=new_impl.impl_type,
         )
 
-
-    def __mul__(self, other):
-        if isinstance(other, Qarray):
-            return self.__matmul__(other)
-
-        other = other + 0.0j
-        if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
-            other = other.reshape(other.shape + (1, 1))
-
-        return Qarray.create(
-            other * self.data,
-            dims=self._qdims.dims,
-        )
-
     def __mul__(self, other):
         if isinstance(other, Qarray):
             return self.__matmul__(other)
