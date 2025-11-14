@@ -129,13 +129,13 @@ class Transmon(FluxDevice):
         """Return Charge ZPF."""
         return (self.Ej / (32 * self.params["Ec"])) ** (0.25)
 
-    def get_linear_ω(self):
+    def get_linear_frequency(self):
         """Get frequency of linear terms."""
         return jnp.sqrt(8 * self.params["Ec"] * self.Ej)
 
     def get_H_linear(self):
         """Return linear terms in H."""
-        w = self.get_linear_ω()
+        w = self.get_linear_frequency()
         return w * self.original_ops["a_dag"] @ self.original_ops["a"]
 
     def get_H_full(self):

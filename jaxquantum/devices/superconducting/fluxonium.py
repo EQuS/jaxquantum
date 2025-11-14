@@ -42,13 +42,13 @@ class Fluxonium(FluxDevice):
         """Return Phase ZPF."""
         return (2 * self.params["Ec"] / self.params["El"]) ** (0.25)
 
-    def get_linear_ω(self):
+    def get_linear_frequency(self):
         """Get frequency of linear terms."""
         return jnp.sqrt(8 * self.params["Ec"] * self.params["El"])
 
     def get_H_linear(self):
         """Return linear terms in H."""
-        w = self.get_linear_ω()
+        w = self.get_linear_frequency()
         return w * (
             self.linear_ops["a_dag"] @ self.linear_ops["a"]
             + 0.5 * self.linear_ops["id"]
