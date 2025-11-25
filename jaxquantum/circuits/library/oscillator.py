@@ -57,6 +57,35 @@ def CD(N, beta, ts=None):
         num_modes=2,
     )
 
+def ECD(N, beta, ts=None):
+    g = basis(2, 0)
+    e = basis(2, 1)
+
+    eg = e @ g.dag()
+    ge = g @ e.dag()
+
+    # gen_Ht = None
+    # if ts is not None:
+    #     delta_t = ts[-1] - ts[0]
+    #     amp = 1j * beta / delta_t / 2
+    #     a = destroy(N)
+    #     gen_Ht = lambda params: lambda t: (
+    #         eg
+    #         ^ (jnp.conj(amp) * a + amp * a.dag()) + ge
+    #         ^ (jnp.conj(-amp) * a + (-amp) * a.dag())
+    #     )
+
+    return Gate.create(
+        [2, N],
+        name="ECD",
+        params={"beta": beta},
+        gen_U=lambda params: (eg ^ displace(N, params["beta"] / 2))
+        + (ge ^ displace(N, -params["beta"] / 2)),
+        gen_Ht=None,
+        ts=ts,
+        num_modes=2,
+    )
+
 
 def _Ph_Loss_Kraus_Op(N, err_prob, l):
     """ " Returns the Kraus Operators for l-photon loss with probability

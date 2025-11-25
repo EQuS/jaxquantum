@@ -198,16 +198,18 @@ def coherent(N: int, α: complex) -> Qarray:
     return displace(N, α) @ basis(N, 0)
 
 
-def thermal(N: int, beta: float) -> Qarray:
+def thermal_dm(N: int, n: float) -> Qarray:
     """Thermal state.
 
     Args:
         N: Hilbert Space Size.
-        beta: thermal state inverse temperature.
+        n: average photon number.
 
     Return:
         Thermal state.
     """
+
+    beta = jnp.log(1 + 1 / n)
 
     return Qarray.create(
         jnp.where(
