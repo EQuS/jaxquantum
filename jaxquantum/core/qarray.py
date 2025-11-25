@@ -861,8 +861,7 @@ def eigenstates(qarr: Qarray) -> Qarray:
     evecs = jnp.take_along_axis(evecs, idxs_sorted[..., None, :], axis=-1)
 
     # numpy returns [batch, :, i] as the i-th eigenvector
-    # we've also added an extra axis 
-    # we want [batch, i,:] as the i-th eigenvector
+    # we want [batch, i, :] as the i-th eigenvector
     evecs = jnp.swapaxes(evecs, -2, -1)
 
     evecs = Qarray.create(
