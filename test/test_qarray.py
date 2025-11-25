@@ -416,6 +416,17 @@ def test_eigh():
     assert evecs.shape == (2,3,4,4,1)
     assert jnp.isclose(evals[0,1,1], 3.4, rtol=0, atol=1e-9)
 
+    N = 10
+    H = jqt.displace(N, jnp.array([[1.0,2.0,3.0],[4.0,5.0,6.0]]))
+    H = H + H.dag()  # make sure H is Hermitian
+
+    j = 3
+    b_index = (2, 1)
+    assert jnp.allclose(
+        (H[b_index[0]][b_index[1]] @ H.eigenstates()[1][b_index[0]][b_index[1]][j]).data, 
+        (H.eigenenergies()[b_index[0]][b_index[1]][j] * H.eigenstates()[1][b_index[0]][b_index[1]][j]).data
+    )
+
 
 def test_norm_unit():
 
