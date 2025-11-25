@@ -112,7 +112,7 @@ def _simulate_layer(
 
     elif mode == SimulateMode.HAMILTONIAN:
 
-        solver_options = kwargs.get("solver_options", SolverOptions.create(progress_meter=False))
+        solver_options = kwargs.pop("solver_options", SolverOptions.create(progress_meter=False))
 
         Ht = layer.gen_Ht()
         c_ops = layer.gen_c_ops()
@@ -121,9 +121,9 @@ def _simulate_layer(
         ts = ts + start_time
 
         if state.is_dm() or (c_ops is not None and len(c_ops) > 0):
-            intermediate_states = mesolve(Ht, state, ts, c_ops=c_ops, solver_options=solver_options)
+            intermediate_states = mesolve(Ht, state, ts, c_ops=c_ops, solver_options=solver_options, **kwargs)
         else:
-            intermediate_states = sesolve(Ht, state, ts, solver_options=solver_options)
+            intermediate_states = sesolve(Ht, state, ts, solver_options=solver_options, **kwargs)
 
         result = intermediate_states
         state = intermediate_states[-1]

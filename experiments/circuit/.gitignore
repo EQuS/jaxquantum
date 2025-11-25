@@ -2,3 +2,5 @@ data
 data/*
 plots
 plots/*
+tmp/
+tmp/*

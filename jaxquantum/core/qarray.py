@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from flax import struct
-from jax import Array, config
+from jax import Array, config, vmap
 from typing import List, Union
 
 
@@ -630,21 +630,35 @@ def unit(qarr: Qarray) -> Qarray:
     Returns:
         Normalized quantum array
     """
-    data = qarr.data
-    data = data / qarr.norm()
-    return Qarray.create(data, dims=qarr.dims)
+    return qarr / qarr.norm()
 
 
 def norm(qarr: Qarray) -> float:
-    data = qarr.data
-    data_dag = qarr.dag().data
+    qdata = qarr.data
+    bdims = qarr.bdims
 
     if qarr.qtype == Qtypes.oper:
-        evals, _ = jnp.linalg.eigh(data @ data_dag)
-        rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)))
-        return rho_norm
+        qdata_dag = qarr.dag().data
+
+        if len(bdims) > 0:
+            qdata = qdata.reshape(-1, qdata.shape[-2], qdata.shape[-1])
+            qdata_dag = qdata_dag.reshape(-1, qdata_dag.shape[-2], qdata_dag.shape[-1])
+
+            evals, _ = vmap(jnp.linalg.eigh)(qdata @ qdata_dag)
+            rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)), axis=-1)
+            rho_norm = rho_norm.reshape(*bdims)
+            return rho_norm
+        else:
+            evals, _ = jnp.linalg.eigh(qdata @ qdata_dag)
+            rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)))
+            return rho_norm
+        
     elif qarr.qtype in [Qtypes.ket, Qtypes.bra]:
-        return jnp.linalg.norm(data)
+        if len(bdims) > 0:
+            qdata = qdata.reshape(-1, qdata.shape[-2], qdata.shape[-1])
+            return vmap(jnp.linalg.norm)(qdata).reshape(*bdims)
+        else:
+            return jnp.linalg.norm(qdata)
 
 
 def tensor(*args, **kwargs) -> Qarray:

@@ -149,10 +149,12 @@ def IP_Reset(p_eg, p_ee):
     eg = e @ g.dag()
     ee = e @ e.dag()
 
-    k_0 = jnp.sqrt(1 - p_eg) * gg + jnp.sqrt(p_eg) * eg
-    k_1 = jnp.sqrt(p_ee) * ee + jnp.sqrt(1 - p_ee) * ge
+    k_0 = jnp.sqrt(1 - p_eg) * gg
+    k_1 = jnp.sqrt(p_ee) * ee
+    k_2 = jnp.sqrt(p_eg) * eg
+    k_3 = jnp.sqrt(1 - p_ee) * ge
 
-    kmap = Qarray.from_list([k_0, k_1])
+    kmap = Qarray.from_list([k_0, k_1, k_2, k_3])
 
     return Gate.create(
         2,

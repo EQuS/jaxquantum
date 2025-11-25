@@ -13,7 +13,7 @@ REQUIREMENTS = [
     "numpy",
     "matplotlib",
     "qutip",
-    "jax[cpu]",
+    "jax",
     "diffrax",
     "flax",
     "tqdm",

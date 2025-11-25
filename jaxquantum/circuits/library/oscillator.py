@@ -1,6 +1,7 @@
 """Oscillator gates."""
 
-from jaxquantum.core.operators import displace, basis, destroy, create, num
+from jaxquantum.core.operators import (displace, basis, destroy, create, num,
+                                       identity)
 from jaxquantum.circuits.gates import Gate
 from jax.scipy.special import factorial
 import jax.numpy as jnp
@@ -9,6 +10,17 @@ from jaxquantum.utils import hermgauss
 
 
 def D(N, alpha, ts=None, c_ops=None):
+    """Displacement gate.
+
+    Args:
+        N: Hilbert space dimension.
+        alpha: Displacement amplitude.
+        ts: Optional time array for hamiltonian simulation.
+        c_ops: Optional collapse operators.
+
+    Returns:
+        Displacement gate.
+    """
     gen_Ht = None
     if ts is not None:
         delta_t = ts[-1] - ts[0]
@@ -29,6 +41,16 @@ def D(N, alpha, ts=None, c_ops=None):
 
 
 def CD(N, beta, ts=None):
+    """Conditional displacement gate.
+
+    Args:
+        N: Hilbert space dimension.
+        beta: Conditional displacement amplitude.
+        ts: Optional time sequence for hamiltonian simulation.
+
+    Returns:
+        Conditional displacement gate.
+    """
     g = basis(2, 0)
     e = basis(2, 1)
 
@@ -57,7 +79,18 @@ def CD(N, beta, ts=None):
         num_modes=2,
     )
 
+
 def ECD(N, beta, ts=None):
+    """Echoed conditional displacement gate.
+
+    Args:
+        N: Hilbert space dimension.
+        beta: Conditional displacement amplitude.
+        ts: Optional time sequence for hamiltonian simulation.
+
+    Returns:
+        Echoed conditional displacement gate.
+    """
     g = basis(2, 0)
     e = basis(2, 1)
 
@@ -86,8 +119,44 @@ def ECD(N, beta, ts=None):
         num_modes=2,
     )
 
+def CR(N, theta):
+    """Conditional rotation gate.
+
+    Args:
+        N: Hilbert space dimension.
+        theta: Conditional rotation angle.
+
+    Returns:
+        Conditional rotation gate.
+    """
+    g = basis(2, 0)
+    e = basis(2, 1)
+
+    gg = g @ g.dag()
+    ee = e @ e.dag()
+
+
+    return Gate.create(
+        [2, N],
+        name="CR",
+        params={"theta": theta},
+        gen_U=lambda params: (gg ^ (-1.j*theta/2*create(N)@destroy(N)).expm())
+        + (ee ^ (1.j*theta/2*create(N)@destroy(N)).expm()),
+        num_modes=2,
+    )
+
 
 def _Ph_Loss_Kraus_Op(N, err_prob, l):
+    """Returns the Kraus Operators for l-photon loss.
+
+    Args:
+        N: Hilbert space dimension.
+        err_prob: Error probability.
+        l: Number of photons lost.
+
+    Returns:
+        Kraus operator for l-photon loss.
+    """
     """ " Returns the Kraus Operators for l-photon loss with probability
     err_prob in a Hilbert Space of size N"""
     return (
@@ -98,6 +167,16 @@ def _Ph_Loss_Kraus_Op(N, err_prob, l):
 
 
 def Amp_Damp(N, err_prob, max_l):
+    """Amplitude damping channel.
+
+    Args:
+        N: Hilbert space dimension.
+        err_prob: Error probability.
+        max_l: Maximum number of photons lost.
+
+    Returns:
+        Amplitude damping channel.
+    """
     kmap = lambda params: Qarray.from_list(
         [_Ph_Loss_Kraus_Op(N, err_prob, l) for l in range(max_l + 1)]
     )
@@ -111,6 +190,16 @@ def Amp_Damp(N, err_prob, max_l):
 
 
 def _Ph_Gain_Kraus_Op(N, err_prob, l):
+    """Returns the Kraus Operators for l-photon gain.
+
+    Args:
+        N: Hilbert space dimension.
+        err_prob: Error probability.
+        l: Number of photons gained.
+
+    Returns:
+        Kraus operator for l-photon gain.
+    """
     """ " Returns the Kraus Operators for l-photon gain with probability
     err_prob in a Hilbert Space of size N"""
     return (
@@ -121,6 +210,16 @@ def _Ph_Gain_Kraus_Op(N, err_prob, l):
 
 
 def Amp_Gain(N, err_prob, max_l):
+    """Amplitude gain channel.
+
+    Args:
+        N: Hilbert space dimension.
+        err_prob: Error probability.
+        max_l: Maximum number of photons gained.
+
+    Returns:
+        Amplitude gain channel.
+    """
     kmap = lambda params: Qarray.from_list(
         [_Ph_Gain_Kraus_Op(N, err_prob, l) for l in range(max_l + 1)]
     )
@@ -134,6 +233,18 @@ def Amp_Gain(N, err_prob, max_l):
 
 
 def _Thermal_Kraus_Op(N, err_prob, n_bar, l, k):
+    """Returns the Kraus Operators for a thermal channel.
+
+    Args:
+        N: Hilbert space dimension.
+        err_prob: Error probability.
+        n_bar: Average photon number.
+        l: Number of photons gained.
+        k: Number of photons lost.
+
+    Returns:
+        Kraus operator for thermal channel.
+    """
     """ " Returns the Kraus Operators for a thermal channel with probability
     err_prob and average photon number n_bar in a Hilbert Space of size N"""
     return (
@@ -150,11 +261,22 @@ def _Thermal_Kraus_Op(N, err_prob, n_bar, l, k):
 
 
 def Thermal_Ch(N, err_prob, n_bar, max_l):
+    """Thermal channel.
+
+    Args:
+        N: Hilbert space dimension.
+        err_prob: Error probability.
+        n_bar: Average photon number.
+        max_l: Maximum number of photons gained/lost.
+
+    Returns:
+        Thermal channel.
+    """
     kmap = lambda params: Qarray.from_list(
         [
             _Thermal_Kraus_Op(N, err_prob, n_bar, l, k)
             for l in range(max_l + 1)
-            for k in range(l + 1)
+            for k in range(max_l + 1)
         ]
     )
     return Gate.create(
@@ -175,6 +297,16 @@ def _Dephasing_Kraus_Op(N, w, phi):
 
 
 def Dephasing_Ch(N, err_prob, max_l):
+    """Dephasing channel.
+
+    Args:
+        N: Hilbert space dimension.
+        err_prob: Error probability.
+        max_l: Maximum number of kraus operators.
+
+    Returns:
+        Dephasing channel.
+    """
 
     xs, ws = hermgauss(max_l)
     phis = jnp.sqrt(2*err_prob)*xs
@@ -192,6 +324,15 @@ def Dephasing_Ch(N, err_prob, max_l):
     )
 
 def selfKerr(N, K):
+    """Self-Kerr interaction gate.
+
+    Args:
+        N: Hilbert space dimension.
+        K: Kerr coefficient.
+
+    Returns:
+        Self-Kerr gate.
+    """
     a = destroy(N)
     return Gate.create(
         N,
@@ -199,4 +340,71 @@ def selfKerr(N, K):
         params={"Kerr": K},
         gen_U=lambda params: (-1.0j * K / 2 * (a.dag() @ a.dag() @ a @ a)).expm(),
         num_modes=1,
+    )
+
+
+def _Reset_Deph_Kraus_Op(N, p, t_rst, chi, l, max_l):
+    """Returns the Kraus Operators for dephasing during reset.
+
+    Args:
+        N: Hilbert space dimension.
+        p: Reset error probability.
+        t_rst: Reset time.
+        chi: cross-Kerr strength between qubit and resonator.
+        l: Operator index.
+        max_l: Maximum number of operators.
+
+    Returns:
+        Kraus operator for dephasing during reset.
+    """
+
+    if l == 0:
+        K_0 = (basis(2, 0) @ basis(2, 0).dag()) ^ identity(N)
+        return K_0
+    if l == 1:
+        K_1 = jnp.sqrt(p) * (basis(2, 1) @ basis(2, 1).dag()) ^ (
+                    -1.j * chi * t_rst * num(N)).expm()
+        return K_1
+
+    ls = jnp.arange(2, max_l, 1)
+
+    normalization_factor = (1 - p) / jnp.sum(
+        -(jnp.log(p) * p ** ((ls - 2) / (max_l - 1))) / ((max_l - 1)))
+
+    prefactor = (jnp.sqrt(-(jnp.log(p) * p ** ((l - 2) / (max_l - 1))) / (
+    (max_l - 1))) * jnp.sqrt(normalization_factor))
+
+    K_i = (
+            prefactor *
+            ((basis(2, 0) @ basis(2, 1).dag()) ^
+             (-1.j * chi * t_rst * (l - 2) / (max_l - 1) * num(N)).expm())
+    )
+
+    return K_i
+
+
+def Dephasing_Reset(N, p, t_rst, chi, max_l):
+    """Dephasing due to imperfect reset between a qubit and a resonator.
+
+    Args:
+        N: Hilbert space dimension.
+        p: Reset error probability.
+        t_rst: Reset time.
+        chi: Dephasing strength.
+        max_l: Maximum number of operators.
+
+    Returns:
+        Dephasing due to reset channel.
+    """
+
+    kmap = lambda params: Qarray.from_list(
+        [_Reset_Deph_Kraus_Op(N, p, t_rst, chi, l, max_l) for l in
+         range(max_l)]
+    )
+    return Gate.create(
+        [2, N],
+        name="Dephasing_Reset",
+        params={"p": p, "t_rst": t_rst, "chi": chi, "max_l": max_l},
+        gen_KM=kmap,
+        num_modes=2,
     )
