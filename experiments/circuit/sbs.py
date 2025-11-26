@@ -63,6 +63,7 @@ def sbs(initial_state,
         t_CD_p,
         t_rst,
         error_channels,
+        speedup
         ):
 
     l = jnp.sqrt(2*jnp.pi)
@@ -78,7 +79,7 @@ def sbs(initial_state,
         return jax.lax.max(t_CD_floor, jnp.polyval(t_CD_p, beta)) #ns
 
     t_CDs = jax.vmap(t_CD)(jnp.abs(alphas))
-    t_CDs = jnp.array([456, 1344, 456, 456, 1344, 456]) / error_channels["resonator"]["chi"] * 34e-6*2*jnp.pi
+    t_CDs = jnp.array([696, 1912, 696, 696, 1912, 696]) / speedup
     t_round = t_CDs.sum()+t_sqg*8+t_rst*2
     
     exp = jnp.array([jqt.overlap(observable, initial_state.ptrace(1))])
