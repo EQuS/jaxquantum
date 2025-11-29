@@ -152,7 +152,7 @@ class Device(ABC):
         """Set up common ops in the specified basis."""
 
     @abstractmethod
-    def get_linear_ω(self):
+    def get_linear_frequency(self):
         """Get frequency of linear terms."""
 
     @abstractmethod

@@ -72,7 +72,7 @@ class FluxDevice(Device):
     def potential(self, phi):
         """Return potential energy as a function of phi."""
 
-    def plot_wavefunctions(self, phi_vals, max_n=None, which=None, ax=None, mode="abs", ylim=None, y_scale_factor=1, zero_potential=False):
+    def plot_wavefunctions(self, phi_vals, max_n=None, which=None, ax=None, mode="abs", ylim=None, y_scale_factor=1, zero_potential=False, wavefunction_color=None):
         if self.basis == BasisTypes.fock:
             _calculate_wavefunctions = self._calculate_wavefunctions_fock
         elif self.basis == BasisTypes.charge:
@@ -120,10 +120,18 @@ class FluxDevice(Device):
             if max_val is None or curr_max_val > max_val:
                 max_val = curr_max_val
 
+            extra_kwargs = {}
+            if wavefunction_color is not None:
+                if isinstance(wavefunction_color, list):
+                    extra_kwargs["color"] = wavefunction_color[n]
+                else:
+                    extra_kwargs["color"] = wavefunction_color
+
             ax.plot(
-                phi_vals, (wf_vals - min_potential)*y_scale_factor, label=f"$|${n}$\\rangle$", linestyle="-", linewidth=1
+                phi_vals, (wf_vals - min_potential)*y_scale_factor, label=f"$|${n}$\\rangle$", linestyle="-", linewidth=1, **extra_kwargs
             )
-            ax.fill_between(phi_vals, (energy_levels[n] - min_potential)*y_scale_factor, (wf_vals - min_potential)*y_scale_factor, alpha=0.5)
+
+            ax.fill_between(phi_vals, (energy_levels[n] - min_potential)*y_scale_factor, (wf_vals - min_potential)*y_scale_factor, alpha=0.5, **extra_kwargs)
 
         ax.plot(
             phi_vals,

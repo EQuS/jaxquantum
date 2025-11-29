@@ -320,6 +320,7 @@ def plot_cf(
         cbar_label="",
         axis_scale_factor=1,
         plot_cbar=True,
+        plot_grid=True,
         x_ticks=None,
         y_ticks=None,
         z_ticks=None,
@@ -452,9 +453,12 @@ def plot_cf(
                     )
                 ax.set_xticks(x_ticks)
                 ax.set_yticks(y_ticks)
-                ax.axhline(0, linestyle="-", color="black", alpha=0.7)
-                ax.axvline(0, linestyle="-", color="black", alpha=0.7)
-                ax.grid()
+                # ax.axhline(0, linestyle="-", color="black", alpha=0.7)
+                # ax.axvline(0, linestyle="-", color="black", alpha=0.7)
+
+                if plot_grid:
+                    ax.grid()
+                
                 ax.set_aspect("equal", adjustable="box")
 
                 if plot_cbar:
@@ -485,6 +489,7 @@ def plot_cf_wigner(
     cbar_label="",
     axis_scale_factor=1,
     plot_cbar=True,
+    plot_grid=True,
     x_ticks=None,
     y_ticks=None,
     z_ticks=None,
@@ -523,6 +528,7 @@ def plot_cf_wigner(
         cbar_label=cbar_label,
         axis_scale_factor=axis_scale_factor,
         plot_cbar=plot_cbar,
+        plot_grid=plot_grid,
         x_ticks=x_ticks,
         y_ticks=y_ticks,
         z_ticks=z_ticks,

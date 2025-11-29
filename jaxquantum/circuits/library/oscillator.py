@@ -79,6 +79,46 @@ def CD(N, beta, ts=None):
         num_modes=2,
     )
 
+
+def ECD(N, beta, ts=None):
+    """Echoed conditional displacement gate.
+
+    Args:
+        N: Hilbert space dimension.
+        beta: Conditional displacement amplitude.
+        ts: Optional time sequence for hamiltonian simulation.
+
+    Returns:
+        Echoed conditional displacement gate.
+    """
+    g = basis(2, 0)
+    e = basis(2, 1)
+
+    eg = e @ g.dag()
+    ge = g @ e.dag()
+
+    # gen_Ht = None
+    # if ts is not None:
+    #     delta_t = ts[-1] - ts[0]
+    #     amp = 1j * beta / delta_t / 2
+    #     a = destroy(N)
+    #     gen_Ht = lambda params: lambda t: (
+    #         eg
+    #         ^ (jnp.conj(amp) * a + amp * a.dag()) + ge
+    #         ^ (jnp.conj(-amp) * a + (-amp) * a.dag())
+    #     )
+
+    return Gate.create(
+        [2, N],
+        name="ECD",
+        params={"beta": beta},
+        gen_U=lambda params: (eg ^ displace(N, params["beta"] / 2))
+        + (ge ^ displace(N, -params["beta"] / 2)),
+        gen_Ht=None,
+        ts=ts,
+        num_modes=2,
+    )
+
 def CR(N, theta):
     """Conditional rotation gate.
 

@@ -136,9 +136,9 @@ def get_metrics_linear_rar(params):
 
     metrics = {}
 
-    metrics[f"ω_{system.devices[0].label}"] = Es[1, 0, 0] - Es[0, 0, 0]
-    metrics[f"ω_{system.devices[1].label}"] = Es[0, 1, 0] - Es[0, 0, 0]
-    metrics[f"ω_{system.devices[2].label}"] = Es[0, 0, 1] - Es[0, 0, 0]
+    metrics[f"f_{system.devices[0].label}"] = Es[1, 0, 0] - Es[0, 0, 0]
+    metrics[f"f_{system.devices[1].label}"] = Es[0, 1, 0] - Es[0, 0, 0]
+    metrics[f"f_{system.devices[2].label}"] = Es[0, 0, 1] - Es[0, 0, 0]
 
     drive_strength = params.get("ATS__drive_strength", DRIVE_STRENGTH)
     metrics[f"g_ex"] = ϕ["ATS"]["ResonatorA"] * ϕ["ATS"]["ResonatorB"] * drive_strength * ats.params["Ej"]
@@ -153,9 +153,9 @@ def get_devices_normal_rar(params):
     ϕ0, metrics0, system0 = get_metrics_linear_rar(params)
 
     # units are GHz and ns
-    ω_a = metrics0["ω_ResonatorA"]
-    ω_c = metrics0["ω_ATS"]
-    ω_b = metrics0["ω_ResonatorB"]
+    f_a = metrics0["f_ResonatorA"]
+    f_c = metrics0["f_ATS"]
+    f_b = metrics0["f_ResonatorB"]
 
     ϕa_zpf = ϕ0["ResonatorA"]["ResonatorA"]
     ϕc_zpf = ϕ0["ATS"]["ATS"]
@@ -166,9 +166,9 @@ def get_devices_normal_rar(params):
     Ec_over_El_c = ϕc_zpf**4 / 2
     Ec_over_El_b = ϕb_zpf**4 / 2
 
-    Ec_a = jnp.sqrt(ω_a**2 / 8 * Ec_over_El_a)
-    Ec_c = jnp.sqrt(ω_c**2 / 8 * Ec_over_El_c)
-    Ec_b = jnp.sqrt(ω_b**2 / 8 * Ec_over_El_b)
+    Ec_a = jnp.sqrt(f_a**2 / 8 * Ec_over_El_a)
+    Ec_c = jnp.sqrt(f_c**2 / 8 * Ec_over_El_c)
+    Ec_b = jnp.sqrt(f_b**2 / 8 * Ec_over_El_b)
 
     resonator_a = qs.Resonator.create(
         N_CONS["resonator_a"]["truncated"],

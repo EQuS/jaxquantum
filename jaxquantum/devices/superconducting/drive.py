@@ -16,14 +16,14 @@ config.update("jax_enable_x64", True)
 @struct.dataclass
 class Drive(ABC):
     N: int = struct.field(pytree_node=False)
-    ωd: float
+    fd: float
     _label: int = struct.field(pytree_node=False)
 
     @classmethod
-    def create(cls, M_max, ωd, label=0):
+    def create(cls, M_max, fd, label=0):
         cls.M_max = M_max
         N = 2 * M_max + 1
-        return cls(N, ωd, label)
+        return cls(N, fd, label)
 
     @property
     def label(self):
@@ -67,6 +67,6 @@ class Drive(ABC):
 
     def get_H(self):
         """
-        Bare "drive" Hamiltonian (ωd * M) in the extended Hilbert space.
+        Bare "drive" Hamiltonian (fd * M) in the extended Hilbert space.
         """
-        return self.ωd * self.ops["M"]
+        return self.fd * self.ops["M"]
