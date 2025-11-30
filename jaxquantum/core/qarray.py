@@ -71,9 +71,6 @@ class QarrayImplType(Enum):
         else:
             raise ValueError(f"No implementation class for type: {self}")
 
-
-
-
 def robust_asarray(data) -> Union[Array, sparse.BCOO]:
     """Convert data to JAX array or sparse BCOO array."""
     if isinstance(data, sparse.BCOO):
@@ -1045,7 +1042,6 @@ class Qarray(Generic[ImplT]):
     def collapse(self, mode="sum"):
         return collapse(self, mode=mode)
 
-
 # Qarray operations ---------------------------------------------------------------------
 
 def concatenate(qarr_list: List[Qarray], axis: int = 0) -> Qarray:
@@ -1129,7 +1125,6 @@ def unit(qarr: Qarray) -> Qarray:
     """
     return qarr / qarr.norm()
 
-
 def norm(qarr: Qarray) -> float:
     qarr = qarr.to_dense() # TODO: support sparse norm!
 
@@ -1158,7 +1153,6 @@ def norm(qarr: Qarray) -> float:
             return vmap(jnp.linalg.norm)(qdata).reshape(*bdims)
         else:
             return jnp.linalg.norm(qdata)
-
 
 def tensor(*args, **kwargs) -> Qarray:
     """Tensor product."""
@@ -1392,7 +1386,6 @@ def is_dm_data(data: Array) -> bool:
 def powm_data(data: Array, n: int) -> Array:
     """Matrix power."""
     return jnp.linalg.matrix_power(data, n)
-
 
 # Type aliases for readability
 DenseQarray = Qarray[DenseImpl]
