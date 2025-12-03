@@ -366,7 +366,7 @@ def _Reset_Deph_Kraus_Op(N, p, t_rst, chi, l, max_l):
                     -1.j * chi * t_rst * num(N)).expm()
         return K_1
 
-    ls = jnp.arange(2, max_l, 1)
+    ls = jnp.arange(2, max_l+1, 1)
 
     normalization_factor = (1 - p) / jnp.sum(
         -(jnp.log(p) * p ** ((ls - 2) / (max_l - 1))) / ((max_l - 1)))
@@ -399,7 +399,7 @@ def Dephasing_Reset(N, p, t_rst, chi, max_l):
 
     kmap = lambda params: Qarray.from_list(
         [_Reset_Deph_Kraus_Op(N, p, t_rst, chi, l, max_l) for l in
-         range(max_l)]
+         range(max_l+1)]
     )
     return Gate.create(
         [2, N],
