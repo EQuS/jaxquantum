@@ -180,14 +180,21 @@ def CX():
 def _Thermal_Kraus_Ops_Qb(err_prob, n_bar):
     """ " Returns the Kraus Operators for a thermal channel with probability
     err_prob and average photon number n_bar in a Hilbert Space of size 2"""
-    p = n_bar / (n_bar + 1)
+    p0 = (n_bar + 1) / (2*n_bar + 1)
+    p1 = n_bar / (2*n_bar + 1)
     return [
         Qarray.create(
-            jnp.sqrt(1 - p) * jnp.array([[1, 0], [0, jnp.sqrt(1 - err_prob)]])
-        ),
-        Qarray.create(jnp.sqrt(1 - p) * jnp.array([[0, jnp.sqrt(err_prob)], [0, 0]])),
-        Qarray.create(jnp.sqrt(p) * jnp.array([[0, 0], [jnp.sqrt(err_prob), 0]])),
-        Qarray.create(jnp.sqrt(p) * jnp.array([[jnp.sqrt(1 - err_prob), 0], [0, 1]])),
+            jnp.sqrt(p0) * jnp.array([[1, 0],
+                                         [0, jnp.sqrt(1 - err_prob)]])),
+
+        Qarray.create(jnp.sqrt(p0) * jnp.array([[0, jnp.sqrt(err_prob)],
+                                                   [0, 0]])),
+
+        Qarray.create(jnp.sqrt(p1) * jnp.array([[0, 0],
+                                               [jnp.sqrt(err_prob), 0]])),
+
+        Qarray.create(jnp.sqrt(p1) * jnp.array([[jnp.sqrt(1 - err_prob), 0],
+                                               [0, 1]])),
     ]
 
 
