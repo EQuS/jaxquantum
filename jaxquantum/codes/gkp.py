@@ -8,7 +8,7 @@ import warnings
 from jaxquantum.codes.base import BosonicQubit
 import jaxquantum as jqt
 
-from jax import jit, lax, vmap
+from jax import jit, lax, vmap, debug
 
 import jax.numpy as jnp
 
@@ -149,7 +149,11 @@ class GKPQubit(BosonicQubit):
 
         return psi.unit()
 
-    
+
+    @staticmethod
+    def _check_delta_warning(d):
+        if d < 0.02:
+            warnings.warn("State preparation with delta values lower than 0.02 might lead to loss of accuracy.")
 
 
     def _get_basis_z(self) -> Tuple[jqt.Qarray, jqt.Qarray]:
@@ -160,8 +164,7 @@ class GKPQubit(BosonicQubit):
         delta = self.params["delta"]
         dim = self.params["N"]
 
-        if delta<0.02:
-            warnings.warn("State preparation with delta values lower than 0.02 might lead to loss of accuracy.")
+        debug.callback(GKPQubit._check_delta_warning, delta)
         
         jitted_compute_gkp_basis_z = jit(self._compute_gkp_basis_z, 
                                          static_argnames=("dim",))

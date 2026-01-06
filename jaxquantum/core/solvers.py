@@ -376,7 +376,7 @@ def propagator(
 
         basis_states = multi_mode_basis_set(H_first.space_dims)
         results = sesolve(H, basis_states, ts, saveat_tlist=saveat_tlist)
-        propagators_data = results.data.squeeze(-1)
+        propagators_data = results.data.squeeze(-1).mT
         propagators = Qarray.create(propagators_data, dims=H_first.space_dims)
         
         return propagators

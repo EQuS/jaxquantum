@@ -26,8 +26,8 @@ class KNO(Device):
         assert hamiltonian == HamiltonianTypes.full, (
             "Kerr Nonlinear Oscillator uses a full Hamiltonian."
         )
-        assert "ω" in params and "α" in params, (
-            "Kerr Nonlinear Oscillator requires frequency 'ω' and anharmonicity 'α' as parameters."
+        assert "f" in params and "α" in params, (
+            "Kerr Nonlinear Oscillator requires frequency 'f' and anharmonicity 'α' as parameters."
         )
 
     def common_ops(self):
@@ -41,9 +41,9 @@ class KNO(Device):
         ops["n"] = 1j * (ops["a_dag"] - ops["a"]) / jnp.sqrt(2)
         return ops
 
-    def get_linear_ω(self):
+    def get_linear_frequency(self):
         """Get frequency of linear terms."""
-        return self.params["ω"]
+        return self.params["f"]
 
     def get_anharm(self):
         """Get anharmonicity."""
@@ -51,7 +51,7 @@ class KNO(Device):
 
     def get_H_linear(self):
         """Return linear terms in H."""
-        w = self.get_linear_ω()
+        w = self.get_linear_frequency()
         return w * self.linear_ops["a_dag"] @ self.linear_ops["a"]
 
     def get_H_full(self):

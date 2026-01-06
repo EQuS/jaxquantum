@@ -3,10 +3,19 @@
 from jaxquantum.core.operators import (displace, basis, destroy, create, num,
                                        identity)
 from jaxquantum.circuits.gates import Gate
-from jax.scipy.special import factorial
+from jax.scipy.special import factorial, gammaln
 import jax.numpy as jnp
 from jaxquantum import Qarray
 from jaxquantum.utils import hermgauss
+from functools import partial
+from jax import jit
+import jax
+
+def diag_expm(diag_matrix):
+    """Computes expm of a diagonal matrix efficiently (O(N) instead of O(N^3))."""
+    # Extract diagonal, exponentiate elements, put back on diagonal
+    return jnp.diag(jnp.exp(jnp.diagonal(diag_matrix)))
+
 
 
 def D(N, alpha, ts=None, c_ops=None):
@@ -79,6 +88,46 @@ def CD(N, beta, ts=None):
         num_modes=2,
     )
 
+
+def ECD(N, beta, ts=None):
+    """Echoed conditional displacement gate.
+
+    Args:
+        N: Hilbert space dimension.
+        beta: Conditional displacement amplitude.
+        ts: Optional time sequence for hamiltonian simulation.
+
+    Returns:
+        Echoed conditional displacement gate.
+    """
+    g = basis(2, 0)
+    e = basis(2, 1)
+
+    eg = e @ g.dag()
+    ge = g @ e.dag()
+
+    # gen_Ht = None
+    # if ts is not None:
+    #     delta_t = ts[-1] - ts[0]
+    #     amp = 1j * beta / delta_t / 2
+    #     a = destroy(N)
+    #     gen_Ht = lambda params: lambda t: (
+    #         eg
+    #         ^ (jnp.conj(amp) * a + amp * a.dag()) + ge
+    #         ^ (jnp.conj(-amp) * a + (-amp) * a.dag())
+    #     )
+
+    return Gate.create(
+        [2, N],
+        name="ECD",
+        params={"beta": beta},
+        gen_U=lambda params: (eg ^ displace(N, params["beta"] / 2))
+        + (ge ^ displace(N, -params["beta"] / 2)),
+        gen_Ht=None,
+        ts=ts,
+        num_modes=2,
+    )
+
 def CR(N, theta):
     """Conditional rotation gate.
 
@@ -106,193 +155,148 @@ def CR(N, theta):
     )
 
 
-def _Ph_Loss_Kraus_Op(N, err_prob, l):
-    """Returns the Kraus Operators for l-photon loss.
+# --- 2. Optimized Kernels (Using diag_expm) ---
 
-    Args:
-        N: Hilbert space dimension.
-        err_prob: Error probability.
-        l: Number of photons lost.
+@partial(jax.jit, static_argnames=["N", "max_l"])
+def _Amp_Damp_Kraus_Map_JIT(N, err_prob, max_l):
+    n_op = num(N).data
+    a_op = destroy(N).data
 
-    Returns:
-        Kraus operator for l-photon loss.
-    """
-    """ " Returns the Kraus Operators for l-photon loss with probability
-    err_prob in a Hilbert Space of size N"""
-    return (
-        jnp.sqrt(jnp.power(err_prob, l) / factorial(l))
-        * (num(N) * jnp.log(jnp.sqrt(1 - err_prob))).expm()
-        * destroy(N).powm(l)
-    )
+    log_term = jnp.log(jnp.sqrt(1.0 - err_prob))
+    # FIX: Use diag_expm
+    middle_op = diag_expm(n_op * log_term)
 
+    def compute_op(l):
+        prefactor = jnp.sqrt(jnp.power(err_prob, l) / jnp.exp(gammaln(l + 1)))
+        a_pow_l = jnp.linalg.matrix_power(a_op, l)
+        return prefactor * (middle_op @ a_pow_l)
+
+    ls = jnp.arange(max_l + 1)
+    return jax.vmap(compute_op)(ls)
 
 def Amp_Damp(N, err_prob, max_l):
-    """Amplitude damping channel.
-
-    Args:
-        N: Hilbert space dimension.
-        err_prob: Error probability.
-        max_l: Maximum number of photons lost.
-
-    Returns:
-        Amplitude damping channel.
-    """
-    kmap = lambda params: Qarray.from_list(
-        [_Ph_Loss_Kraus_Op(N, err_prob, l) for l in range(max_l + 1)]
+    kmap = lambda params: Qarray.create(
+        _Amp_Damp_Kraus_Map_JIT(params["N"], params["err_prob"], params["max_l"]),
+        dims=[[N], [N]],
+        bdims=(params["max_l"] + 1,)
     )
     return Gate.create(
         N,
         name="Amp_Damp",
-        params={"err_prob": err_prob, "max_l": max_l},
+        params={"err_prob": err_prob, "max_l": max_l, "N": N},
         gen_KM=kmap,
         num_modes=1,
     )
 
 
-def _Ph_Gain_Kraus_Op(N, err_prob, l):
-    """Returns the Kraus Operators for l-photon gain.
+@partial(jax.jit, static_argnames=["N", "max_l"])
+def _Amp_Gain_Kraus_Map_JIT(N, err_prob, max_l):
+    n_op = num(N).data
+    adag_op = create(N).data
 
-    Args:
-        N: Hilbert space dimension.
-        err_prob: Error probability.
-        l: Number of photons gained.
+    log_term = jnp.log(jnp.sqrt(1.0 - err_prob))
+    # FIX: Use diag_expm
+    middle_op = diag_expm(n_op * log_term)
 
-    Returns:
-        Kraus operator for l-photon gain.
-    """
-    """ " Returns the Kraus Operators for l-photon gain with probability
-    err_prob in a Hilbert Space of size N"""
-    return (
-        jnp.sqrt(jnp.power(err_prob, l) / factorial(l))
-        * create(N).powm(l)
-        * (num(N) * jnp.log(jnp.sqrt(1 - err_prob))).expm()
-    )
+    def compute_op(l):
+        prefactor = jnp.sqrt(jnp.power(err_prob, l) / jnp.exp(gammaln(l + 1)))
+        adag_pow_l = jnp.linalg.matrix_power(adag_op, l)
+        return prefactor * (adag_pow_l @ middle_op)
 
+    ls = jnp.arange(max_l + 1)
+    return jax.vmap(compute_op)(ls)
 
 def Amp_Gain(N, err_prob, max_l):
-    """Amplitude gain channel.
-
-    Args:
-        N: Hilbert space dimension.
-        err_prob: Error probability.
-        max_l: Maximum number of photons gained.
-
-    Returns:
-        Amplitude gain channel.
-    """
-    kmap = lambda params: Qarray.from_list(
-        [_Ph_Gain_Kraus_Op(N, err_prob, l) for l in range(max_l + 1)]
+    kmap = lambda params: Qarray.create(
+        _Amp_Gain_Kraus_Map_JIT(params["N"], params["err_prob"], params["max_l"]),
+        dims=[[N], [N]],
+        bdims=(params["max_l"] + 1,)
     )
     return Gate.create(
         N,
         name="Amp_Gain",
-        params={"err_prob": err_prob, "max_l": max_l},
+        params={"err_prob": err_prob, "max_l": max_l, "N": N},
         gen_KM=kmap,
         num_modes=1,
     )
 
 
-def _Thermal_Kraus_Op(N, err_prob, n_bar, l, k):
-    """Returns the Kraus Operators for a thermal channel.
+@partial(jax.jit, static_argnames=["N", "max_l"])
+def _Thermal_Ch_Kraus_Map_JIT(N, err_prob, n_bar, max_l):
+    a_op = destroy(N).data
+    adag_op = create(N).data
+    n_op = num(N).data
 
-    Args:
-        N: Hilbert space dimension.
-        err_prob: Error probability.
-        n_bar: Average photon number.
-        l: Number of photons gained.
-        k: Number of photons lost.
+    a_powers = jnp.stack([jnp.linalg.matrix_power(a_op, i) for i in range(max_l + 1)])
+    adag_powers = jnp.stack([jnp.linalg.matrix_power(adag_op, i) for i in range(max_l + 1)])
 
-    Returns:
-        Kraus operator for thermal channel.
-    """
-    """ " Returns the Kraus Operators for a thermal channel with probability
-    err_prob and average photon number n_bar in a Hilbert Space of size N"""
-    return (
-        jnp.sqrt(
-            jnp.power(err_prob * (1 + n_bar), k)
-            * jnp.power(err_prob * n_bar, l)
-            / factorial(l)
-            / factorial(k)
-        )
-        * (num(N) * jnp.log(jnp.sqrt(1 - err_prob))).expm()
-        * destroy(N).powm(k)
-        * create(N).powm(l)
-    )
+    log_term = jnp.log(jnp.sqrt(1.0 - err_prob))
+    # FIX: Use diag_expm
+    middle_op = diag_expm(n_op * log_term)
 
+    def compute_single_op(idx):
+        l = idx // (max_l + 1)
+        k = idx % (max_l + 1)
+
+        fact_l = jnp.exp(gammaln(l + 1))
+        fact_k = jnp.exp(gammaln(k + 1))
+
+        term_k = jnp.power(err_prob * (1.0 + n_bar), k)
+        term_l = jnp.power(err_prob * n_bar, l)
+
+        prefactor = jnp.sqrt( (term_k * term_l) / (fact_k * fact_l) )
+        op_k = a_powers[k]
+        op_l = adag_powers[l]
+
+        return prefactor * (middle_op @ op_k @ op_l)
+
+    indices = jnp.arange((max_l + 1)**2)
+    return jax.vmap(compute_single_op)(indices)
 
 def Thermal_Ch(N, err_prob, n_bar, max_l):
-    """Thermal channel.
-
-    Args:
-        N: Hilbert space dimension.
-        err_prob: Error probability.
-        n_bar: Average photon number.
-        max_l: Maximum number of photons gained/lost.
-
-    Returns:
-        Thermal channel.
-    """
-    kmap = lambda params: Qarray.from_list(
-        [
-            _Thermal_Kraus_Op(N, err_prob, n_bar, l, k)
-            for l in range(max_l + 1)
-            for k in range(max_l + 1)
-        ]
+    kmap = lambda params: Qarray.create(
+        _Thermal_Ch_Kraus_Map_JIT(params["N"], params["err_prob"], params["n_bar"], params["max_l"]),
+        dims=[[N], [N]],
+        bdims=((params["max_l"] + 1)**2,)
     )
     return Gate.create(
         N,
         name="Thermal_Ch",
-        params={"err_prob": err_prob, "n_bar": n_bar, "max_l": max_l},
+        params={"err_prob": err_prob, "n_bar": n_bar, "max_l": max_l, "N": N},
         gen_KM=kmap,
         num_modes=1,
     )
 
 
-def _Dephasing_Kraus_Op(N, w, phi):
-    """ " Returns the Kraus Operators for dephasing with weight w and phase phi
-     in a Hilbert Space of size N"""
-    return (
-        jnp.sqrt(w)*(1.j*phi*num(N)).expm()
-    )
-
+@partial(jax.jit, static_argnames=["N", "max_l"])
+def _Dephasing_Ch_Kraus_Map_JIT(N, ws, phis, max_l):
+    n_op = num(N).data
+    def compute_op(w, phi):
+        # FIX: Use diag_expm
+        op = diag_expm(1.0j * phi * n_op)
+        return jnp.sqrt(w) * op
+    return jax.vmap(compute_op)(ws, phis)
 
 def Dephasing_Ch(N, err_prob, max_l):
-    """Dephasing channel.
-
-    Args:
-        N: Hilbert space dimension.
-        err_prob: Error probability.
-        max_l: Maximum number of kraus operators.
-
-    Returns:
-        Dephasing channel.
-    """
-
-    xs, ws = hermgauss(max_l)
+    xs, ws_raw = hermgauss(max_l)
     phis = jnp.sqrt(2*err_prob)*xs
-    ws = 1/jnp.sqrt(jnp.pi)*ws
+    ws = 1/jnp.sqrt(jnp.pi)*ws_raw
 
-    kmap = lambda params: Qarray.from_list(
-        [_Dephasing_Kraus_Op(N, w, phi) for (w, phi) in zip(ws, phis)]
+    kmap = lambda params: Qarray.create(
+        _Dephasing_Ch_Kraus_Map_JIT(params["N"], ws, phis, params["max_l"]),
+        dims=[[N], [N]],
+        bdims=(params["max_l"],)
     )
     return Gate.create(
         N,
-        name="Amp_Gain",
-        params={"err_prob": err_prob, "max_l": max_l},
+        name="Dephasing_Ch",
+        params={"err_prob": err_prob, "max_l": max_l, "N": N},
         gen_KM=kmap,
         num_modes=1,
     )
 
+
 def selfKerr(N, K):
-    """Self-Kerr interaction gate.
-
-    Args:
-        N: Hilbert space dimension.
-        K: Kerr coefficient.
-
-    Returns:
-        Self-Kerr gate.
-    """
     a = destroy(N)
     return Gate.create(
         N,
@@ -303,68 +307,62 @@ def selfKerr(N, K):
     )
 
 
-def _Reset_Deph_Kraus_Op(N, p, t_rst, chi, l, max_l):
-    """Returns the Kraus Operators for dephasing during reset.
+@partial(jax.jit, static_argnames=["N", "max_l"])
+def _Dephasing_Reset_Kraus_Map_JIT(N, p, t_rst, chi, max_l):
+    g = basis(2, 0).data
+    e = basis(2, 1).data
+    gg = g @ jnp.conj(g.T)
+    ee = e @ jnp.conj(e.T)
+    ge = g @ jnp.conj(e.T)
 
-    Args:
-        N: Hilbert space dimension.
-        p: Reset error probability.
-        t_rst: Reset time.
-        chi: cross-Kerr strength between qubit and resonator.
-        l: Operator index.
-        max_l: Maximum number of operators.
+    n_op = num(N).data
+    I_N = jnp.eye(N)
 
-    Returns:
-        Kraus operator for dephasing during reset.
-    """
+    ls_all = jnp.arange(2, max_l+1)
+    norm_terms = -(jnp.log(p) * jnp.power(p, (ls_all - 2) / (max_l - 1))) / (max_l - 1)
+    normalization_factor = (1 - p) / jnp.sum(norm_terms)
 
-    if l == 0:
-        K_0 = (basis(2, 0) @ basis(2, 0).dag()) ^ identity(N)
-        return K_0
-    if l == 1:
-        K_1 = jnp.sqrt(p) * (basis(2, 1) @ basis(2, 1).dag()) ^ (
-                    -1.j * chi * t_rst * num(N)).expm()
-        return K_1
+    def compute_op(l):
+        def branch_0(_):
+            return jnp.kron(gg, I_N)
 
-    ls = jnp.arange(2, max_l, 1)
+        def branch_1(_):
+            # FIX: Use diag_expm
+            op_osc = diag_expm(-1.0j * chi * t_rst * n_op)
+            return jnp.sqrt(p) * jnp.kron(ee, op_osc)
 
-    normalization_factor = (1 - p) / jnp.sum(
-        -(jnp.log(p) * p ** ((ls - 2) / (max_l - 1))) / ((max_l - 1)))
+        def branch_rest(_):
+            term_val = -(jnp.log(p) * jnp.power(p, (l - 2) / (max_l - 1))) / (max_l - 1)
+            prefactor = jnp.sqrt(term_val) * jnp.sqrt(normalization_factor)
 
-    prefactor = (jnp.sqrt(-(jnp.log(p) * p ** ((l - 2) / (max_l - 1))) / (
-    (max_l - 1))) * jnp.sqrt(normalization_factor))
+            exponent = -1.0j * chi * t_rst * (l - 2) / (max_l - 1)
+            # FIX: Use diag_expm
+            op_osc = diag_expm(exponent * n_op)
+            return prefactor * jnp.kron(ge, op_osc)
 
-    K_i = (
-            prefactor *
-            ((basis(2, 0) @ basis(2, 1).dag()) ^
-             (-1.j * chi * t_rst * (l - 2) / (max_l - 1) * num(N)).expm())
-    )
+        return jax.lax.cond(
+            l == 0,
+            branch_0,
+            lambda _: jax.lax.cond(l == 1, branch_1, branch_rest, operand=None),
+            operand=None
+        )
 
-    return K_i
-
+    ls = jnp.arange(max_l+1)
+    return jax.vmap(compute_op)(ls)
 
 def Dephasing_Reset(N, p, t_rst, chi, max_l):
-    """Dephasing due to imperfect reset between a qubit and a resonator.
-
-    Args:
-        N: Hilbert space dimension.
-        p: Reset error probability.
-        t_rst: Reset time.
-        chi: Dephasing strength.
-        max_l: Maximum number of operators.
-
-    Returns:
-        Dephasing due to reset channel.
-    """
-
-    kmap = lambda params: Qarray.from_list(
-        [_Reset_Deph_Kraus_Op(N, p, t_rst, chi, l, max_l) for l in
-         range(max_l)]
+    kmap = lambda params: Qarray.create(
+        _Dephasing_Reset_Kraus_Map_JIT(
+            params["N"], params["p"], params["t_rst"], params["chi"], params["max_l"]
+        ),
+        dims=[[2, N], [2, N]],
+        bdims=(params["max_l"]+1,)
     )
+
     return Gate.create(
         [2, N],
         name="Dephasing_Reset",
-        params={"p": p, "t_rst": t_rst, "chi": chi, "max_l": max_l},
+        params={"p": p, "t_rst": t_rst, "chi": chi, "max_l": max_l, "N": N},
         gen_KM=kmap,
         num_modes=2,
     )

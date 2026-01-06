@@ -26,8 +26,10 @@ class IdealQubit(Device):
             "IdealQubit requires a full Hamiltonian."
         )
         assert N == N_pre_diag == 2, "IdealQubit is a two-level system."
-        assert "ω" in params, "IdealQubit requires a frequency parameter 'ω'."
+        assert "f" in params, "IdealQubit requires a frequency parameter 'f'."
 
+        params["Δ"] = params.get("Δ", 0.0)
+        
     def common_ops(self):
         """Written in the linear basis."""
         ops = {}
@@ -45,15 +47,16 @@ class IdealQubit(Device):
 
         return ops
 
-    def get_linear_ω(self):
+    def get_linear_frequency(self):
         """Get frequency of linear terms."""
-        return self.params["ω"]
+        return self.params["f"]
 
     def get_H_linear(self):
         """Return linear terms in H."""
-        w = self.get_linear_ω()
+        w = self.get_linear_frequency()
         return (w / 2) * self.linear_ops["sigmaz"]
 
     def get_H_full(self):
         """Return full H in linear basis."""
-        return self.get_H_linear()
+         
+        return self.get_H_linear() + self.params["Δ"] / 2 * self.linear_ops["sigmax"] 
