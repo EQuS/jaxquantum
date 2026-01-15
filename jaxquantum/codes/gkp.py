@@ -28,6 +28,8 @@ class GKPQubit(BosonicQubit):
         self.params["l"] = 2.0 * jnp.sqrt(jnp.pi)
         s_delta = jnp.sinh(self.params["delta"] ** 2)
         self.params["epsilon"] = s_delta * self.params["l"]
+        self.params["squeezing"] = jnp.log(self.params["delta"])
+        self.params["squeezing_dB"] = 20*jnp.log10(jnp.exp(jnp.abs(self.params["squeezing"])))
 
     def _gen_common_gates(self) -> None:
         """
