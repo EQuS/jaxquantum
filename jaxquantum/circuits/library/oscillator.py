@@ -162,13 +162,16 @@ def _Amp_Damp_Kraus_Map_JIT(N, err_prob, max_l):
     n_op = num(N).data
     a_op = destroy(N).data
 
+    a_powers = jnp.stack(
+            [jnp.linalg.matrix_power(a_op, i) for i in range(max_l + 1)])
+
     log_term = jnp.log(jnp.sqrt(1.0 - err_prob))
     # FIX: Use diag_expm
     middle_op = diag_expm(n_op * log_term)
 
     def compute_op(l):
         prefactor = jnp.sqrt(jnp.power(err_prob, l) / jnp.exp(gammaln(l + 1)))
-        a_pow_l = jnp.linalg.matrix_power(a_op, l)
+        a_pow_l = a_powers[l]
         return prefactor * (middle_op @ a_pow_l)
 
     ls = jnp.arange(max_l + 1)
