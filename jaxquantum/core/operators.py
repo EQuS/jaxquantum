@@ -155,6 +155,28 @@ def displace(N, α) -> Qarray:
     a = destroy(N)
     return (α * a.dag() - jnp.conj(α) * a).expm()
 
+def squeeze(N, z):
+    """Single-mode Squeezing operator.
+
+
+    Args:
+        N: Hilbert Space Size
+        z: squeezing parameter
+
+    Returns:
+        Sqeezing operator
+    """
+    
+    a = destroy(N)
+    op = (1 / 2.0) * jnp.conj(z) * (a @ a) - (1 / 2.0) * z * (a.dag() @ a.dag())
+    return op.expm()
+
+
+def squeezing_linear_to_dB(z):
+    return 20 * jnp.log10(jnp.exp(jnp.abs(z)))
+
+def squeezing_dB_to_linear(z_dB):
+    return jnp.log(10**(z_dB/20))
 
 # States ---------------------------------------------------------------------
 

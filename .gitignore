@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# custom misc
+experiments/circuit/state-prep/data/*
