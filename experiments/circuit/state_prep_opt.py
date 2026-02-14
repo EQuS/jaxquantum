@@ -100,10 +100,13 @@ def cf_tomography_circuit(state, beta, measure_real=True):
     cirq = jqtc.Circuit.create(reg, layers=[])
 
     cirq.append(jqtc.Ry(jnp.pi/2), 0)
+
+    # ECD
     cirq.append(jqtc.CD(N, beta), [0,1])
+    cirq.append(jqtc.Rx(jnp.pi), 0)
     
     if measure_real:
-        cirq.append(jqtc.Ry(jnp.pi/2), 0)
+        cirq.append(jqtc.Ry(-jnp.pi/2), 0)
     else:
         cirq.append(jqtc.Rx(jnp.pi/2), 0)
 
