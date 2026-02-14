@@ -131,3 +131,5 @@ dmypy.json
 
 # custom misc
 experiments/circuit/state-prep/data/*
+
+local/*
