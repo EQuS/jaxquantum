@@ -18,8 +18,10 @@ config.update("jax_enable_x64", True)
 
 class BinomialQubit(BosonicQubit):
     """
-    Cat Qubit Class.
+    Binomial Qubit Class.
     """
+
+    PARAMETERS = ["L", "G", "D"]
 
     name = "binomial"
 

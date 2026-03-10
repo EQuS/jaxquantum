@@ -21,6 +21,9 @@ class BosonicQubit(metaclass=ABCMeta):
     Base class for Bosonic Qubits.
     """
 
+    BASE_PARAMETERS = ["N"]
+    PARAMETERS = []
+
     name = "bqubit"
 
     @property
@@ -59,6 +62,13 @@ class BosonicQubit(metaclass=ABCMeta):
         if "N" not in self.params:
             self.params["N"] = 50
         """
+
+        for key in self.params:
+            if key not in self.BASE_PARAMETERS + self.PARAMETERS:
+                raise ValueError(
+                    f"Invalid parameter {key}. Allowed parameters are {self.BASE_PARAMETERS + self.PARAMETERS}"
+                )
+
         if "N" not in self.params:
             self.params["N"] = 50
 
