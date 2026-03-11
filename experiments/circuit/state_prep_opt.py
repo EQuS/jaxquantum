@@ -204,7 +204,7 @@ def optimize(initial_params, settings):
     
     return history
     
-def generate_target_cavity_state(settings, large=True):
+def generate_target_cavity_state(settings, large=False):
     
     N = settings["N" if not large else "N_large"]
     
