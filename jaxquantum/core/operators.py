@@ -7,63 +7,66 @@ from math import prod
 import jax.numpy as jnp
 from jax.nn import one_hot
 
-from jaxquantum.core.qarray import Qarray, tensor
+from jaxquantum.core.qarray import Qarray, tensor, QarrayImplType
 
 config.update("jax_enable_x64", True)
 
 
-def sigmax() -> Qarray:
+def sigmax(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     """σx
+
+    Args:
+        implementation: Qarray implementation type, e.g. "sparse" or "dense".
 
     Returns:
         σx Pauli Operator
     """
-    return Qarray.create(jnp.array([[0.0, 1.0], [1.0, 0.0]]))
+    return Qarray.create(jnp.array([[0.0, 1.0], [1.0, 0.0]]), implementation=implementation)
 
 
-def sigmay() -> Qarray:
+def sigmay(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     """σy
 
     Returns:
         σy Pauli Operator
     """
-    return Qarray.create(jnp.array([[0.0, -1.0j], [1.0j, 0.0]]))
+    return Qarray.create(jnp.array([[0.0, -1.0j], [1.0j, 0.0]]), implementation=implementation)
 
 
-def sigmaz() -> Qarray:
+def sigmaz(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     """σz
 
     Returns:
         σz Pauli Operator
     """
-    return Qarray.create(jnp.array([[1.0, 0.0], [0.0, -1.0]]))
+    return Qarray.create(jnp.array([[1.0, 0.0], [0.0, -1.0]]), implementation=implementation)
 
 
-def hadamard() -> Qarray:
+def hadamard(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     """H
 
     Returns:
         H: Hadamard gate
     """
-    return Qarray.create(jnp.array([[1, 1], [1, -1]]) / jnp.sqrt(2))
+    return Qarray.create(jnp.array([[1, 1], [1, -1]]) / jnp.sqrt(2), implementation=implementation)
 
 
-def sigmam() -> Qarray:
+def sigmam(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     """σ-
 
     Returns:
         σ- Pauli Operator
     """
-    return Qarray.create(jnp.array([[0.0, 0.0], [1.0, 0.0]]))
+    return Qarray.create(jnp.array([[0.0, 0.0], [1.0, 0.0]]), implementation=implementation)
 
 
-def sigmap() -> Qarray:
+def sigmap(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     """σ+
 
     Returns:
         σ+ Pauli Operator
     """
-    return Qarray.create(jnp.array([[0.0, 1.0], [0.0, 0.0]]))
+    return Qarray.create(jnp.array([[0.0, 1.0], [0.0, 0.0]]), implementation=implementation)
 
 
 def qubit_rotation(theta: float, nx, ny, nz) -> Qarray:
@@ -127,6 +130,8 @@ def identity(*args, **kwargs) -> Qarray:
     """
     return Qarray.create(jnp.eye(*args, **kwargs))
 
+
+qeye = identity
 
 def identity_like(A) -> Qarray:
     """Identity matrix with the same shape as A.
