@@ -133,8 +133,8 @@ def sbs(initial_state,
         return jax.lax.max(t_CD_floor, jnp.polyval(t_CD_p, beta)) #ns
 
     t_CDs = jax.vmap(t_CD)(jnp.abs(alphas))
-    t_CDs = jnp.array([696, 1912, 696, 696, 1912, 696]) / speedup
-    t_round = t_CDs.sum()+t_sqg*8+t_rst*2
+    t_CDs = jnp.array([288, 1640, 384, 288, 1640, 384]) / speedup
+    t_round = t_CDs.sum()+t_sqg*6+t_rst*2
     
     exp = jnp.array([jqt.overlap(observable, initial_state.ptrace(1))])
     
@@ -189,14 +189,18 @@ def sBs_half_round_circuit(N,
     cirq.append(jqtc.Ry(jnp.pi / 2), 0)
     cirq.append(jqtc.Thermal_Ch_Qb(1-jnp.exp(-t_sqg/error_channels["fluxonium"]["T1"]), n_bar_qb), 0, default_simulate_mode="kraus")
     cirq.append(jqtc.Dephasing_Ch_Qb((1-jnp.exp(-t_sqg/error_channels["fluxonium"]["Tphi"]))/2), 0, default_simulate_mode="kraus")
-    cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
-    # cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.CR(N, t_sqg * error_channels["resonator"]["chi"]), [0, 1], default_simulate_mode="unitary")
+    cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
     #cirq.append(jqtc.Dephasing_Ch(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["Tphi"]), max_l), 1, default_simulate_mode="kraus")
 
     cirq.append(CD_Ancilla_Decay(N, alphas[0], t_CD[0]/error_channels["fluxonium"]["T1"], n_bar_qb, max_l), [0, 1], default_simulate_mode="kraus")
+    
+    cirq.append(jqtc.Thermal_Ch_Qb(1-jnp.exp(-t_CD[0]/error_channels["fluxonium"]["T1"]), n_bar_qb), 0, default_simulate_mode="kraus")
     cirq.append(jqtc.Dephasing_Ch_Qb((1-jnp.exp(-t_CD[0]/error_channels["fluxonium"]["Tphi"]))/2), 0, default_simulate_mode="kraus")
-    cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_CD[0]/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
-    # cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_CD[0]/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_CD[0]/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.CR(N, t_CD[0] * error_channels["resonator"]["chi"]), [0, 1], default_simulate_mode="unitary")
+    cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_CD[0]/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
     #cirq.append(jqtc.Dephasing_Ch(N, 1-jnp.exp(-t_CD[0]/error_channels["resonator"]["Tphi"]), max_l), 1, default_simulate_mode="kraus")
     
     # # cirq.append(jqtc.Ry(phis[0]), 0)
@@ -208,14 +212,17 @@ def sBs_half_round_circuit(N,
     cirq.append(jqtc.Rx(thetas[0]), 0)
     cirq.append(jqtc.Thermal_Ch_Qb(1-jnp.exp(-t_sqg/error_channels["fluxonium"]["T1"]), n_bar_qb), 0, default_simulate_mode="kraus")
     cirq.append(jqtc.Dephasing_Ch_Qb((1-jnp.exp(-t_sqg/error_channels["fluxonium"]["Tphi"]))/2), 0, default_simulate_mode="kraus")
-    cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
-    # cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.CR(N, t_sqg* error_channels["resonator"]["chi"]), [0, 1], default_simulate_mode="unitary")
+    cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
     #cirq.append(jqtc.Dephasing_Ch(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["Tphi"]), max_l), 1, default_simulate_mode="kraus")
     
     cirq.append(CD_Ancilla_Decay(N, alphas[1], t_CD[1]/error_channels["fluxonium"]["T1"], n_bar_qb, max_l), [0, 1], default_simulate_mode="kraus")
+    cirq.append(jqtc.Thermal_Ch_Qb(1-jnp.exp(-t_CD[1]/error_channels["fluxonium"]["T1"]), n_bar_qb), 0, default_simulate_mode="kraus")
     cirq.append(jqtc.Dephasing_Ch_Qb((1-jnp.exp(-t_CD[1]/error_channels["fluxonium"]["Tphi"]))/2), 0, default_simulate_mode="kraus")
-    cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_CD[1]/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
-    # cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_CD[1]/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_CD[1]/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.CR(N, t_CD[1] * error_channels["resonator"]["chi"]), [0, 1], default_simulate_mode="unitary")
+    cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_CD[1]/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
     #cirq.append(jqtc.Dephasing_Ch(N, 1-jnp.exp(-t_CD[1]/error_channels["resonator"]["Tphi"]), max_l), 1, default_simulate_mode="kraus")
     
     # # cirq.append(jqtc.Ry(phis[1]), 0)
@@ -227,21 +234,25 @@ def sBs_half_round_circuit(N,
     cirq.append(jqtc.Rx(thetas[1]), 0)
     cirq.append(jqtc.Thermal_Ch_Qb(1-jnp.exp(-t_sqg/error_channels["fluxonium"]["T1"]), n_bar_qb), 0, default_simulate_mode="kraus")
     cirq.append(jqtc.Dephasing_Ch_Qb((1-jnp.exp(-t_sqg/error_channels["fluxonium"]["Tphi"]))/2), 0, default_simulate_mode="kraus")
-    cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
-    # cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.CR(N, t_sqg * error_channels["resonator"]["chi"]), [0, 1], default_simulate_mode="unitary")
+    cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
     #cirq.append(jqtc.Dephasing_Ch(N, 1-jnp.exp(-t_sqg/error_channels["resonator"]["Tphi"]), max_l), 1, default_simulate_mode="kraus")
     
     cirq.append(CD_Ancilla_Decay(N, alphas[2], t_CD[2]/error_channels["fluxonium"]["T1"], n_bar_qb, max_l), [0, 1], default_simulate_mode="kraus")
+    cirq.append(jqtc.Thermal_Ch_Qb(1-jnp.exp(-t_CD[2]/error_channels["fluxonium"]["T1"]), n_bar_qb), 0, default_simulate_mode="kraus")
     cirq.append(jqtc.Dephasing_Ch_Qb((1-jnp.exp(-t_CD[2]/error_channels["fluxonium"]["Tphi"]))/2), 0, default_simulate_mode="kraus")
-    cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_CD[2]/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
-    # cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_CD[2]/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_CD[2]/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.CR(N, t_CD[2] * error_channels["resonator"]["chi"]), [0, 1], default_simulate_mode="unitary")
+    cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_CD[2]/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
     #cirq.append(jqtc.Dephasing_Ch(N, 1-jnp.exp(-t_CD[2]/error_channels["resonator"]["Tphi"]), max_l), 1, default_simulate_mode="kraus")
     
     cirq.append(jqtc.Dephasing_Reset(N, error_channels["fluxonium"]["reset_p_ee"], error_channels["fluxonium"]["t_rst"], error_channels["resonator"]["chi"], max_l), [0, 1], default_simulate_mode="kraus")
-    # cirq.append(jqtc.Thermal_Ch_Qb(1-jnp.exp(-t_rst/error_channels["fluxonium"]["T1"]), n_bar_qb), 0, default_simulate_mode="kraus")
+    cirq.append(jqtc.Thermal_Ch_Qb(1-jnp.exp(-t_rst/error_channels["fluxonium"]["T1"]), n_bar_qb), 0, default_simulate_mode="kraus")
     cirq.append(jqtc.Dephasing_Ch_Qb((1-jnp.exp(-t_rst/error_channels["fluxonium"]["Tphi"]))/2), 0, default_simulate_mode="kraus")
-    cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_rst/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
-    # cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_rst/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.Amp_Damp(N, 1-jnp.exp(-t_rst/error_channels["resonator"]["T1"]), max_l), 1, default_simulate_mode="kraus")
+    # cirq.append(jqtc.CR(N, t_sqg * error_channels["resonator"]["chi"]), [0, 1], default_simulate_mode="unitary")
+    cirq.append(jqtc.Thermal_Ch(N, 1-jnp.exp(-t_rst/error_channels["resonator"]["T1"]), n_bar_osc, max_l), 1, default_simulate_mode="kraus")
     #cirq.append(jqtc.Dephasing_Ch(N, 1-jnp.exp(-t_rst/error_channels["resonator"]["Tphi"]), max_l), 1, default_simulate_mode="kraus")
 
     return cirq

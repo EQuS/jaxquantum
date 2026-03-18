@@ -609,18 +609,18 @@ class TestRectangularGKPQubit:
         assert rect_gkp_qubit.name == "gkp"  # All GKP variants use "gkp" name
         assert rect_gkp_qubit.params["N"] == 50  # default
         assert rect_gkp_qubit.params["delta"] == 0.25  # default
-        # Note: eta parameter may not be present in all implementations
+        # Note: a parameter may not be present in all implementations
     
     def test_rectangular_gkp_qubit_custom_params(self):
         """Test RectangularGKPQubit with custom parameters."""
-        rect_gkp_qubit = jqtb.RectangularGKPQubit({"N": 40, "delta": 0.3, "eta": 1.5})
+        rect_gkp_qubit = jqtb.RectangularGKPQubit({"N": 40, "delta": 0.3, "a": 0.8})
         assert rect_gkp_qubit.params["N"] == 40
         assert rect_gkp_qubit.params["delta"] == 0.3
-        # Note: eta parameter may not be stored in params
+        # Note: a parameter may not be stored in params
     
     def test_rectangular_gkp_qubit_basis_states(self):
         """Test RectangularGKPQubit basis state construction."""
-        rect_gkp_qubit = jqtb.RectangularGKPQubit({"N": 30, "delta": 0.3, "eta": 1.2})
+        rect_gkp_qubit = jqtb.RectangularGKPQubit({"N": 30, "delta": 0.3, "a": 0.8})
         plus_z, minus_z = rect_gkp_qubit._get_basis_z()
         assert plus_z.shape == (30, 1)
         assert minus_z.shape == (30, 1)

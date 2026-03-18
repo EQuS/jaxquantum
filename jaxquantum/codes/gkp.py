@@ -18,6 +18,8 @@ class GKPQubit(BosonicQubit):
     GKP Qubit Class.
     """
 
+    PARAMETERS = ["delta"]
+
     name = "gkp"
 
     def _params_validation(self):
@@ -25,9 +27,12 @@ class GKPQubit(BosonicQubit):
 
         if "delta" not in self.params:
             self.params["delta"] = 0.25
+
         self.params["l"] = 2.0 * jnp.sqrt(jnp.pi)
         s_delta = jnp.sinh(self.params["delta"] ** 2)
         self.params["epsilon"] = s_delta * self.params["l"]
+        self.params["squeezing"] = jnp.log(self.params["delta"])
+        self.params["squeezing_dB"] = 20*jnp.log10(jnp.exp(jnp.abs(self.params["squeezing"])))
 
     def _gen_common_gates(self) -> None:
         """
@@ -201,6 +206,9 @@ class GKPQubit(BosonicQubit):
 
 
 class RectangularGKPQubit(GKPQubit):
+
+    PARAMETERS = ["delta", "a"]
+
     def _params_validation(self):
         super()._params_validation()
         if "a" not in self.params:
@@ -214,12 +222,14 @@ class RectangularGKPQubit(GKPQubit):
 
 
 class SquareGKPQubit(GKPQubit):
+
     def _params_validation(self):
         super()._params_validation()
         self.params["a"] = 1.0
 
 
 class HexagonalGKPQubit(GKPQubit):
+    
     def _get_axis(self):
         a = jnp.sqrt(2 / jnp.sqrt(3))
         x_axis = a * (

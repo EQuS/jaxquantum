@@ -100,10 +100,13 @@ def cf_tomography_circuit(state, beta, measure_real=True):
     cirq = jqtc.Circuit.create(reg, layers=[])
 
     cirq.append(jqtc.Ry(jnp.pi/2), 0)
+
+    # ECD
     cirq.append(jqtc.CD(N, beta), [0,1])
+    cirq.append(jqtc.Rx(jnp.pi), 0)
     
     if measure_real:
-        cirq.append(jqtc.Ry(jnp.pi/2), 0)
+        cirq.append(jqtc.Ry(-jnp.pi/2), 0)
     else:
         cirq.append(jqtc.Rx(jnp.pi/2), 0)
 
@@ -201,12 +204,35 @@ def optimize(initial_params, settings):
     
     return history
     
+def generate_target_cavity_state(settings, large=False):
+    
+    N = settings["N" if not large else "N_large"]
+    
+    if settings["state"]["mode"] == "squeeze":
+        z = jqt.squeezing_dB_to_linear(settings["state"]["squeezing_dB"])
+        target_state_cavity = jqt.squeeze(N, z) @ jqt.basis(N, 0)
+    elif settings["state"]["mode"] == "gkp":
+        delta = settings["state"]["delta"]
+        gkp_qubit = jqtb.GKPQubit({"delta": delta, "N": N})
+        squeezing_level = 20*jnp.log10(jnp.exp(jnp.abs(jnp.log(delta))))
+        settings["state"]["squeezing_level"] = squeezing_level
+        target_state_cavity = gkp_qubit.basis[settings["state"]["logical_state"]]
+    elif settings["state"]["mode"] == "fock":
+        if settings["state"]["logical_state"]=="+z":
+            target_state_cavity = jqt.basis(N, 0)
+        elif settings["state"]["logical_state"]=="-z":
+            target_state_cavity = jqt.basis(N, 1)
+        elif settings["state"]["logical_state"]=="+x":
+            target_state_cavity = (jqt.basis(N, 0) + jqt.basis(N, 1)).unit()
+        elif settings["state"]["logical_state"]=="-x":
+            target_state_cavity = (jqt.basis(N, 0) - jqt.basis(N, 1)).unit()
+        elif settings["state"]["logical_state"]=="+y":
+            target_state_cavity = (jqt.basis(N, 0) + 1.j*jqt.basis(N, 1)).unit()
+        elif settings["state"]["logical_state"]=="-y":
+            target_state_cavity = (jqt.basis(N, 0) - 1.j*jqt.basis(N, 1)).unit()
 
 
-
-
-
-
+    return target_state_cavity
 
 
 
