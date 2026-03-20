@@ -721,12 +721,30 @@ class TestFromListSparse:
 # ===========================================================================
 
 class TestTensorSparse:
-    def test_tensor_sparse_returns_dense(self):
-        """tensor() always produces a dense Qarray, even from sparse inputs."""
+    def test_tensor_sparse_stays_sparse(self):
+        """tensor() with all-sparse inputs returns a sparse Qarray."""
         a = jqt.destroy(3, implementation=QarrayImplType.SPARSE)
         b = jqt.create(3, implementation=QarrayImplType.SPARSE)
         result = jqt.tensor(a, b)
-        assert result.is_dense, "tensor() should return dense (documented limitation)"
+        assert result.is_sparse, "tensor() should stay sparse for all-sparse inputs"
+
+    def test_tensor_dense_stays_dense(self):
+        """tensor() with all-dense inputs returns a dense Qarray."""
+        a = jqt.destroy(3)
+        b = jqt.create(3)
+        assert jqt.tensor(a, b).is_dense
+
+    def test_tensor_mixed_returns_dense(self):
+        """tensor() with mixed sparse/dense inputs promotes to dense."""
+        a = jqt.destroy(3, implementation=QarrayImplType.SPARSE)
+        b = jqt.create(3)
+        assert jqt.tensor(a, b).is_dense
+
+    def test_tensor_parallel_always_dense(self):
+        """tensor(parallel=True) always returns dense even for sparse inputs."""
+        a = jqt.destroy(3, implementation=QarrayImplType.SPARSE)
+        b = jqt.create(3, implementation=QarrayImplType.SPARSE)
+        assert jqt.tensor(a, b, parallel=True).is_dense
 
     def test_tensor_sparse_correct_values(self):
         """Values from tensor() with sparse inputs must match the dense counterpart."""
@@ -737,6 +755,32 @@ class TestTensorSparse:
         result_s = jqt.tensor(a_s, b_s)
         result_d = jqt.tensor(a_d, b_d)
         assert jnp.allclose(todense(result_s.data), result_d.data)
+
+    def test_tensor_three_sparse(self):
+        """tensor() chains correctly for three sparse operands."""
+        ops_s = [jqt.identity(2, implementation=QarrayImplType.SPARSE) for _ in range(3)]
+        ops_d = [jqt.identity(2) for _ in range(3)]
+        result_s = jqt.tensor(*ops_s)
+        result_d = jqt.tensor(*ops_d)
+        assert result_s.is_sparse
+        assert jnp.allclose(todense(result_s.data), result_d.data)
+
+    def test_tensor_no_densification(self):
+        """Sparse kron stores far fewer entries than the full dense grid.
+
+        Confirms that sparsify(jnp.kron) actually keeps the result sparse rather
+        than converting to dense and back.
+        """
+        N = 5
+        a = jqt.destroy(N, implementation=QarrayImplType.SPARSE)
+        b = jqt.create(N, implementation=QarrayImplType.SPARSE)
+        result = jqt.tensor(a, b)
+        assert result.is_sparse
+        # destroy and create each have N-1 non-zeros; kron has (N-1)^2
+        # which is much less than the full (N^2) x (N^2) = N^4 entries
+        nnz = result.data.nse
+        total = (N ** 2) ** 2
+        assert nnz < total, f"expected sparse result, got {nnz}/{total} stored entries"
 
 
 # ===========================================================================

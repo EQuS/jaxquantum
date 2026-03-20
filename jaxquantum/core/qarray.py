@@ -279,6 +279,20 @@ class QarrayImpl(ABC):
         """
         pass
 
+    @abstractmethod
+    def kron(self, other: "QarrayImpl") -> "QarrayImpl":
+        """Kronecker (tensor) product with another implementation.
+
+        Args:
+            other: Right-hand operand.  Mixed-type pairs are handled by
+                ``_coerce`` — the result has the higher ``PROMOTION_ORDER``
+                type (dense wins over sparse).
+
+        Returns:
+            A new ``QarrayImpl`` containing the Kronecker product.
+        """
+        pass
+
     @classmethod
     @abstractmethod
     def _eye_data(cls, n: int, dtype=None):
@@ -504,6 +518,20 @@ class DenseImpl(QarrayImpl):
         return DenseImpl(
             _data=data_new
         )
+
+    def kron(self, other: "QarrayImpl") -> "QarrayImpl":
+        """Kronecker product using ``jnp.kron``.
+
+        Args:
+            other: Right-hand operand.
+
+        Returns:
+            A ``DenseImpl`` containing the Kronecker product.
+        """
+        a, b = self._coerce(other)
+        if a is not self:
+            return a.kron(b)
+        return DenseImpl(jnp.kron(self._data, b._data))
 
     @classmethod
     def _eye_data(cls, n: int, dtype=None):
@@ -924,6 +952,26 @@ class SparseImpl(QarrayImpl):
         im = jnp.imag(values)
         new_values = re * (jnp.abs(re) > atol) + 1j * im * (jnp.abs(im) > atol)
         return SparseImpl(sparse.BCOO((new_values, self._data.indices), shape=self._data.shape))
+
+    def kron(self, other: "QarrayImpl") -> "QarrayImpl":
+        """Kronecker product using ``sparsify(jnp.kron)`` — stays sparse.
+
+        Uses JAX's ``sparsify`` transform so the Kronecker product is computed
+        natively on BCOO arrays without materialising a dense intermediate.
+
+        Args:
+            other: Right-hand operand.
+
+        Returns:
+            A ``SparseImpl`` containing the Kronecker product when both operands
+            are sparse; a ``DenseImpl`` when types differ (via ``_coerce``).
+        """
+        a, b = self._coerce(other)
+        if a is not self:
+            return a.kron(b)
+        sparse_kron = sparse.sparsify(jnp.kron)
+        return SparseImpl(sparse_kron(self._data, b._data))
+
 
 
 # Register implementation classes with the enum registry
@@ -1936,47 +1984,49 @@ def tensor(*args, **kwargs) -> Qarray:
             an einsum-based batched outer product instead of ``jnp.kron``.
 
     Returns:
-        The tensor product as a dense ``Qarray``.
+        The tensor product as a ``Qarray``.  When all inputs share the same
+        backend (e.g. all sparse), the output uses that backend.  Mixed inputs
+        or ``parallel=True`` always produce a dense result.
 
     Note:
-        Mixed-backend inputs are all converted to dense before the product.
+        ``parallel=True`` uses an einsum-based batched outer product and always
+        returns a dense ``Qarray``.  For the default (``parallel=False``) path,
+        each backend's ``kron`` method is used, so all-sparse inputs stay sparse.
     """
     parallel = kwargs.pop("parallel", False)
 
-    # For tensor operations, we'll need to handle mixed implementations
-    # For now, convert all to dense for tensor operations
-    dense_args = [arg.to_dense() if arg.impl_type != QarrayImplType.DENSE else arg for arg in args]
-
-    data = dense_args[0].data
-    dims = deepcopy(dense_args[0].dims)
-    dims_0 = dims[0]
-    dims_1 = dims[1]
-
-    for arg in dense_args[1:]:
-        if parallel:
-            a = data
-            b = arg.data
-
+    if parallel:
+        # Einsum-based batched outer product — dense only.
+        dense_args = [arg.to_dense() for arg in args]
+        data = dense_args[0].data
+        dims_0 = dense_args[0].dims[0]
+        dims_1 = dense_args[0].dims[1]
+        for arg in dense_args[1:]:
+            a, b = data, arg.data
             if len(a.shape) > len(b.shape):
                 batch_dim = a.shape[:-2]
             elif len(a.shape) == len(b.shape):
-                if prod(a.shape[:-2]) > prod(b.shape[:-2]):
-                    batch_dim = a.shape[:-2]
-                else:
-                    batch_dim = b.shape[:-2]
+                batch_dim = a.shape[:-2] if prod(a.shape[:-2]) > prod(b.shape[:-2]) else b.shape[:-2]
             else:
                 batch_dim = b.shape[:-2]
-
             data = jnp.einsum("...ij,...kl->...ikjl", a, b).reshape(
                 *batch_dim, a.shape[-2] * b.shape[-2], -1
             )
-        else:
-            data = jnp.kron(data, arg.data, **kwargs)
+            dims_0 = dims_0 + arg.dims[0]
+            dims_1 = dims_1 + arg.dims[1]
+        return Qarray.create(data, dims=(dims_0, dims_1))
 
+    # Non-parallel: delegate to each impl's kron method.
+    # All-sparse inputs stay sparse; mixed inputs promote to dense via _coerce.
+    current_impl = args[0]._impl
+    dims_0 = args[0].dims[0]
+    dims_1 = args[0].dims[1]
+    for arg in args[1:]:
+        current_impl = current_impl.kron(arg._impl)
         dims_0 = dims_0 + arg.dims[0]
         dims_1 = dims_1 + arg.dims[1]
-
-    return Qarray.create(data, dims=(dims_0, dims_1))
+    return Qarray.create(current_impl.data, dims=(dims_0, dims_1),
+                         implementation=current_impl.impl_type)
 
 
 def tr(qarr: Qarray, **kwargs) -> Array:

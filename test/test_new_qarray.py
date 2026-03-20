@@ -303,16 +303,16 @@ def test_sparse_tensor_operations():
     a_sparse = jqt.Qarray.create(dense_data1, implementation="sparse")
     b_sparse = jqt.Qarray.create(dense_data2, implementation="sparse")
     
-    # Tensor product should convert to dense
+    # Tensor product of two sparse arrays stays sparse
     tensor_result = a_sparse ^ b_sparse
-    assert tensor_result.is_dense
+    assert tensor_result.is_sparse
     
     # Compare with dense result
     a_dense = a_sparse.to_dense()
     b_dense = b_sparse.to_dense()
     tensor_dense = a_dense ^ b_dense
     
-    assert jnp.allclose(tensor_result.data, tensor_dense.data)
+    assert jnp.allclose(tensor_result.data.todense(), tensor_dense.data)
 
 def test_sparse_memory_efficiency():
     """Test that sparse matrices are actually more memory efficient for sparse data."""
