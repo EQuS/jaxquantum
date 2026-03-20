@@ -86,65 +86,72 @@ def qubit_rotation(theta: float, nx, ny, nz) -> Qarray:
     )
 
 
-def destroy(N) -> Qarray:
+def destroy(N, implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     """annihilation operator
 
     Args:
         N: Hilbert space size
+        implementation: Qarray implementation type, e.g. "sparse" or "dense".
 
     Returns:
         annilation operator in Hilber Space of size N
     """
-    return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=1))
+    return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=1), implementation=implementation)
 
 
-def create(N) -> Qarray:
+def create(N, implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     """creation operator
 
     Args:
         N: Hilbert space size
+        implementation: Qarray implementation type, e.g. "sparse" or "dense".
 
     Returns:
         creation operator in Hilber Space of size N
     """
-    return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=-1))
+    return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=-1), implementation=implementation)
 
 
-def num(N) -> Qarray:
+def num(N, implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     """Number operator
 
     Args:
         N: Hilbert Space size
+        implementation: Qarray implementation type, e.g. "sparse" or "dense".
 
     Returns:
         number operator in Hilber Space of size N
     """
-    return Qarray.create(jnp.diag(jnp.arange(N)))
+    return Qarray.create(jnp.diag(jnp.arange(N)), implementation=implementation)
 
 
-def identity(*args, **kwargs) -> Qarray:
+def identity(*args, implementation: QarrayImplType = QarrayImplType.DENSE, **kwargs) -> Qarray:
     """Identity matrix.
+
+    Args:
+        implementation: Qarray implementation type, e.g. "sparse" or "dense".
 
     Returns:
         Identity matrix.
     """
-    return Qarray.create(jnp.eye(*args, **kwargs))
+    return Qarray.create(jnp.eye(*args, **kwargs), implementation=implementation)
 
 
 qeye = identity
 
-def identity_like(A) -> Qarray:
+def identity_like(A, implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     """Identity matrix with the same shape as A.
 
     Args:
         A: Matrix.
+        implementation: Qarray implementation type, e.g. "sparse" or "dense".
 
     Returns:
         Identity matrix with the same shape as A.
     """
     space_dims = A.space_dims
     total_dim = prod(space_dims)
-    return Qarray.create(jnp.eye(total_dim, total_dim), dims=[space_dims, space_dims])
+    return Qarray.create(jnp.eye(total_dim, total_dim), dims=[space_dims, space_dims], implementation=implementation)
 
 
 def displace(N, α) -> Qarray:
@@ -186,17 +193,18 @@ def squeezing_dB_to_linear(z_dB):
 # States ---------------------------------------------------------------------
 
 
-def basis(N: int, k: int):
+def basis(N: int, k: int, implementation: QarrayImplType = QarrayImplType.DENSE):
     """Creates a |k> (i.e. fock state) ket in a specified Hilbert Space.
 
     Args:
         N: Hilbert space dimension
         k: fock number
+        implementation: Qarray implementation type, e.g. "sparse" or "dense".
 
     Returns:
         Fock State |k>
     """
-    return Qarray.create(one_hot(k, N).reshape(N, 1))
+    return Qarray.create(one_hot(k, N).reshape(N, 1), implementation=implementation)
 
 def multi_mode_basis_set(Ns: List[int]) -> Qarray:
     """Creates a multi-mode basis set.

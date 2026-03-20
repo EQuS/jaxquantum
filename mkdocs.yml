@@ -90,6 +90,7 @@ nav:
       - The Sharp Bits 🔪: documentation/getting_started/sharp_bits.md
     - Tutorials:
       - Circuits: documentation/tutorials/circuits.ipynb
+      - Sparse Backend: documentation/tutorials/sparse_backend.ipynb
       - Bosonic Codes: documentation/tutorials/bosonic_codes.md
     - Advanced Concepts:
       - Excitation Number Restricted Basis: documentation/advanced/enr.md

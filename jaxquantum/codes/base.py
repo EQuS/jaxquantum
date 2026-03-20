@@ -289,9 +289,5 @@ class BosonicQubit(metaclass=ABCMeta):
             ax.set_ylabel(r"Im[$\alpha$]")
 
         fig.suptitle(self.name)
-        fig.tight_layout()
         fig.align_xlabels(axs)
         fig.align_ylabels(axs)
-        
-        fig.tight_layout()
-        plt.show()

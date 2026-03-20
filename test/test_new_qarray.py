@@ -427,7 +427,7 @@ def test_sparse_dag_performance():
     
     # Create a large sparse matrix
     size = 50
-    dense_data = jnp.zeros((size, size))
+    dense_data = jnp.zeros((size, size)) + 0.0j
     # Make it sparse by setting only diagonal and a few off-diagonal elements
     dense_data = dense_data.at[jnp.diag_indices(size)].set(jnp.arange(size) + 1j * jnp.arange(size))
     dense_data = dense_data.at[0, 1].set(1+2j)
