@@ -1125,12 +1125,14 @@ class Qarray(Generic[ImplT]):
     def from_list(cls, qarr_list: List[Qarray]) -> Qarray:
         """Create a batched ``Qarray`` from a list of same-shaped ``Qarray`` objects.
 
-        If the input list is empty an empty ``Qarray`` is returned.  When all
-        inputs are sparse the output is also sparse; otherwise dense.
+        The output implementation is determined by the element with the highest
+        ``PROMOTION_ORDER``: if all inputs are sparse the result is sparse; if
+        any input is dense (or types are mixed) all inputs are promoted to dense
+        and the result is dense.
 
         Args:
-            qarr_list: Non-empty list of ``Qarray`` objects with identical
-                ``dims`` and ``bdims``.
+            qarr_list: List of ``Qarray`` objects with identical ``dims`` and
+                ``bdims``.  May be empty.
 
         Returns:
             A ``Qarray`` with an extra leading batch dimension of size
@@ -1150,15 +1152,22 @@ class Qarray(Generic[ImplT]):
         if not all(qarr.dims == dims and qarr.bdims == bdims for qarr in qarr_list):
             raise ValueError("All Qarrays in the list must have the same dimensions.")
 
-        bdims = (len(qarr_list),) + bdims
+        new_bdims = (len(qarr_list),) + bdims
 
-        if all(q.is_sparse for q in qarr_list):
-            # Stack via dense intermediates, then re-sparsify
+        # Pick the target type: highest PROMOTION_ORDER wins (dense beats sparse).
+        target_impl_type = max(
+            (q.impl_type for q in qarr_list),
+            key=lambda t: t.get_impl_class().PROMOTION_ORDER,
+        )
+
+        if target_impl_type == QarrayImplType.SPARSE:
+            # All inputs are sparse — stack via dense intermediates then re-sparsify.
             data = jnp.array([q.data.todense() for q in qarr_list])
-            return cls.create(data, dims=dims, bdims=bdims, implementation=QarrayImplType.SPARSE)
+            return cls.create(data, dims=dims, bdims=new_bdims, implementation=QarrayImplType.SPARSE)
 
-        data = jnp.array([q.data for q in qarr_list])
-        return cls.create(data, dims=dims, bdims=bdims, implementation=QarrayImplType.DENSE)
+        # Target is dense: promote any sparse inputs before stacking.
+        data = jnp.array([q.to_dense().data for q in qarr_list])
+        return cls.create(data, dims=dims, bdims=new_bdims, implementation=QarrayImplType.DENSE)
 
     @classmethod
     @overload

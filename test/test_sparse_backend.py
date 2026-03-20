@@ -715,6 +715,39 @@ class TestFromListSparse:
         batch = jqt.Qarray.from_list([])
         assert batch is not None
 
+    def test_from_list_mixed_promotes_to_dense(self):
+        """Mixed sparse/dense list promotes all to dense."""
+        kets = [
+            jqt.basis(4, 0, implementation=QarrayImplType.SPARSE),
+            jqt.basis(4, 1),  # dense
+        ]
+        batch = jqt.Qarray.from_list(kets)
+        assert batch.is_dense
+
+    def test_from_list_mixed_correct_values(self):
+        """Mixed list values match an all-dense stack."""
+        kets_mixed = [
+            jqt.basis(4, k, implementation=QarrayImplType.SPARSE) if k % 2 == 0 else jqt.basis(4, k)
+            for k in range(4)
+        ]
+        kets_dense = [jqt.basis(4, k) for k in range(4)]
+        batch_mixed = jqt.Qarray.from_list(kets_mixed)
+        batch_dense = jqt.Qarray.from_list(kets_dense)
+        assert jnp.allclose(batch_mixed.data, batch_dense.data)
+
+    def test_from_list_all_sparse_stays_sparse(self):
+        """from_list with operators (not just kets) stays sparse when all are sparse."""
+        ops = [jqt.num(5, implementation=QarrayImplType.SPARSE) for _ in range(3)]
+        batch = jqt.Qarray.from_list(ops)
+        assert batch.is_sparse
+
+    def test_from_list_preserves_bdims(self):
+        """The leading batch dimension is len(qarr_list) regardless of impl."""
+        kets_s = [jqt.basis(4, k, implementation=QarrayImplType.SPARSE) for k in range(3)]
+        kets_d = [jqt.basis(4, k) for k in range(3)]
+        assert jqt.Qarray.from_list(kets_s).bdims == (3,)
+        assert jqt.Qarray.from_list(kets_d).bdims == (3,)
+
 
 # ===========================================================================
 # tensor() with sparse inputs → dense output  (documented behaviour)
