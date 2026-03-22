@@ -307,6 +307,40 @@ class QarrayImpl(ABC):
         """
         pass
 
+    @classmethod
+    @abstractmethod
+    def can_handle_data(cls, arr) -> bool:
+        """Return True if *arr* is a raw data type natively handled by this impl.
+
+        Used by the module-level :func:`dag_data` dispatcher to route raw
+        arrays to the correct backend without any isinstance chain outside the
+        impl classes.
+
+        Args:
+            arr: Raw array — e.g. ``jnp.ndarray`` for ``DenseImpl`` or
+                ``sparse.BCOO`` for ``SparseImpl``.
+
+        Returns:
+            True if this impl can operate on *arr* without conversion.
+        """
+        pass
+
+    @classmethod
+    @abstractmethod
+    def dag_data(cls, arr):
+        """Conjugate transpose of raw data in this impl's native format.
+
+        Implementations must handle batched arrays (last two axes are
+        swapped) and must not densify sparse arrays.
+
+        Args:
+            arr: Raw array in this impl's native format.
+
+        Returns:
+            Conjugate transpose with the last two axes swapped.
+        """
+        pass
+
     def _promote_to(self, target_cls: type) -> "QarrayImpl":
         """Convert this impl to *target_cls* by passing through dense.
 
@@ -545,6 +579,36 @@ class DenseImpl(QarrayImpl):
             A ``jnp.ndarray`` identity matrix of shape ``(n, n)``.
         """
         return jnp.eye(n, dtype=dtype)
+
+    @classmethod
+    def can_handle_data(cls, arr) -> bool:
+        """Return True for any non-BCOO array.
+
+        Args:
+            arr: Raw array.
+
+        Returns:
+            True when *arr* is not a ``sparse.BCOO`` (dense arrays and
+            array-likes are accepted).
+        """
+        return not isinstance(arr, sparse.BCOO)
+
+    @classmethod
+    def dag_data(cls, arr) -> Array:
+        """Conjugate transpose for dense arrays.
+
+        Swaps the last two axes via :func:`jnp.moveaxis` and conjugates all
+        elements.  For 1-D inputs only conjugation is applied.
+
+        Args:
+            arr: Dense array.
+
+        Returns:
+            Conjugate transpose with the last two axes swapped.
+        """
+        if len(arr.shape) == 1:
+            return jnp.conj(arr)
+        return jnp.moveaxis(jnp.conj(arr), -1, -2)
 
 
 @struct.dataclass
@@ -828,6 +892,39 @@ class SparseImpl(QarrayImpl):
             A ``sparse.BCOO`` identity matrix of shape ``(n, n)``.
         """
         return sparse.eye(n, dtype=dtype)
+
+    @classmethod
+    def can_handle_data(cls, arr) -> bool:
+        """Return True when *arr* is a ``sparse.BCOO`` array.
+
+        Args:
+            arr: Raw array.
+
+        Returns:
+            True if *arr* is a ``sparse.BCOO`` instance.
+        """
+        return isinstance(arr, sparse.BCOO)
+
+    @classmethod
+    def dag_data(cls, arr: sparse.BCOO) -> sparse.BCOO:
+        """Conjugate transpose for BCOO sparse arrays without densifying.
+
+        Uses :func:`jax.experimental.sparse.bcoo_transpose` to swap the last
+        two dimensions and conjugates the stored non-zero values in place.
+
+        Args:
+            arr: A ``sparse.BCOO`` array with ``ndim >= 2``.
+
+        Returns:
+            A ``sparse.BCOO`` containing the conjugate transpose.
+        """
+        ndim = arr.ndim
+        permutation = tuple(range(ndim - 2)) + (ndim - 1, ndim - 2)
+        transposed = sparse.bcoo_transpose(arr, permutation=permutation)
+        return sparse.BCOO(
+            (jnp.conj(transposed.data), transposed.indices),
+            shape=transposed.shape,
+        )
 
     def trace(self) -> Array:
         """Compute the trace of the last two matrix dimensions without densifying.
@@ -2350,22 +2447,29 @@ def dag(qarr: Qarray) -> Qarray:
     )
 
 
-def dag_data(arr: Array) -> Array:
-    """Conjugate transpose of a raw array.
+def dag_data(arr) -> Array:
+    """Conjugate transpose of a raw array, dispatching to the right backend.
+
+    Iterates through registered :class:`QarrayImpl` subclasses and delegates
+    to the first one whose :meth:`~QarrayImpl.can_handle_data` returns True.
+    Adding a new backend automatically extends this function — no changes
+    required here.
 
     Args:
-        arr: Input array.  If 1-D, only conjugation is applied (no transpose).
+        arr: Input array (``jnp.ndarray``, ``sparse.BCOO``, or any type
+            handled by a registered impl).  For 1-D dense arrays only
+            conjugation is applied (no transpose).
 
     Returns:
         Conjugate transpose with the last two axes swapped.
-    """
-    # TODO: revisit this case...
-    if len(arr.shape) == 1:
-        return jnp.conj(arr)
 
-    return jnp.moveaxis(
-        jnp.conj(arr), -1, -2
-    )  # transposes last two axes, good for batching
+    Raises:
+        TypeError: If no registered impl can handle *arr*.
+    """
+    for impl_class in _IMPL_REGISTRY:
+        if impl_class.can_handle_data(arr):
+            return impl_class.dag_data(arr)
+    raise TypeError(f"dag_data: no registered impl can handle type {type(arr)}")
 
 
 def ket2dm(qarr: Qarray) -> Qarray:

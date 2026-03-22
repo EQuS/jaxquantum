@@ -2,19 +2,21 @@
 
 Coverage map
 ------------
-SparseImpl._eye()           → TestSparseEye
-SparseImpl.trace()          → TestSparseTrace (non-batched + batched)
-SparseImpl.keep_only_diag() → TestSparseKeepDiag
-SparseImpl.l2_norm_batched()→ TestSparseL2Norm
-SparseImpl.tidy_up()        → TestSparseTidyUp
-Qarray.from_sparse()        → TestFromSparse
-Qarray.__eq__()  (sparse)   → TestSparseEquality
+SparseImpl._eye()            → TestSparseEye
+SparseImpl.trace()           → TestSparseTrace (non-batched + batched)
+SparseImpl.keep_only_diag()  → TestSparseKeepDiag
+SparseImpl.l2_norm_batched() → TestSparseL2Norm
+SparseImpl.tidy_up()         → TestSparseTidyUp
+Qarray.from_sparse()         → TestFromSparse
+Qarray.__eq__()  (sparse)    → TestSparseEquality
 Qarray.__add__/__sub__
-  scalar+identity            → TestSparseScalarAddSub
-tr()                        → TestTraceFn
-keep_only_diag_elements()   → TestKeepDiagFn
-norm()                      → TestNormFn
-operators with impl param   → TestSparseOperators
+  scalar+identity             → TestSparseScalarAddSub
+tr()                         → TestTraceFn
+keep_only_diag_elements()    → TestKeepDiagFn
+norm()                       → TestNormFn
+operators with impl param    → TestSparseOperators
+dag_data() dispatch          → TestDagDataDispatch
+mesolve with sparse c_ops    → TestMesolveSparseCollapse
 """
 
 import pytest
@@ -852,3 +854,150 @@ class TestMatmulSparseDense:
         result = a @ b
         expected = jqt.destroy(N) @ jqt.create(N)
         assert jnp.allclose(todense(result.data), expected.data)
+
+
+# ===========================================================================
+# dag_data() dispatch via impl registry  (QarrayImpl.can_handle_data / dag_data)
+# ===========================================================================
+
+class TestDagDataDispatch:
+    """dag_data() must dispatch to the right impl without any isinstance chain
+    in the caller — the registry routes dense and BCOO arrays automatically."""
+
+    def test_dense_array_returns_dense(self):
+        from jaxquantum.core.qarray import dag_data
+        arr = jnp.array([[1+0j, 2+1j], [0+0j, 3+0j]])
+        result = dag_data(arr)
+        assert isinstance(result, jnp.ndarray.__class__) or hasattr(result, "shape")
+        assert not isinstance(result, sparse.BCOO)
+
+    def test_dense_dag_correct_values(self):
+        from jaxquantum.core.qarray import dag_data
+        arr = jnp.array([[1+2j, 3+4j], [5+6j, 7+8j]])
+        result = dag_data(arr)
+        expected = jnp.conj(arr).T
+        assert jnp.allclose(result, expected)
+
+    def test_bcoo_returns_bcoo(self):
+        from jaxquantum.core.qarray import dag_data
+        arr = sparse.BCOO.fromdense(jnp.array([[1+0j, 2+1j], [0+0j, 3+0j]]))
+        result = dag_data(arr)
+        assert isinstance(result, sparse.BCOO)
+
+    def test_bcoo_dag_correct_values(self):
+        from jaxquantum.core.qarray import dag_data
+        mat = jnp.array([[1+2j, 3+0j], [0+0j, 4+1j]])
+        bcoo = sparse.BCOO.fromdense(mat)
+        result = dag_data(bcoo)
+        expected = jnp.conj(mat).T
+        assert jnp.allclose(result.todense(), expected)
+
+    def test_batched_dense_dag(self):
+        """Batched (n, N, N) dense — last two axes must be swapped."""
+        from jaxquantum.core.qarray import dag_data
+        mat = jnp.arange(18, dtype=complex).reshape(2, 3, 3)
+        result = dag_data(mat)
+        assert result.shape == (2, 3, 3)
+        for i in range(2):
+            assert jnp.allclose(result[i], jnp.conj(mat[i]).T)
+
+    def test_batched_bcoo_dag(self):
+        """Batched (n, N, N) BCOO — last two axes must be swapped without densifying."""
+        from jaxquantum.core.qarray import dag_data
+        mat = jnp.array([[[1+1j, 2+0j], [0+0j, 3+1j]],
+                          [[0+0j, 4+0j], [5+1j, 0+0j]]])  # (2, 2, 2)
+        bcoo = sparse.BCOO.fromdense(mat)
+        result = dag_data(bcoo)
+        assert isinstance(result, sparse.BCOO)
+        assert result.shape == (2, 2, 2)
+        for i in range(2):
+            assert jnp.allclose(result.todense()[i], jnp.conj(mat[i]).T)
+
+    def test_can_handle_data_dense(self):
+        arr = jnp.eye(3)
+        assert DenseImpl.can_handle_data(arr) is True
+        assert SparseImpl.can_handle_data(arr) is False
+
+    def test_can_handle_data_sparse(self):
+        arr = sparse.BCOO.fromdense(jnp.eye(3))
+        assert SparseImpl.can_handle_data(arr) is True
+        assert DenseImpl.can_handle_data(arr) is False
+
+
+# ===========================================================================
+# mesolve with sparse collapse operators
+# ===========================================================================
+
+class TestMesolveSparseCollapse:
+    """Verify that mesolve accepts sparse Qarrays as c_ops and produces the
+    same trajectory as the dense equivalent."""
+
+    def _make_decay_system(self, N=4, kappa=1.0, sparse_c=False):
+        """Single-mode amplitude-damping channel starting from |1><1|."""
+        a = jqt.destroy(N)
+        rho0 = jqt.ket2dm(jqt.basis(N, 1))   # |1><1|
+
+        if sparse_c:
+            c_op = jnp.sqrt(kappa) * jqt.destroy(N, implementation=QarrayImplType.SPARSE)
+        else:
+            c_op = jnp.sqrt(kappa) * a
+
+        c_ops = jqt.Qarray.from_list([c_op])
+
+        H = jnp.zeros((1,), dtype=complex)[0] * (a.dag() @ a)  # zero Hamiltonian
+        tlist = jnp.linspace(0.0, 3.0, 30)
+        return H, rho0, c_ops, tlist
+
+    def test_sparse_c_ops_run(self):
+        """mesolve with sparse c_ops must not raise any exception."""
+        H, rho0, c_ops_sparse, tlist = self._make_decay_system(sparse_c=True)
+        result = jqt.mesolve(H, rho0, tlist, c_ops=c_ops_sparse,
+                              solver_options=jqt.SolverOptions.create(progress_meter=False))
+        assert result is not None
+
+    def test_sparse_c_ops_match_dense(self):
+        """Trajectory with sparse c_ops must match the dense-c_ops trajectory."""
+        N = 4
+        H, rho0, c_ops_dense, tlist = self._make_decay_system(N=N, sparse_c=False)
+        _, _, c_ops_sparse, _ = self._make_decay_system(N=N, sparse_c=True)
+
+        opts = jqt.SolverOptions.create(progress_meter=False)
+        dense_result = jqt.mesolve(H, rho0, tlist, c_ops=c_ops_dense, solver_options=opts)
+        sparse_result = jqt.mesolve(H, rho0, tlist, c_ops=c_ops_sparse, solver_options=opts)
+
+        # Both should give nearly identical density matrices at every saved time
+        assert jnp.allclose(
+            dense_result.data,
+            sparse_result.data,
+            atol=1e-5,
+        ), "sparse c_ops trajectory differs from dense c_ops trajectory"
+
+    def test_sparse_c_ops_decay_to_ground(self):
+        """After long evolution, amplitude damping should leave the system in |0><0|."""
+        N = 4
+        kappa = 2.0
+        H, rho0, c_ops_sparse, tlist = self._make_decay_system(
+            N=N, kappa=kappa, sparse_c=True
+        )
+        opts = jqt.SolverOptions.create(progress_meter=False)
+        result = jqt.mesolve(H, rho0, tlist, c_ops=c_ops_sparse, solver_options=opts)
+
+        # Final state: last time point
+        rho_final = result[-1]
+        ground_dm = jqt.ket2dm(jqt.basis(N, 0))
+        fidelity = jnp.real(jqt.tr(ground_dm @ rho_final))
+        assert float(fidelity) > 0.99, f"Expected decay to |0>, got fidelity {fidelity}"
+
+    def test_sparse_c_ops_c_ops_dag_precomputed(self):
+        """c_ops_dag is precomputed (BCOO) — verify the dag is correct before solve."""
+        from jaxquantum.core.qarray import dag_data
+        N = 4
+        a_s = jqt.destroy(N, implementation=QarrayImplType.SPARSE)
+        c_op_data = a_s.data  # BCOO shape (N, N)
+        # Batch it as mesolve would: shape (1, N, N)
+        batched = sparse.BCOO.fromdense(c_op_data.todense()[None])  # (1,N,N)
+        c_ops_dag = dag_data(batched)
+        assert isinstance(c_ops_dag, sparse.BCOO)
+        # dag of a batched BCOO should equal dag of the dense version
+        expected = jnp.conj(c_op_data.todense()).T[None]  # (1, N, N)
+        assert jnp.allclose(c_ops_dag.todense(), expected)

@@ -18,6 +18,7 @@ import tqdm
 import logging
 
 
+from jax.experimental import sparse as jax_sparse
 from jaxquantum.core.qarray import Qarray, Qtypes, dag_data
 from jaxquantum.core.conversions import jnp2jqt
 from jaxquantum.core.operators import identity_like, multi_mode_basis_set
@@ -199,22 +200,41 @@ def _mesolve_data(
 
     ρ0 = rho0
 
+    # Shape inference: when c_ops contains batched operators (e.g. shape
+    # (1, B, N, N)), the initial state ρ0 must be broadcast to (B, N, N) so
+    # that the ODE RHS produces consistently shaped output.
+    #
+    # The output batch shape is the broadcast of:
+    #   c_ops[0] batch dims  →  c_ops.shape[1:-2]  (outer batch index stripped)
+    #   H batch dims         →  H(0.0).shape[:-2]
+    #   ρ0 batch dims        →  ρ0.shape[:-2]
+    # This is a pure shape calculation — no array values are materialised.
+    H0_shape = H(0.0).shape
     if len(c_ops) == 0:
-        test_data = H(0.0) @ ρ0
+        batch_shape = jnp.broadcast_shapes(H0_shape[:-2], ρ0.shape[:-2])
     else:
-        test_data = c_ops[0] @ H(0.0) @ ρ0
-
-    ρ0 = jnp.resize(ρ0, test_data.shape)  # ensure correct shape
+        # c_ops.shape[1:-2]: strip the outermost (c_op index) dim and the two
+        # matrix dims to get the batch dims that will be broadcast into ρ.
+        batch_shape = jnp.broadcast_shapes(
+            c_ops.shape[1:-2], H0_shape[:-2], ρ0.shape[:-2]
+        )
+    ρ0 = jnp.resize(ρ0, batch_shape + ρ0.shape[-2:])  # ensure correct shape
 
     if len(c_ops) != 0:
         c_ops_bdims = c_ops.shape[:-2]
         c_ops = c_ops.reshape(*c_ops_bdims, c_ops.shape[-2], c_ops.shape[-1])
 
+    # Precompute the adjoint once, outside the ODE hot-loop.
+    # dag_data dispatches to the correct impl (dense or sparse) automatically,
+    # so c_ops_dag is BCOO when c_ops is sparse and a dense array otherwise.
+    c_ops_dag = dag_data(c_ops) if len(c_ops) != 0 else c_ops
+
     def f(
         t: float,
         rho: Array,
-        c_ops_val: Array,
+        args,
     ):
+        c_ops_val, c_ops_dag_val = args
         H_val = H(t)  # type: ignore
 
         rho_dot = -1j * (H_val @ rho - rho @ H_val)
@@ -222,13 +242,19 @@ def _mesolve_data(
         if len(c_ops_val) == 0:
             return rho_dot
 
-        c_ops_val_dag = dag_data(c_ops_val)
+        # Compute the Lindblad dissipator D[L](ρ) = L ρ L† - ½(L†L ρ + ρ L†L)
+        # using only  (sparse L) @ (dense rho)  operations to support BCOO
+        # collapse operators natively — no dense @ sparse required:
+        #
+        #   L ρ L†  = dag( L @ dag(L @ ρ) )     avoids the dense @ L† step
+        #   L†L ρ   = L† @ (L @ ρ)              BCOO @ dense → dense ✓
+        #   ρ L†L   = dag(L†L ρ)                dag of dense ✓  (ρ Hermitian)
+        Lrho = c_ops_val @ rho
+        LrhoLdag = dag_data(c_ops_val @ dag_data(Lrho))
+        LdagLrho = c_ops_dag_val @ Lrho
+        rhoLdagL = dag_data(LdagLrho)
 
-        rho_dot_delta = 0.5 * (
-            2 * c_ops_val @ rho @ c_ops_val_dag
-            - rho @ c_ops_val_dag @ c_ops_val
-            - c_ops_val_dag @ c_ops_val @ rho
-        )
+        rho_dot_delta = 0.5 * (2 * LrhoLdag - LdagLrho - rhoLdagL)
 
         rho_dot_delta = jnp.sum(rho_dot_delta, axis=0)
 
@@ -236,7 +262,7 @@ def _mesolve_data(
 
         return rho_dot
 
-    sol = solve(f, ρ0, tlist, saveat_tlist, c_ops,
+    sol = solve(f, ρ0, tlist, saveat_tlist, (c_ops, c_ops_dag),
                 solver_options=solver_options)
 
     return sol.ys
