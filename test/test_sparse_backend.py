@@ -775,11 +775,45 @@ class TestTensorSparse:
         b = jqt.create(3)
         assert jqt.tensor(a, b).is_dense
 
-    def test_tensor_parallel_always_dense(self):
-        """tensor(parallel=True) always returns dense even for sparse inputs."""
+    def test_tensor_parallel_all_sparse_stays_sparse(self):
+        """tensor(parallel=True) with all-sparse inputs must return sparse."""
         a = jqt.destroy(3, implementation=QarrayImplType.SPARSE)
         b = jqt.create(3, implementation=QarrayImplType.SPARSE)
+        assert jqt.tensor(a, b, parallel=True).is_sparse
+
+    def test_tensor_parallel_all_dense_stays_dense(self):
+        """tensor(parallel=True) with all-dense inputs must return dense."""
+        a = jqt.destroy(3)
+        b = jqt.create(3)
         assert jqt.tensor(a, b, parallel=True).is_dense
+
+    def test_tensor_parallel_mixed_returns_dense(self):
+        """tensor(parallel=True) with mixed inputs promotes to dense."""
+        a = jqt.destroy(3, implementation=QarrayImplType.SPARSE)
+        b = jqt.create(3)
+        assert jqt.tensor(a, b, parallel=True).is_dense
+
+    def test_tensor_parallel_sparse_correct_values(self):
+        """tensor(parallel=True) with sparse inputs must give the same values as dense."""
+        a_s = jqt.destroy(4, implementation=QarrayImplType.SPARSE)
+        b_s = jqt.create(4, implementation=QarrayImplType.SPARSE)
+        a_d = jqt.destroy(4)
+        b_d = jqt.create(4)
+        result_sparse = jqt.tensor(a_s, b_s, parallel=True)
+        result_dense = jqt.tensor(a_d, b_d, parallel=True)
+        assert jnp.allclose(result_sparse.data.todense(), result_dense.data)
+
+    def test_tensor_parallel_matches_non_parallel_sparse(self):
+        """parallel and non-parallel paths must agree on sparse inputs."""
+        a = jqt.destroy(3, implementation=QarrayImplType.SPARSE)
+        b = jqt.create(3, implementation=QarrayImplType.SPARSE)
+        parallel_result = jqt.tensor(a, b, parallel=True)
+        serial_result = jqt.tensor(a, b)
+        assert parallel_result.is_sparse
+        assert serial_result.is_sparse
+        assert jnp.allclose(
+            parallel_result.data.todense(), serial_result.data.todense()
+        )
 
     def test_tensor_sparse_correct_values(self):
         """Values from tensor() with sparse inputs must match the dense counterpart."""

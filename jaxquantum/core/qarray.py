@@ -2090,19 +2090,28 @@ def tensor(*args, **kwargs) -> Qarray:
             an einsum-based batched outer product instead of ``jnp.kron``.
 
     Returns:
-        The tensor product as a ``Qarray``.  When all inputs share the same
-        backend (e.g. all sparse), the output uses that backend.  Mixed inputs
-        or ``parallel=True`` always produce a dense result.
+        The tensor product as a ``Qarray``.  The output implementation is
+        determined by the highest ``PROMOTION_ORDER`` among the inputs: all-sparse
+        inputs → sparse output; any dense input → dense output.  This holds for
+        both ``parallel=True`` and ``parallel=False``.
 
     Note:
-        ``parallel=True`` uses an einsum-based batched outer product and always
-        returns a dense ``Qarray``.  For the default (``parallel=False``) path,
-        each backend's ``kron`` method is used, so all-sparse inputs stay sparse.
+        ``parallel=True`` uses an einsum-based batched outer product.  The
+        einsum is always computed on dense data for efficiency, but the result
+        is then wrapped in the appropriate backend (sparse when all inputs are
+        sparse, dense otherwise).  For the default (``parallel=False``) path
+        each backend's ``kron`` method is used directly.
     """
     parallel = kwargs.pop("parallel", False)
 
     if parallel:
-        # Einsum-based batched outer product — dense only.
+        # Determine target implementation: highest PROMOTION_ORDER wins.
+        # All-sparse → sparse; any dense input → dense (same rule as non-parallel).
+        target_impl_type = max(
+            (arg.impl_type for arg in args),
+            key=lambda t: t.get_impl_class().PROMOTION_ORDER,
+        )
+        # Einsum-based batched outer product (computed on dense data).
         dense_args = [arg.to_dense() for arg in args]
         data = dense_args[0].data
         dims_0 = dense_args[0].dims[0]
@@ -2115,12 +2124,14 @@ def tensor(*args, **kwargs) -> Qarray:
                 batch_dim = a.shape[:-2] if prod(a.shape[:-2]) > prod(b.shape[:-2]) else b.shape[:-2]
             else:
                 batch_dim = b.shape[:-2]
+
+            # NOTE: implementation einsum should be used when available
             data = jnp.einsum("...ij,...kl->...ikjl", a, b).reshape(
                 *batch_dim, a.shape[-2] * b.shape[-2], -1
             )
             dims_0 = dims_0 + arg.dims[0]
             dims_1 = dims_1 + arg.dims[1]
-        return Qarray.create(data, dims=(dims_0, dims_1))
+        return Qarray.create(data, dims=(dims_0, dims_1), implementation=target_impl_type)
 
     # Non-parallel: delegate to each impl's kron method.
     # All-sparse inputs stay sparse; mixed inputs promote to dense via _coerce.
