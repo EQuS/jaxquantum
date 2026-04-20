@@ -641,8 +641,9 @@ def _sparsedia_kron(a: SparseDiaImpl, b: SparseDiaImpl) -> SparseDiaImpl:
     """
     n_A = a._diags.shape[-1]
     m = b._diags.shape[-1]
-    N = n_A * m
-    batch_shape = jnp.broadcast_shapes(a._diags.shape[:-2], b._diags.shape[:-2])
+    
+    # N = n_A * m
+    # batch_shape = jnp.broadcast_shapes(a._diags.shape[:-2], b._diags.shape[:-2])
 
     # Accumulate contributions per output offset
     out_accum: dict[int, Array] = {}
