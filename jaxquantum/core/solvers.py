@@ -150,6 +150,10 @@ def mesolve(
         )
 
     ρ0 = rho0.to_dm()
+
+    if robust_isscalar(H):
+        H = H * identity_like(ρ0)  # treat scalar H as a multiple of the identity
+
     dims = ρ0.dims
     ρ0 = ρ0.data
 
@@ -302,6 +306,10 @@ def sesolve(
         )
 
     ψ = ψ.to_ket()
+
+    if robust_isscalar(H):
+        H = H * identity_like(ψ)  # treat scalar H as a multiple of the identity
+
     dims = ψ.dims
     ψ = ψ.data
 

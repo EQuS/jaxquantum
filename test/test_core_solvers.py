@@ -165,5 +165,44 @@ def test_mesolve_edge_cases():
     assert jnp.isclose(test_szt, cal_szt, atol=1e-5)
 
 
+def test_sesolve_scalar_H():
+    """sesolve with a scalar H = omega should behave like H = omega * I."""
+    N = 4
+    omega = 2.0
+    psi0 = jqt.basis(N, 1)
+    ts = jnp.linspace(0, 1.0, 50)
+
+    states_scalar = jqt.sesolve(omega, psi0, ts)
+
+    H_ref = omega * jqt.identity(N)
+    states_ref = jqt.sesolve(H_ref, psi0, ts)
+
+    assert jnp.allclose(
+        jnp.abs(states_scalar.data) ** 2,
+        jnp.abs(states_ref.data) ** 2,
+        atol=1e-6,
+    ), "sesolve scalar H populations differ from omega*I reference"
+
+
+def test_mesolve_scalar_H():
+    """mesolve with a scalar H should match H = omega * I."""
+    N = 4
+    omega = 1.0
+    kappa = 0.2
+    rho0 = jqt.basis(N, 2).to_dm()
+    ts = jnp.linspace(0, 2.0, 40)
+    c_ops = jqt.Qarray.from_list([jqt.destroy(N) * jnp.sqrt(kappa)])
+    opts = jqt.SolverOptions.create(progress_meter=False)
+
+    result_scalar = jqt.mesolve(omega, rho0, ts, c_ops=c_ops, solver_options=opts)
+
+    H_ref = omega * jqt.identity(N)
+    result_ref = jqt.mesolve(H_ref, rho0, ts, c_ops=c_ops, solver_options=opts)
+
+    assert jnp.allclose(
+        result_scalar.data, result_ref.data, atol=1e-6
+    ), "mesolve scalar H differs from omega*I reference"
+
+
 # ====
 
