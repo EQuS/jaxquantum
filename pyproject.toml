@@ -45,6 +45,8 @@ dev = [
     "pylint",
     "black",
     "coverage",
+    "build",
+    "twine",
 ]
 docs = [
     "mkdocs",
