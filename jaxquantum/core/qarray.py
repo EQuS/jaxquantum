@@ -1672,6 +1672,9 @@ def norm(qarr: Qarray) -> float:
         # jnp.real strips any floating-point imaginary artefact.
         return jnp.real(qarr._impl.trace())
 
+    if qarr.qtype == Qtypes.oper and qarr.is_sparse_dia:
+        return jnp.real(qarr._impl.trace())
+
     qarr = qarr.to_dense()
 
     qdata = qarr.data
@@ -1783,6 +1786,8 @@ def tr(qarr: Qarray, **kwargs) -> Array:
         The trace as a scalar (or batched array of scalars).
     """
     if qarr.is_sparse_bcoo:
+        return qarr._impl.trace()
+    if qarr.is_sparse_dia:
         return qarr._impl.trace()
     axis1 = kwargs.get("axis1", -2)
     axis2 = kwargs.get("axis2", -1)
@@ -1956,6 +1961,17 @@ def keep_only_diag_elements(qarr: Qarray) -> Qarray:
     if qarr.is_sparse_bcoo:
         new_impl = qarr._impl.keep_only_diag()
         return Qarray.create(new_impl.data, dims=dims, implementation=QarrayImplType.SPARSE_BCOO)
+    if qarr.is_sparse_dia:
+        from jaxquantum.core.sparse_dia import SparseDiaImpl
+        impl = qarr._impl
+        n = impl._diags.shape[-1]
+        if 0 in impl._offsets:
+            i = impl._offsets.index(0)
+            main_diag = impl._diags[..., i:i + 1, :]
+        else:
+            main_diag = jnp.zeros((*impl._diags.shape[:-2], 1, n), dtype=impl._diags.dtype)
+        new_impl = SparseDiaImpl(_offsets=(0,), _diags=main_diag)
+        return Qarray.create(new_impl.get_data(), dims=dims, implementation=QarrayImplType.SPARSE_DIA)
     data = jnp.diag(jnp.diag(qarr.data))
     return Qarray.create(data, dims=dims)
 
