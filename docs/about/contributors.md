@@ -11,7 +11,7 @@ This package is open source and, as such, very open to contributions. Please don
 As a contributor, you should install jaxquantum in editable mode with the `dev` and `docs` extra:
 
 ```
-pip install --upgrade -e ".[dev,docs]" 
+pip install --upgrade -e ".[dev,docs,tests]" 
 ```
 
 ### Run Tests
