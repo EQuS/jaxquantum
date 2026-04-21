@@ -9,6 +9,36 @@ This is a non-exhaustive, but growing list of common pitfalls when using `jaxqua
 Often the sharp bits poking at you originate from the functional paradigm within which JAX operates. The JAX developers have compiled a great list of these common "gotchas": https://docs.jax.dev/en/latest/notebooks/Common_Gotchas_in_JAX.html 
 
 
+# JIT-compile your own functions
+
+jaxquantum functions (`mesolve`, `sesolve`, `displace`, operator constructors, etc.) are **not** JIT-compiled by default — they run in eager mode on every call. To get full XLA speed, wrap your own code with `jax.jit`:
+
+```python
+import jax
+import jaxquantum as jqt
+import jax.numpy as jnp
+
+@jax.jit
+def decaying_osc(kappa):
+    N = 20
+    H     = jqt.num(N)
+    rho0  = jqt.ket2dm(jqt.basis(N, 4))
+    c_ops = jqt.Qarray.from_list([jnp.sqrt(kappa) * jqt.destroy(N)])
+    return jqt.mesolve(H, rho0, jnp.linspace(0, 10, 100), c_ops=c_ops)
+
+result = decaying_osc(jnp.array(0.1))  # first call: compiles
+result = decaying_osc(jnp.array(0.3))  # subsequent calls: fast
+```
+
+!!! tip
+    Any function you call repeatedly — parameter sweeps, fitting loops, circuit simulations — should be wrapped with `@jax.jit`. Without it you pay eager-mode overhead on every call and leave most of JAX's performance on the table.
+
+    Note that `N` (the Hilbert space dimension) must be a **static** value for JIT to work. If you need to vary `N`, use `static_argnames`:
+    ```python
+    @partial(jax.jit, static_argnames=["N"])
+    def my_fn(N, alpha): ...
+    ```
+
 # Constant folding
 
 JAX constant folding is an optimization where constant expressions are evaluated at compile time rather than runtime, reducing computation during execution. For example, if a function contains only operations on constants, JAX may precompute the result and replace the expression with the constant value.
