@@ -32,20 +32,20 @@ def test_implementation_types():
     # Test dense implementation (default)
     a_dense = jqt.Qarray.create(jnp.array([1, 2, 3]))
     assert a_dense.is_dense
-    assert not a_dense.is_sparse
+    assert not a_dense.is_sparse_bcoo
     assert isinstance(a_dense._impl, jqt.DenseImpl)
     
     # Test sparse implementation
-    a_sparse = jqt.Qarray.create(jnp.array([1, 2, 3]), implementation=jqt.QarrayImplType.SPARSE)
-    assert a_sparse.is_sparse
+    a_sparse = jqt.Qarray.create(jnp.array([1, 2, 3]), implementation=jqt.QarrayImplType.SPARSE_BCOO)
+    assert a_sparse.is_sparse_bcoo
     assert not a_sparse.is_dense
-    assert isinstance(a_sparse._impl, jqt.SparseImpl)
+    assert isinstance(a_sparse._impl, jqt.SparseBCOOImpl)
     
     # Test from_sparse
     sparse_data = sparse.BCOO.fromdense(jnp.array([[1, 0], [0, 2]]))
-    a_from_sparse = jqt.Qarray.from_sparse(sparse_data)
-    assert a_from_sparse.is_sparse
-    assert isinstance(a_from_sparse._impl, jqt.SparseImpl)
+    a_from_sparse = jqt.Qarray.from_sparse_bcoo(sparse_data)
+    assert a_from_sparse.is_sparse_bcoo
+    assert isinstance(a_from_sparse._impl, jqt.SparseBCOOImpl)
 
 def test_conversion_between_implementations():
     """Test conversion between dense and sparse implementations."""
@@ -54,8 +54,8 @@ def test_conversion_between_implementations():
     
     # Dense to sparse
     a_dense = jqt.Qarray.create(data)
-    a_sparse = a_dense.to_sparse()
-    assert a_sparse.is_sparse
+    a_sparse = a_dense.to_sparse_bcoo()
+    assert a_sparse.is_sparse_bcoo
     assert jnp.allclose(a_dense.data, a_sparse.data.todense())
     
     # Sparse to dense
@@ -65,7 +65,7 @@ def test_conversion_between_implementations():
     
     # Test that conversion is idempotent
     assert a_dense.to_dense() == a_dense
-    assert a_sparse.to_sparse() == a_sparse
+    assert a_sparse.to_sparse_bcoo() == a_sparse
 
 def test_implementation_preservation():
     """Test that operations preserve implementation type when possible."""
@@ -82,20 +82,20 @@ def test_implementation_preservation():
     assert a.dag().is_dense
     
     # Sparse operations should stay sparse for supported operations
-    a_sparse = a.to_sparse()
-    b_sparse = b.to_sparse()
+    a_sparse = a.to_sparse_bcoo()
+    b_sparse = b.to_sparse_bcoo()
     
-    assert (a_sparse + b_sparse).is_sparse
-    assert (a_sparse - b_sparse).is_sparse
-    assert (a_sparse @ b_sparse).is_sparse
-    assert (a_sparse * 2).is_sparse
+    assert (a_sparse + b_sparse).is_sparse_bcoo
+    assert (a_sparse - b_sparse).is_sparse_bcoo
+    assert (a_sparse @ b_sparse).is_sparse_bcoo
+    assert (a_sparse * 2).is_sparse_bcoo
     # Note: dag() converts to dense for sparse due to JAX limitations
 
 def test_mixed_implementation_operations():
     """Test operations between dense and sparse implementations."""
     
     a_dense = jqt.Qarray.create(jnp.array([[1, 2], [3, 4]]))
-    a_sparse = a_dense.to_sparse()
+    a_sparse = a_dense.to_sparse_bcoo()
     
     # Mixed operations should work (auto-conversion)
     result1 = a_dense + a_sparse
@@ -115,7 +115,7 @@ def test_mixed_implementation_operations():
     
     # Test with different sparse matrices
     sparse_data = sparse.BCOO.fromdense(jnp.array([[1, 0], [0, 2]]))
-    b_sparse = jqt.Qarray.from_sparse(sparse_data)
+    b_sparse = jqt.Qarray.from_sparse_bcoo(sparse_data)
     
     result5 = a_dense + b_sparse
     result6 = b_sparse + a_dense
@@ -225,21 +225,21 @@ def test_sparse_creation_and_operations():
     
     # Create a sparse matrix
     dense_data = jnp.array([[1, 0, 2], [0, 3, 0], [4, 0, 5]])
-    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE)
+    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE_BCOO)
     
     # Test that it's actually sparse
-    assert a_sparse.is_sparse
+    assert a_sparse.is_sparse_bcoo
     assert hasattr(a_sparse.data, 'todense')  # BCOO has todense method
     
     # Test sparse operations
     b_sparse = a_sparse + a_sparse
-    assert b_sparse.is_sparse
+    assert b_sparse.is_sparse_bcoo
     
     c_sparse = a_sparse * 2
-    assert c_sparse.is_sparse
+    assert c_sparse.is_sparse_bcoo
     
     d_sparse = a_sparse @ a_sparse
-    assert d_sparse.is_sparse
+    assert d_sparse.is_sparse_bcoo
     
     # Test that results are correct
     assert jnp.allclose(b_sparse.data.todense(), dense_data * 2)
@@ -250,7 +250,7 @@ def test_sparse_fallback_operations():
     """Test operations that should fallback to dense for sparse."""
     
     dense_data = jnp.array([[1, 0, 2], [0, 3, 0], [4, 0, 5]])
-    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE)
+    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE_BCOO)
     
     # These operations should convert to dense automatically
     exp_a = a_sparse.expm()
@@ -275,7 +275,7 @@ def test_sparse_eigenoperations():
     
     # Create a Hermitian sparse matrix
     dense_data = jnp.array([[2, 0, 1], [0, 3, 0], [1, 0, 2]])
-    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE)
+    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE_BCOO)
     
     # Eigenvalue operations should convert to dense
     evals_sparse = a_sparse.eigenenergies()
@@ -296,12 +296,12 @@ def test_sparse_tensor_operations():
     dense_data1 = jnp.array([[1, 0], [0, 2]])
     dense_data2 = jnp.array([[3, 0, 0], [0, 4, 0], [0, 0, 5]])
     
-    a_sparse = jqt.Qarray.create(dense_data1, implementation="sparse")
-    b_sparse = jqt.Qarray.create(dense_data2, implementation="sparse")
+    a_sparse = jqt.Qarray.create(dense_data1, implementation="sparse_bcoo")
+    b_sparse = jqt.Qarray.create(dense_data2, implementation="sparse_bcoo")
     
     # Tensor product of two sparse arrays stays sparse
     tensor_result = a_sparse ^ b_sparse
-    assert tensor_result.is_sparse
+    assert tensor_result.is_sparse_bcoo
     
     # Compare with dense result
     a_dense = a_sparse.to_dense()
@@ -323,7 +323,7 @@ def test_sparse_memory_efficiency():
             dense_data = dense_data.at[i, i+1].set(1)
     
     a_dense = jqt.Qarray.create(dense_data)
-    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE)
+    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE_BCOO)
     
     # Both should give the same results
     a_sparse_dense = a_sparse.data.todense() if hasattr(a_sparse.data, 'todense') else a_sparse.data
@@ -366,12 +366,12 @@ def test_sparse_error_handling():
     
     # Test creating sparse from non-2D data
     # This actually works now - BCOO can handle 1D data
-    sparse_1d = jqt.Qarray.create(jnp.array([1, 2, 3]), implementation=jqt.QarrayImplType.SPARSE)
-    assert sparse_1d.is_sparse
+    sparse_1d = jqt.Qarray.create(jnp.array([1, 2, 3]), implementation=jqt.QarrayImplType.SPARSE_BCOO)
+    assert sparse_1d.is_sparse_bcoo
     
     # Test operations that should fail gracefully
     dense_data = jnp.array([[1, 0], [0, 2]])
-    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE)
+    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE_BCOO)
     
     # These should work (with fallback to dense if needed)
     try:
@@ -385,7 +385,7 @@ def test_sparse_new_operations():
     
     # Create a complex sparse matrix
     dense_data = jnp.array([[1+2j, 0, 3+4j], [0, 5+6j, 0], [7+8j, 0, 9+10j]])
-    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE)
+    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE_BCOO)
     a_dense = a_sparse.to_dense()
     
     # Test frobenius_norm
@@ -396,26 +396,26 @@ def test_sparse_new_operations():
     # Test real part
     real_sparse = a_sparse.real()
     real_dense = a_dense.real()
-    assert real_sparse.is_sparse, "Real part should stay sparse"
+    assert real_sparse.is_sparse_bcoo, "Real part should stay sparse"
     assert jnp.allclose(real_sparse.data.todense(), real_dense.data), "Real parts should match"
     
     # Test imaginary part
     imag_sparse = a_sparse.imag()
     imag_dense = a_dense.imag()
-    assert imag_sparse.is_sparse, "Imaginary part should stay sparse"
+    assert imag_sparse.is_sparse_bcoo, "Imaginary part should stay sparse"
     assert jnp.allclose(imag_sparse.data.todense(), imag_dense.data), "Imaginary parts should match"
     
     # Test conjugate
     conj_sparse = a_sparse.conj()
     conj_dense = a_dense.conj()
-    assert conj_sparse.is_sparse, "Conjugate should stay sparse"
+    assert conj_sparse.is_sparse_bcoo, "Conjugate should stay sparse"
     assert jnp.allclose(conj_sparse.data.todense(), conj_dense.data), "Conjugates should match"
     
     
     # Test dag (should now stay sparse)
     dag_sparse = a_sparse.dag()
     dag_dense = a_dense.dag()
-    assert dag_sparse.is_sparse, "Dag should stay sparse"
+    assert dag_sparse.is_sparse_bcoo, "Dag should stay sparse"
     assert jnp.allclose(dag_sparse.data.todense(), dag_dense.data), "Dags should match"
 
 def test_sparse_dag_performance():
@@ -429,11 +429,11 @@ def test_sparse_dag_performance():
     dense_data = dense_data.at[0, 1].set(1+2j)
     dense_data = dense_data.at[1, 0].set(3+4j)
     
-    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE)
+    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE_BCOO)
     
     # Test that dag stays sparse
     dag_sparse = a_sparse.dag()
-    assert dag_sparse.is_sparse, "Dag should stay sparse"
+    assert dag_sparse.is_sparse_bcoo, "Dag should stay sparse"
     
     # Verify correctness
     dag_dense = a_sparse.to_dense().dag()
@@ -446,14 +446,14 @@ def test_sparse_batched_operations():
     batched_data = jnp.array([[[1+2j, 3+4j], [5+6j, 7+8j]], 
                               [[9+10j, 11+12j], [13+14j, 15+16j]]])
     
-    sparse_batched = jqt.Qarray.create(batched_data, implementation=jqt.QarrayImplType.SPARSE)
+    sparse_batched = jqt.Qarray.create(batched_data, implementation=jqt.QarrayImplType.SPARSE_BCOO)
     dense_batched = sparse_batched.to_dense()
     
     # Test dag with batched data
     sparse_dag = sparse_batched.dag()
     dense_dag = dense_batched.dag()
     
-    assert sparse_dag.is_sparse, "Batched dag should stay sparse"
+    assert sparse_dag.is_sparse_bcoo, "Batched dag should stay sparse"
     assert sparse_dag.shape == dense_dag.shape, "Shapes should match"
     assert jnp.allclose(sparse_dag.data.todense(), dense_dag.data), "Batched dag results should match"
     
@@ -477,7 +477,7 @@ def test_basic_performance():
             dense_data = dense_data.at[i, i+1].set(1)
     
     a_dense = jqt.Qarray.create(dense_data)
-    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE)
+    a_sparse = jqt.Qarray.create(dense_data, implementation=jqt.QarrayImplType.SPARSE_BCOO)
     
     # Test that both give the same results for basic operations
     # Addition

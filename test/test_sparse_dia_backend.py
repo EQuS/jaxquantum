@@ -7,7 +7,7 @@ Coverage:
   - add / sub: SparseDIA ± SparseDIA
   - scalar mul, neg
   - real, imag, conj
-  - to_dense / to_sparse / to_sparse_dia conversions
+  - to_dense / to_sparse_bcoo / to_sparse_dia conversions
   - kron: SparseDIA ⊗ SparseDIA
   - tidy_up
   - trace, frobenius_norm
@@ -26,10 +26,10 @@ import pytest
 import jaxquantum as jqt
 from jaxquantum.core.qarray import (
     DenseImpl,
-    SparseImpl,
     QarrayImplType,
     dag_data,
 )
+from jaxquantum.core.sparse_bcoo import SparseBCOOImpl
 from jaxquantum.core.sparse_dia import SparseDiaData, SparseDiaImpl, _dia_slice
 
 
@@ -102,7 +102,7 @@ class TestConstruction:
 
 
 # ===========================================================================
-# to_dense / to_sparse / to_sparse_dia
+# to_dense / to_sparse_bcoo / to_sparse_dia
 # ===========================================================================
 
 
@@ -123,10 +123,10 @@ class TestConversions:
         impl = SparseDiaImpl.from_data(mat)
         assert jnp.allclose(impl.to_dense()._data, mat)
 
-    def test_to_sparse_is_bcoo(self):
+    def test_to_sparse_bcoo_is_bcoo(self):
         impl = SparseDiaImpl.from_data(jnp.array(_dense_num(N)))
-        sparse_impl = impl.to_sparse()
-        assert isinstance(sparse_impl, SparseImpl)
+        sparse_impl = impl.to_sparse_bcoo()
+        assert isinstance(sparse_impl, SparseBCOOImpl)
 
     def test_to_sparse_dia_is_self(self):
         impl = SparseDiaImpl.from_data(jnp.array(_dense_num(N)))
@@ -477,7 +477,7 @@ class TestQarrayAPI:
         a = jqt.Qarray.create(jnp.array(_dense_destroy(N)), implementation="sparse_dia")
         assert a.is_sparse_dia
         assert not a.is_dense
-        assert not a.is_sparse
+        assert not a.is_sparse_bcoo
 
     def test_create_with_enum(self):
         a = jqt.Qarray.create(
@@ -612,7 +612,7 @@ class TestPromotion:
 
     def test_promotion_order(self):
         assert SparseDiaImpl.PROMOTION_ORDER == 0
-        assert SparseImpl.PROMOTION_ORDER == 1
+        assert SparseBCOOImpl.PROMOTION_ORDER == 1
         assert DenseImpl.PROMOTION_ORDER == 2
 
 

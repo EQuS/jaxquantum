@@ -211,7 +211,7 @@ def test_sesolve_sparse_ket():
     N = 4
     omega = 1.0
     psi0 = jqt.basis(N, 1)
-    psi0_sparse = psi0.to_sparse()
+    psi0_sparse = psi0.to_sparse_bcoo()
     ts = jnp.linspace(0, 1.0, 20)
     opts = jqt.SolverOptions.create(progress_meter=False)
 
@@ -227,7 +227,7 @@ def test_mesolve_sparse_dm():
     N = 4
     kappa = 0.2
     rho0 = jqt.basis(N, 1).to_dm()
-    rho0_sparse = rho0.to_sparse()
+    rho0_sparse = rho0.to_sparse_bcoo()
     ts = jnp.linspace(0, 1.0, 20)
     H = jqt.num(N)
     c_ops = jqt.Qarray.from_list([jqt.destroy(N) * jnp.sqrt(kappa)])

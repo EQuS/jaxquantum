@@ -38,7 +38,8 @@ from flax import struct
 from jax import Array
 
 if TYPE_CHECKING:
-    from jaxquantum.core.qarray import DenseImpl, SparseImpl, QarrayImplType
+    from jaxquantum.core.qarray import DenseImpl, QarrayImplType
+    from jaxquantum.core.sparse_bcoo import SparseBCOOImpl
 
 
 # ---------------------------------------------------------------------------
@@ -82,7 +83,7 @@ class SparseDiaData:
     # Class-level marker (not a dataclass field — no type annotation).
     # Used by DenseImpl.can_handle_data to exclude SparseDiaData without
     # a direct import (which would be circular).
-    _is_sparsedia = True
+    _is_sparse_dia = True
 
     @property
     def shape(self) -> tuple:
@@ -175,7 +176,7 @@ def _dense_to_sparsedia(arr: np.ndarray) -> tuple[tuple, np.ndarray]:
 # SparseDiaImpl
 # ---------------------------------------------------------------------------
 
-from jaxquantum.core.qarray import QarrayImpl, DenseImpl, SparseImpl, QarrayImplType  # noqa: E402
+from jaxquantum.core.qarray import QarrayImpl, DenseImpl, QarrayImplType  # noqa: E402
 
 
 @struct.dataclass
@@ -376,9 +377,9 @@ class SparseDiaImpl(QarrayImpl):
             result = result.at[..., row_idx, col_idx].set(vals)
         return DenseImpl(result)
 
-    def to_sparse(self) -> "SparseImpl":
-        """Convert to a ``SparseImpl`` (BCOO) via dense."""
-        return self.to_dense().to_sparse()
+    def to_sparse_bcoo(self) -> "SparseBCOOImpl":
+        """Convert to a ``SparseBCOOImpl`` (BCOO) via dense."""
+        return self.to_dense().to_sparse_bcoo()
 
     def to_sparse_dia(self) -> "SparseDiaImpl":
         """Return self (already SparseDIA)."""
