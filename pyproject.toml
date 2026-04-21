@@ -1,10 +1,86 @@
-[tool.ruff]
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
 
+[project]
+name = "jaxquantum"
+version = "0.3.0"
+description = "jaxquantum"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Shantanu Jha", email = "shantanu.rajesh.jha@gmail.com" },
+    { name = "Shoumik Chowdhury" },
+    { name = "Gabriele Rolleri" },
+    { name = "Max Hays" },
+]
+keywords = ["quantum", "computing"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "matplotlib",
+    "qutip",
+    "jax",
+    "diffrax",
+    "flax",
+    "tqdm",
+    "optax",
+    "jax-tqdm",
+]
+
+[project.optional-dependencies]
+dev = [
+    "jupyterlab>=3.1.0",
+    "mypy",
+    "pylint",
+    "black",
+    "coverage",
+]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocs-literate-nav",
+    "mkdocs-section-index",
+    "mkdocs-gen-files",
+    "mkdocstrings-python",
+    "mkdocs-jupyter",
+    "pymdown-extensions",
+]
+tests = [
+    "pytest",
+    "pytest-cov",
+]
+gpu = [
+    "jax[cuda13]",
+]
+tpu = [
+    "jax[tpu]",
+]
+
+[project.urls]
+Documentation = "https://jaxquantum.org"
+"Source Code" = "https://github.com/EQuS/jaxquantum"
+Tutorials = "https://github.com/EQuS/jaxquantum/tree/main/experiments"
+
+[tool.setuptools.packages.find]
+namespaces = true
+exclude = ["experiments*"]
+
+[tool.ruff]
 line-length = 88
 indent-width = 4
 
 [tool.ruff.lint]
-
 ignore = ["E731", "E741"]
 
 [tool.ruff.lint.per-file-ignores]
