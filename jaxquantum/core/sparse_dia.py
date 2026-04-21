@@ -353,8 +353,11 @@ class SparseDiaImpl(QarrayImpl):
         """Zero diagonal values whose magnitude is below *atol*."""
         diags = self._diags
         real_part = jnp.where(jnp.abs(jnp.real(diags)) < atol, 0.0, jnp.real(diags))
-        imag_part = jnp.where(jnp.abs(jnp.imag(diags)) < atol, 0.0, jnp.imag(diags))
-        new_diags = (real_part + 1j * imag_part).astype(diags.dtype)
+        if jnp.issubdtype(diags.dtype, jnp.complexfloating):
+            imag_part = jnp.where(jnp.abs(jnp.imag(diags)) < atol, 0.0, jnp.imag(diags))
+            new_diags = (real_part + 1j * imag_part).astype(diags.dtype)
+        else:
+            new_diags = real_part.astype(diags.dtype)
         return SparseDiaImpl(_offsets=self._offsets, _diags=new_diags)
 
     # ------------------------------------------------------------------
@@ -493,13 +496,14 @@ def _sparsedia_add(
     batch_shape = jnp.broadcast_shapes(a._diags.shape[:-2], b._diags.shape[:-2])
 
     out_offsets = tuple(sorted(set(a._offsets) | set(b._offsets)))
-    out_diags = jnp.zeros((*batch_shape, len(out_offsets), n), dtype=a._diags.dtype)
+    out_dtype = jnp.result_type(a._diags.dtype, b._diags.dtype)
+    out_diags = jnp.zeros((*batch_shape, len(out_offsets), n), dtype=out_dtype)
 
     a_idx = {k: i for i, k in enumerate(a._offsets)}
     b_idx = {k: i for i, k in enumerate(b._offsets)}
 
     for oi, k in enumerate(out_offsets):
-        val = jnp.zeros((*batch_shape, n), dtype=a._diags.dtype)
+        val = jnp.zeros((*batch_shape, n), dtype=out_dtype)
         if k in a_idx:
             val = val + a._diags[..., a_idx[k], :]
         if k in b_idx:
@@ -618,7 +622,8 @@ def _sparsedia_matmul_sparsedia(
         out_offset_set = [0]
     out_offset_idx = {k: i for i, k in enumerate(out_offset_set)}
     out_diags = jnp.zeros(
-        (*batch_shape, len(out_offset_set), n), dtype=left_diags.dtype
+        (*batch_shape, len(out_offset_set), n),
+        dtype=jnp.result_type(left_diags.dtype, right_diags.dtype),
     )
 
     for li, k1 in enumerate(left_offsets):
