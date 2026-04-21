@@ -1,7 +1,5 @@
 # /Users/phionx/Github/qc/EQuS/bosonic/jax/jaxquantum/test_example.py
 
-import pytest
-
 import sys
 import os
 

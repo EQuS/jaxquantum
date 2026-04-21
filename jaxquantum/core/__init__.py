@@ -10,3 +10,5 @@ from .dims import *  # noqa
 from .measurements import *  # noqa
 from .qp_distributions import *  # noqa
 from .cfunctions import *  # noqa
+from .sparse_bcoo import *  # noqa — registers SparseBCOOImpl with QarrayImplType
+from .sparse_dia import *  # noqa — registers SparseDiaImpl with QarrayImplType

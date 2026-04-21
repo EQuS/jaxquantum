@@ -2,7 +2,6 @@
 ### Testing measurements.py
 
 #%%
-import pytest
 import jax.numpy as jnp
 from jaxquantum.core.qarray import Qarray
 from jaxquantum.core.operators import identity, sigmax, sigmay, sigmaz
@@ -14,7 +13,6 @@ from jaxquantum.core.measurements import (
     _reconstruct_density_matrix,
     _parametrize_density_matrix,
     _L1_reg,
-    _likelihood
 )
 
 #%% md
@@ -84,7 +82,6 @@ def test_fidelity():
 #%%
 def test_quantum_state_tomography_direct():
     # Create a simple test state
-    dim = 2
     rho = Qarray.create(jnp.array([[1.0, 0.0], [0.0, 0.0]], dtype=jnp.complex128))
     
     # Create measurement basis (Pauli matrices)
@@ -106,7 +103,6 @@ def test_quantum_state_tomography_direct():
 #%%
 def test_quantum_state_tomography_mle():
     # Create a simple test state
-    dim = 2
     rho = Qarray.create(jnp.array([[1.0, 0.0], [0.0, 0.0]], dtype=jnp.complex128))
     
     # Create measurement basis

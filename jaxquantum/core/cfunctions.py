@@ -1,6 +1,5 @@
 import jax.numpy as jnp
 from jax import vmap
-from jax.scipy.special import factorial
 import jaxquantum as jqt
 
 
