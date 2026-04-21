@@ -31,7 +31,7 @@ from jaxquantum.core.qarray import (
     QarrayImplType,
     dag_data,
 )
-from jaxquantum.core.sparse_dia import SparseDiaData, SparseDiaImpl
+from jaxquantum.core.sparse_dia import SparseDiaData, SparseDiaImpl, _dia_slice
 
 
 # ---------------------------------------------------------------------------
@@ -781,3 +781,76 @@ class TestBatchedSparseDIA:
         assert jnp.allclose(
             result_dense.data, result_dia.data, atol=1e-5
         ), "mesolve with batched SparseDIA c_ops differs from dense reference"
+
+
+# ===========================================================================
+# _dia_slice helper
+# ===========================================================================
+
+
+class TestDiaSlice:
+    def test_positive_offset(self):
+        assert _dia_slice(2) == slice(2, None)
+
+    def test_negative_offset(self):
+        assert _dia_slice(-2) == slice(None, -2)
+
+    def test_zero_offset(self):
+        assert _dia_slice(0) == slice(0, None)
+
+    def test_complement_positive(self):
+        """_dia_slice(-k) for k>0 gives the complementary slice."""
+        assert _dia_slice(-3) == slice(None, -3)
+
+    def test_complement_negative(self):
+        assert _dia_slice(3) == slice(3, None)
+
+
+# ===========================================================================
+# powm — integer matrix power staying SparseDIA
+# ===========================================================================
+
+
+class TestPowm:
+    def test_powm_zero_is_identity(self):
+        a = jqt.destroy(N, implementation=QarrayImplType.SPARSE_DIA)
+        result = a._impl.powm(0)
+        assert isinstance(result, SparseDiaImpl)
+        assert jnp.allclose(result.to_dense()._data, jnp.eye(N), atol=1e-10)
+
+    def test_powm_one_is_self(self):
+        a = jqt.destroy(N, implementation=QarrayImplType.SPARSE_DIA)
+        result = a._impl.powm(1)
+        assert jnp.allclose(result.to_dense()._data, a.to_dense().data, atol=1e-10)
+
+    def test_powm_two_matches_dense(self):
+        a = jqt.destroy(N, implementation=QarrayImplType.SPARSE_DIA)
+        result = a._impl.powm(2)
+        expected = _dense_destroy(N) @ _dense_destroy(N)
+        assert jnp.allclose(result.to_dense()._data, expected, atol=1e-10)
+
+    def test_powm_stays_sparsedia(self):
+        a = jqt.destroy(N, implementation=QarrayImplType.SPARSE_DIA)
+        for n in (0, 1, 2, 3, 4):
+            result = a._impl.powm(n)
+            assert isinstance(result, SparseDiaImpl), f"powm({n}) not SparseDIA"
+
+    def test_powm_via_qarray(self):
+        """Qarray.powm dispatches to SparseDiaImpl.powm and stays SparseDIA."""
+        a = jqt.destroy(N, implementation=QarrayImplType.SPARSE_DIA)
+        result = a.powm(3)
+        assert result.is_sparse_dia
+        expected = jqt.destroy(N).powm(3)
+        assert jnp.allclose(result.to_dense().data, expected.to_dense().data, atol=1e-10)
+
+    def test_powm_negative_raises(self):
+        a = jqt.destroy(N, implementation=QarrayImplType.SPARSE_DIA)
+        with pytest.raises(ValueError):
+            a._impl.powm(-1)
+
+    def test_powm_sparsedia_out_of_range_offsets_pruned(self):
+        """a^k for large k: output offsets should be pruned to valid range."""
+        a = jqt.destroy(N, implementation=QarrayImplType.SPARSE_DIA)
+        result = a._impl.powm(N - 1)  # a^(N-1) is nearly nilpotent
+        for k in result._offsets:
+            assert abs(k) < N, f"out-of-range offset {k} found in powm result"

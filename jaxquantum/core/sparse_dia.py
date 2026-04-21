@@ -21,6 +21,10 @@ Unified access formula (holds for any k, out-of-range slots are zero):
     A[i, i+k]  =  diags[..., diag_idx, i+k]
 
 This makes every matrix operation a set of aligned slice multiplications.
+
+Some improvements (_dia_slice helper, integer matrix power, diagonal-range pruning,
+offset detection) were identified by studying the dynamiqs library
+(https://github.com/dynamiqs/dynamiqs).
 """
 
 from __future__ import annotations
@@ -35,6 +39,22 @@ from jax import Array
 
 if TYPE_CHECKING:
     from jaxquantum.core.qarray import DenseImpl, SparseImpl, QarrayImplType
+
+
+# ---------------------------------------------------------------------------
+# Slice helper
+# ---------------------------------------------------------------------------
+
+def _dia_slice(k: int) -> slice:
+    """Slice selecting the valid data positions for diagonal offset k.
+
+    For k ≥ 0: valid data lives at column indices [k, n), so slice(k, None).
+    For k < 0: valid data lives at column indices [0, n+k), so slice(None, k).
+
+    The complementary slice (for the result rows / left-operand columns) is
+    always ``_dia_slice(-k)``.
+    """
+    return slice(k, None) if k >= 0 else slice(None, k)
 
 
 # ---------------------------------------------------------------------------
@@ -133,19 +153,12 @@ def _dense_to_sparsedia(arr: np.ndarray) -> tuple[tuple, np.ndarray]:
     n = arr.shape[-1]
     batch_shape = arr.shape[:-2]
 
-    # Union offsets across all batch elements so every non-zero diagonal is captured.
-    elems = np.asarray(arr).reshape(-1, n, n)
-    offsets = sorted({
-        k
-        for elem in elems
-        for k in range(-(n - 1), n)
-        if np.any(np.diagonal(elem, offset=k) != 0)
-    })
-    if not offsets:
-        offsets = [0]  # always store at least the main diagonal
-
-    offsets = tuple(sorted(offsets))
+    # Union non-zero diagonals across all batch elements via a single mask + nonzero call.
     arr_np = np.asarray(arr)
+    flat_np = arr_np.reshape(-1, n, n)
+    union_mask = np.any(flat_np != 0, axis=0)   # (n, n): True where any batch elem is non-zero
+    r, c = np.nonzero(union_mask)
+    offsets = tuple(sorted(set((c - r).tolist()))) if len(r) > 0 else (0,)
 
     diags = np.zeros((*batch_shape, len(offsets), n), dtype=arr_np.dtype)
     for i, k in enumerate(offsets):
@@ -313,21 +326,12 @@ class SparseDiaImpl(QarrayImpl):
         Negates every offset and rearranges the stored values so that the
         padding convention remains consistent.
         """
-        n = self._diags.shape[-1]
         new_offsets = tuple(-k for k in self._offsets)
         new_diags = jnp.zeros_like(self._diags)
         for i, k in enumerate(self._offsets):
-            if k >= 0:
-                # old valid at [k:], new (offset -k ≤ 0) valid at [:n-k]
-                new_diags = new_diags.at[..., i, : n - k].set(
-                    jnp.conj(self._diags[..., i, k:])
-                )
-            else:
-                m = -k
-                # old valid at [:n-m], new (offset m ≥ 0) valid at [m:]
-                new_diags = new_diags.at[..., i, m:].set(
-                    jnp.conj(self._diags[..., i, : n - m])
-                )
+            s = _dia_slice(k)    # valid data slice for offset k
+            sm = _dia_slice(-k)  # valid data slice for offset -k (the new position)
+            new_diags = new_diags.at[..., i, sm].set(jnp.conj(self._diags[..., i, s]))
         return SparseDiaImpl(_offsets=new_offsets, _diags=new_diags)
 
     def kron(self, other: QarrayImpl) -> QarrayImpl:
@@ -362,13 +366,12 @@ class SparseDiaImpl(QarrayImpl):
         batch_shape = self._diags.shape[:-2]
         result = jnp.zeros((*batch_shape, n, n), dtype=self._diags.dtype)
         for i, k in enumerate(self._offsets):
-            lo = max(k, 0)
-            hi = n - max(-k, 0)
-            length = hi - lo  # = n - |k|
+            s = _dia_slice(k)
+            length = n - abs(k)
             if length <= 0:
                 continue
-            vals = self._diags[..., i, lo:hi]  # shape (*batch, length)
-            row_idx = jnp.arange(length) + max(-k, 0)  # row indices on diagonal k
+            vals = self._diags[..., i, s]
+            row_idx = jnp.arange(length) + max(-k, 0)
             col_idx = row_idx + k
             result = result.at[..., row_idx, col_idx].set(vals)
         return DenseImpl(result)
@@ -443,6 +446,33 @@ class SparseDiaImpl(QarrayImpl):
         """Element-wise complex conjugate of stored values."""
         return SparseDiaImpl(_offsets=self._offsets, _diags=jnp.conj(self._diags))
 
+    def powm(self, n: int) -> "SparseDiaImpl":
+        """Integer matrix power staying SparseDIA via binary exponentiation.
+
+        Uses O(log n) SparseDIA @ SparseDIA multiplications rather than
+        densifying.  A^0 returns the identity operator.
+
+        Args:
+            n: Non-negative integer exponent.
+
+        Returns:
+            A ``SparseDiaImpl`` equal to this matrix raised to the *n*-th power.
+
+        Raises:
+            ValueError: If *n* is negative.
+        """
+        if n < 0:
+            raise ValueError("powm requires n >= 0")
+        if n == 0:
+            size = self._diags.shape[-1]
+            eye_diags = jnp.ones((*self._diags.shape[:-2], 1, size), dtype=self._diags.dtype)
+            return SparseDiaImpl(_offsets=(0,), _diags=eye_diags)
+        if n == 1:
+            return self
+        half = self.powm(n // 2)
+        squared = half.matmul(half)  # SparseDIA @ SparseDIA → SparseDIA
+        return squared if n % 2 == 0 else self.matmul(squared)
+
 
 # ---------------------------------------------------------------------------
 # Pure-function helpers (operate on raw arrays, no QarrayImpl wrapping)
@@ -506,15 +536,9 @@ def _sparsedia_matmul_dense(
         dtype=jnp.result_type(diags.dtype, B.dtype),
     )
     for i, k in enumerate(offsets):
-        if k >= 0:
-            result = result.at[..., : n - k, :].add(
-                diags[..., i, k:, None] * B[..., k:, :]
-            )
-        else:
-            m = -k
-            result = result.at[..., m:, :].add(
-                diags[..., i, : n - m, None] * B[..., : n - m, :]
-            )
+        s = _dia_slice(k)    # valid column slice for diagonal k
+        sm = _dia_slice(-k)  # corresponding row slice for the result
+        result = result.at[..., sm, :].add(diags[..., i, s, None] * B[..., s, :])
     return result
 
 
@@ -546,15 +570,9 @@ def _sparsedia_rmatmul_dense(
         dtype=jnp.result_type(diags.dtype, B.dtype),
     )
     for i, k in enumerate(offsets):
-        if k >= 0:
-            result = result.at[..., :, k:].add(
-                B[..., :, : n - k] * diags[..., i, k:][..., None, :]
-            )
-        else:
-            m = -k
-            result = result.at[..., :, : n - m].add(
-                B[..., :, m:] * diags[..., i, : n - m][..., None, :]
-            )
+        s = _dia_slice(k)    # valid column slice for diagonal k
+        sm = _dia_slice(-k)  # complementary slice for B columns / result columns
+        result = result.at[..., :, s].add(B[..., :, sm] * diags[..., i, s][..., None, :])
     return result
 
 
@@ -591,9 +609,12 @@ def _sparsedia_matmul_sparsedia(
         left_diags.shape[:-2], right_diags.shape[:-2]
     )
 
+    # Pre-filter output offsets: diagonal pairs where |k1+k2| >= n are zero.
     out_offset_set = sorted(
-        set(k1 + k2 for k1 in left_offsets for k2 in right_offsets)
+        {k1 + k2 for k1 in left_offsets for k2 in right_offsets if abs(k1 + k2) < n}
     )
+    if not out_offset_set:
+        out_offset_set = [0]
     out_offset_idx = {k: i for i, k in enumerate(out_offset_set)}
     out_diags = jnp.zeros(
         (*batch_shape, len(out_offset_set), n), dtype=left_diags.dtype
@@ -602,14 +623,13 @@ def _sparsedia_matmul_sparsedia(
     for li, k1 in enumerate(left_offsets):
         for ri, k2 in enumerate(right_offsets):
             kout = k1 + k2
+            if abs(kout) >= n:
+                continue
             oi = out_offset_idx[kout]
-            if k2 >= 0:
-                contribution = left_diags[..., li, : n - k2] * right_diags[..., ri, k2:]
-                out_diags = out_diags.at[..., oi, k2:].add(contribution)
-            else:
-                m2 = -k2
-                contribution = left_diags[..., li, m2:] * right_diags[..., ri, : n - m2]
-                out_diags = out_diags.at[..., oi, : n - m2].add(contribution)
+            s = _dia_slice(k2)    # valid column slice for right diagonal k2
+            sm = _dia_slice(-k2)  # complementary slice for left diagonal
+            contribution = left_diags[..., li, sm] * right_diags[..., ri, s]
+            out_diags = out_diags.at[..., oi, s].add(contribution)
 
     return tuple(out_offset_set), out_diags
 

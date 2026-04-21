@@ -2299,12 +2299,18 @@ def powm(qarr: Qarray, n: Union[int, float], clip_eigvals=False) -> Qarray:
             applying the float power (useful for nearly-PSD matrices).
 
     Returns:
-        The *n*-th matrix power as a dense ``Qarray``.
+        The *n*-th matrix power as a ``Qarray`` (stays SparseDIA for integer
+        non-negative exponents when the input is SparseDIA).
 
     Raises:
         ValueError: If *n* is a float and the matrix has negative eigenvalues
             (and *clip_eigvals* is ``False``).
     """
+    # SparseDIA fast path: binary exponentiation stays in SparseDIA format.
+    if qarr.is_sparse_dia and isinstance(n, int) and n >= 0:
+        new_impl = qarr._impl.powm(n)
+        return Qarray.create(new_impl.data, dims=qarr.dims, implementation=new_impl.impl_type)
+
     # Convert to dense for powm
     dense_qarr = qarr.to_dense()
 
