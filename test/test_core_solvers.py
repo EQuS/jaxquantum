@@ -206,3 +206,59 @@ def test_mesolve_scalar_H():
 
 # ====
 
+
+# sparse / sparse_dia initial states ====
+
+def test_sesolve_sparse_ket():
+    """sesolve with a BCOO sparse ket should match the dense result."""
+    N = 4
+    omega = 1.0
+    psi0 = jqt.basis(N, 1)
+    psi0_sparse = psi0.to_sparse()
+    ts = jnp.linspace(0, 1.0, 20)
+    opts = jqt.SolverOptions.create(progress_meter=False)
+
+    ref = jqt.sesolve(omega * jqt.identity(N), psi0, ts, solver_options=opts)
+    result = jqt.sesolve(omega * jqt.identity(N), psi0_sparse, ts, solver_options=opts)
+
+    assert jnp.allclose(result.data, ref.data, atol=1e-6), \
+        "sesolve with sparse ket differs from dense reference"
+
+
+def test_mesolve_sparse_dm():
+    """mesolve with a BCOO sparse density matrix should match the dense result."""
+    N = 4
+    kappa = 0.2
+    rho0 = jqt.basis(N, 1).to_dm()
+    rho0_sparse = rho0.to_sparse()
+    ts = jnp.linspace(0, 1.0, 20)
+    H = jqt.num(N)
+    c_ops = jqt.Qarray.from_list([jqt.destroy(N) * jnp.sqrt(kappa)])
+    opts = jqt.SolverOptions.create(progress_meter=False)
+
+    ref = jqt.mesolve(H, rho0, ts, c_ops=c_ops, solver_options=opts)
+    result = jqt.mesolve(H, rho0_sparse, ts, c_ops=c_ops, solver_options=opts)
+
+    assert jnp.allclose(result.data, ref.data, atol=1e-6), \
+        "mesolve with sparse dm differs from dense reference"
+
+
+def test_mesolve_sparse_dia_dm():
+    """mesolve with a SparseDIA density matrix should match the dense result."""
+    N = 4
+    kappa = 0.2
+    rho0 = jqt.basis(N, 1).to_dm()
+    rho0_dia = rho0.to_sparse_dia()
+    ts = jnp.linspace(0, 1.0, 20)
+    H = jqt.num(N)
+    c_ops = jqt.Qarray.from_list([jqt.destroy(N) * jnp.sqrt(kappa)])
+    opts = jqt.SolverOptions.create(progress_meter=False)
+
+    ref = jqt.mesolve(H, rho0, ts, c_ops=c_ops, solver_options=opts)
+    result = jqt.mesolve(H, rho0_dia, ts, c_ops=c_ops, solver_options=opts)
+
+    assert jnp.allclose(result.data, ref.data, atol=1e-6), \
+        "mesolve with SparseDIA dm differs from dense reference"
+
+# ====
+

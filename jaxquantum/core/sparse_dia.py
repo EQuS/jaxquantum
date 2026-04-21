@@ -529,7 +529,7 @@ def _sparsedia_matmul_dense(
     Returns:
         Dense product of shape (*batch, n, m).
     """
-    n = diags.shape[-1]
+    # n = diags.shape[-1]
     batch_shape = jnp.broadcast_shapes(diags.shape[:-2], B.shape[:-2])
     result = jnp.zeros(
         (*batch_shape, B.shape[-2], B.shape[-1]),
@@ -563,7 +563,7 @@ def _sparsedia_rmatmul_dense(
     Returns:
         Dense product of shape (*batch, p, n).
     """
-    n = diags.shape[-1]
+    # n = diags.shape[-1]
     batch_shape = jnp.broadcast_shapes(diags.shape[:-2], B.shape[:-2])
     result = jnp.zeros(
         (*batch_shape, B.shape[-2], B.shape[-1]),

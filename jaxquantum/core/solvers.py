@@ -149,7 +149,7 @@ def mesolve(
             "Consider using `jqt.sesolve()` instead, as `c_ops` is an empty list and the initial state is not a density matrix."
         )
 
-    ρ0 = rho0.to_dm()
+    ρ0 = rho0.to_dm().to_dense()
 
     if robust_isscalar(H):
         H = H * identity_like(ρ0)  # treat scalar H as a multiple of the identity
@@ -305,7 +305,7 @@ def sesolve(
             "Please use `jqt.mesolve` for initial state inputs in density matrix form."
         )
 
-    ψ = ψ.to_ket()
+    ψ = ψ.to_ket().to_dense()
 
     if robust_isscalar(H):
         H = H * identity_like(ψ)  # treat scalar H as a multiple of the identity
