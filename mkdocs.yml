@@ -76,24 +76,21 @@ extra_javascript:
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 nav:
-  - About: 
+  - About:
     - index.md
     - Community: about/community.md
     - Contributors: about/contributors.md
     - Citation: about/citation.md
   - Documentation:
     - documentation/index.md
-    - Getting started:
+    - Getting Started:
       - Installation: documentation/getting_started/installation.md
       - Qarray: documentation/getting_started/qarray.ipynb
-      # - Examples: getting_started/examples.md
       - The Sharp Bits 🔪: documentation/getting_started/sharp_bits.md
     - Tutorials:
-      - Data Implementations:
-        - Sparse Diagonal Backend: documentation/tutorials/sparse_dia_backend.ipynb
-        - Sparse BCOO Backend: documentation/tutorials/sparse_bcoo_backend.ipynb
+      - documentation/tutorials/index.md
+      - Devices & Systems: documentation/tutorials/devices.ipynb
+      - Bosonic Codes: documentation/tutorials/bosonic_codes.ipynb
       - Circuits: documentation/tutorials/circuits.ipynb
-      - Bosonic Codes: documentation/tutorials/bosonic_codes.md
-    - Advanced Concepts:
-      - Excitation Number Restricted Basis: documentation/advanced/enr.md
+      - Sparse Backends: documentation/tutorials/sparse_backends.ipynb
   - Code Reference: reference/
