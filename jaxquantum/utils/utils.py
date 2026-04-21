@@ -87,7 +87,7 @@ def conj_transpose_iso_matrix(A):
 
 
 def robust_isscalar(val):
-    is_scalar = isinstance(val, Number) or jnp.isscalar(val)
+    is_scalar = isinstance(val, Number) or np.isscalar(val)
     if isinstance(val, Array):
         is_scalar = is_scalar or (len(val.shape) == 0)
     return is_scalar
