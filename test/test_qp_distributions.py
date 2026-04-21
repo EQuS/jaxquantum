@@ -2,14 +2,11 @@
 # Unit Tests for qp_distributions
 
 #%%
-import pytest
 import jax.numpy as jnp
+from jax.scipy.special import factorial
 from jaxquantum import basis
 from jaxquantum.core.qarray import Qarray
-from jaxquantum.core.qp_distributions import (wigner, qfunc,
-                                              _wigner_clenshaw,
-                                              _wig_laguerre_val)
-from jax.scipy.special import factorial
+from jaxquantum.core.qp_distributions import (wigner, qfunc)
 
 
 #%%

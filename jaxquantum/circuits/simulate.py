@@ -3,8 +3,6 @@
 from flax import struct
 from jax import config
 from typing import List
-from tqdm import tqdm
-
 
 from jaxquantum.core.qarray import Qarray, ket2dm
 from jaxquantum.circuits.circuits import Circuit, Layer

@@ -19,7 +19,6 @@ dag_data() dispatch          → TestDagDataDispatch
 mesolve with sparse c_ops    → TestMesolveSparseCollapse
 """
 
-import pytest
 import sys
 import os
 

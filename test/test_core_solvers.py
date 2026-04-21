@@ -16,7 +16,6 @@ def test_sesolve():
     omega_q = 5.0 #GHzz
     Omega = .1
     g_state = jqt.basis(2,0) ^ jqt.basis(2,0)
-    g_state_dm = g_state.to_dm()
 
     ts = jnp.linspace(0,5*jnp.pi/Omega,101)
 
@@ -40,7 +39,6 @@ def test_sesolve_batch():
     omega_q = 5.0 #GHzz
     Omega = jnp.array([.1,.2])
     g_state = jqt.basis(2,0) ^ jqt.basis(2,0)
-    g_state_dm = g_state.to_dm()
 
     ts = jnp.linspace(0,5*jnp.pi/Omega[0],101)
 
@@ -65,7 +63,6 @@ def test_sesolve_batch():
 def test_sesolve_edge_cases():
     # constant H0
 
-    omega_q = 5.0 #GHzz
     Omega = .1
     g_state = jqt.basis(2,0) ^ jqt.basis(2,0)
     ts = jnp.linspace(0,5*jnp.pi/Omega,101)
@@ -90,12 +87,15 @@ def test_sesolve_edge_cases():
 
 def test_mesolve_batch():
     N = 100
-    a = jqt.destroy(N); n = a.dag() @ a
+    a = jqt.destroy(N)
+    n = a.dag() @ a
 
-    omega_a = 2.0*jnp.pi*5.0; H0 = omega_a*n # Hamiltonian
+    omega_a = 2.0*jnp.pi*5.0
+    H0 = omega_a*n
 
-    kappa = 2*jnp.pi*jnp.array([1,2]); batched_loss_op = jnp.sqrt(kappa)*a; 
-    c_ops = jqt.Qarray.from_list([batched_loss_op]) # collapse operators
+    kappa = 2*jnp.pi*jnp.array([1,2])
+    batched_loss_op = jnp.sqrt(kappa)*a
+    c_ops = jqt.Qarray.from_list([batched_loss_op])
 
     initial_state = (jqt.displace(N, 0.1) @ jqt.basis(N,0)).to_dm() # initial state
 
@@ -105,7 +105,7 @@ def test_mesolve_batch():
     states = jqt.mesolve(
         H0, initial_state, ts, c_ops=c_ops, solver_options=solver_options) # solve
         
-    n_exp = jnp.real(jqt.overlap(n, states)); a_exp = jqt.overlap(a, states) # expectation values
+    n_exp = jnp.real(jqt.overlap(n, states))
 
 
     for j in range(2):
@@ -136,8 +136,6 @@ def test_mesolve():
     solver_options = jqt.SolverOptions.create(progress_meter=True)
     states = jqt.mesolve(Ht, initial_state_dm, ts, c_ops=c_ops, solver_options=solver_options) 
     nt = jnp.real(jqt.overlap(n, states))
-    a_real = jnp.real(jqt.overlap(a, states))
-    a_imag = jnp.imag(jqt.overlap(a, states))
 
     test_time = ts[50]
     test_nt = nt[50]
@@ -148,7 +146,6 @@ def test_mesolve():
 def test_mesolve_edge_cases():
     # constant H0
 
-    omega_q = 5.0 #GHzz
     Omega = .1
     g_state = jqt.basis(2,0) ^ jqt.basis(2,0)
     ts = jnp.linspace(0,5*jnp.pi/Omega,101)

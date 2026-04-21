@@ -161,9 +161,9 @@ def test_backward_compatibility_properties():
     
     assert jnp.all(a.shaped_data == a.data.reshape(2,3,1))
 
-    assert a.is_batched == True
+    assert a.is_batched
     assert a[0] == jqt.Qarray.create(jnp.array([1+1.0j,2,3]))
-    
+
     with pytest.raises(ValueError):
         print(a[0][0])
 
@@ -173,7 +173,7 @@ def test_backward_compatibility_properties():
     assert len(a) == 2
     with pytest.raises(ValueError):
         print(len(a[0]))
-    
+
     with pytest.raises(ValueError):
         print(a == a.data)
 
@@ -192,12 +192,9 @@ def test_backward_compatibility_math():
 
     a = jqt.displace(N,1.0)
     b = jqt.displace(N,1.25)
-    c = jqt.displace(N,1.5)
-    
+
     scalar = 1.23
     scalar_id_data = scalar*jnp.eye(N)
-
-    arr = jqt.Qarray.from_list([a,b])
 
     # Test basic operations
     assert jnp.max(jnp.abs(((scalar+a).data) - (scalar_id_data + a.data))) < 1e-10
@@ -212,8 +209,7 @@ def test_backward_compatibility_tensor():
     N = 3
     a = jqt.displace(N,1.0)
     b = jqt.displace(N,1.25)
-    c = jqt.displace(5,1.5)
-    
+
     arr = jqt.Qarray.from_list([a,b])
 
     # Test tensor products

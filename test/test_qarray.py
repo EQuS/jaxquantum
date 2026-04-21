@@ -67,7 +67,7 @@ def test_qarray_properties():
     
     assert jnp.all(a.shaped_data == a.data.reshape(2,3,1))
 
-    assert a.is_batched == True
+    assert a.is_batched
     assert a[0] == jqt.Qarray.create(jnp.array([1+1.0j,2,3]))
     
     with pytest.raises(ValueError):
@@ -214,13 +214,12 @@ def test_qarray_basic_math_mul():
     a = jqt.displace(N,1.0)
     b = jqt.displace(N,1.25)
     c = jqt.displace(N,1.5)
-    
+
     scalar = 1.23
-    scalar_id_data = scalar*jnp.eye(N)
 
     arr = jqt.Qarray.from_list([a,b])
 
-    # Scalar * Qarray 
+    # Scalar * Qarray
     assert jnp.max(jnp.abs(((scalar*a).data) - (scalar * a.data))) < 1e-10
 
     # Qarray * Scalar
@@ -323,8 +322,7 @@ def test_qarray_basic_math_tensor():
     N = 3
     a = jqt.displace(N,1.0)
     b = jqt.displace(N,1.25)
-    c = jqt.displace(5,1.5)
-    
+
     arr = jqt.Qarray.from_list([a,b])
 
     # ----
@@ -383,8 +381,7 @@ def test_qarray_basic_math_tensor():
 def test_qarray_basic_math_pow():
     a = jqt.displace(3,1.0)
     b = jqt.displace(3,1.25)
-    c = jqt.displace(5,1.5)
-    
+
     arr = jqt.Qarray.from_list([a,b])
 
     scalar = 3

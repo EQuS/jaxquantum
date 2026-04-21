@@ -3,7 +3,6 @@
 
 from jaxquantum.core.operators import identity
 from jaxquantum.circuits.gates import Gate
-import jax.numpy as jnp
 from jaxquantum import Qarray, tensor
 
 

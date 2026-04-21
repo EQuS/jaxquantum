@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 import jaxquantum as jqt
 import jaxquantum.codes as jqtb
 import jax.numpy as jnp
-import numpy as np
 
 
 def teardown_function(function):
@@ -382,7 +381,7 @@ class TestQubit:
         # We can't easily test the visual output, but ensure it doesn't raise errors
         try:
             qubit.plot(state)
-        except Exception as e:
+        except Exception:
             # If plotting fails due to display issues, that's acceptable
             # We just want to ensure the method executes without syntax errors
             pass

@@ -1,14 +1,12 @@
 """Oscillator gates."""
 
-from jaxquantum.core.operators import (displace, basis, destroy, create, num,
-                                       identity)
+from jaxquantum.core.operators import (displace, basis, destroy, create, num)
 from jaxquantum.circuits.gates import Gate
-from jax.scipy.special import factorial, gammaln
+from jax.scipy.special import gammaln
 import jax.numpy as jnp
 from jaxquantum import Qarray
 from jaxquantum.utils import hermgauss
 from functools import partial
-from jax import jit
 import jax
 
 def diag_expm(diag_matrix):

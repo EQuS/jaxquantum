@@ -18,7 +18,6 @@ import tqdm
 import logging
 
 
-from jax.experimental import sparse as jax_sparse
 from jaxquantum.core.qarray import Qarray, Qtypes, dag_data
 from jaxquantum.core.conversions import jnp2jqt
 from jaxquantum.core.operators import identity_like, multi_mode_basis_set

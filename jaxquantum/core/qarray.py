@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from flax import struct
 from jax import Array, config, vmap
-from typing import List, Union, TypeVar, Generic, overload, Literal, Any
+from typing import List, Union, TypeVar, Generic, overload, Literal
 import jax.numpy as jnp
 import jax.scipy as jsp
 from jax.experimental import sparse
