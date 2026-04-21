@@ -1,1 +1,0 @@
-This is a tutorial for the Energy Number Restricted (ENR) basis methods in jaxquantum.
