@@ -87,7 +87,7 @@ setup(
         "Topic :: Scientific/Engineering",
     ],
     keywords="quantum computing",
-    python_requires=">=3.7",
+    python_requires=">=3.9",
     project_urls={
         "Documentation": "https://jaxquantum.org",
         "Source Code": "https://github.com/EQuS/jaxquantum",
