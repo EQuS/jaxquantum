@@ -10,7 +10,7 @@
 pip install jaxquantum
 ```
 
-If you are installing on a GPU (NVIDIA, CUDA12), then run this instead:
+If you are installing on a GPU (NVIDIA, CUDA13), then run this instead:
 ```bash
 pip install 'jaxquantum[gpu]'
 ```
@@ -30,7 +30,7 @@ If you face issues running JAX on your hardware, visit this page: [https://docs.
 pip install git+https://github.com/EQuS/jaxquantum.git
 ```
 
-If you are installing on a GPU (NVIDIA, CUDA12), then run this instead:
+If you are installing on a GPU (NVIDIA, CUDA13), then run this instead:
 ```bash
 pip install 'git+https://github.com/EQuS/jaxquantum.git#egg=jaxquantum[gpu]'
 ```

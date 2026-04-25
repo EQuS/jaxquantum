@@ -16,7 +16,7 @@ hide:
 
 <div class="hero-install" markdown>
 ```bash
-pip install jaxquantum
+pip install jaxquantum # Py 3.11+
 ```
 </div>
 

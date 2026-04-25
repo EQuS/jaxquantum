@@ -29,7 +29,7 @@
 pip install jaxquantum
 ```
 
-For GPU (NVIDIA, CUDA12) or TPU, use the `[gpu]` or `[tpu]` extras. For the latest development version, install directly from source:
+For GPU (NVIDIA, CUDA13) or TPU, use the `[gpu]` or `[tpu]` extras. For the latest development version, install directly from source:
 
 ```bash
 pip install git+https://github.com/EQuS/jaxquantum.git
