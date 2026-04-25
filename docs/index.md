@@ -63,7 +63,7 @@ dexpect_n = jax.jit(jax.vmap(jax.grad(expect_n)))
 
     ---
 
-    Use `jax.vmap`, `jax.jit`, and `jax.grad` directly on quantum operators. Parameter sweeps become single compiled calls; fitting becomes autodiff.
+    Use `jax.vmap` (batch), `jax.jit` (compile), and `jax.grad` (autodiff) directly on quantum simulations. Built on batchable `Qarray` objects that wrap JAX `Array`s.
 
 -   :material-circle-double: **QuTiP drop-in**
 

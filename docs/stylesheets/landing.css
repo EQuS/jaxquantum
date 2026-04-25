@@ -84,10 +84,65 @@
     margin: 0;
 }
 
-/* On mobile, give the code block a bit of breathing room from the edges */
+/* On mobile (≤960px): stack and center the hero, scale down typography,
+   and shrink the code preview a bit so it doesn't overflow.
+   Desktop layout is untouched.                                         */
+
 @media screen and (max-width: 960px) {
+    .hero {
+        text-align: center;
+    }
+
+    .hero-text h1 {
+        font-size: 2.5rem;
+        text-align: center;
+    }
+
+    .hero-tagline {
+        font-size: 1.05rem;
+    }
+
+    .hero-subline {
+        margin-bottom: 1.25rem;
+    }
+
+    /* Center the install pill */
+    .hero-install {
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* Center the button row */
+    .hero-buttons {
+        justify-content: center;
+    }
+
+    /* Smaller code preview on phones */
     .hero-code {
         font-size: 0.85em;
+    }
+}
+
+/* Phone-sized screens (≤480px): stack the buttons full-width for tappability
+   and shrink the title a bit more.                                          */
+@media screen and (max-width: 480px) {
+    .hero-text h1 {
+        font-size: 2rem;
+    }
+
+    .hero-buttons {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .hero-buttons .md-button {
+        width: 100%;
+        text-align: center;
+    }
+
+    .hero-code {
+        font-size: 0.78em;
     }
 }
 
@@ -140,4 +195,14 @@
 @media screen and (max-width: 960px) {
     .demo--reverse .demo-code { order: 1; }
     .demo--reverse .demo-plot { order: 2; }
+
+    .demo-code {
+        font-size: 0.85em;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .demo-code {
+        font-size: 0.78em;
+    }
 }

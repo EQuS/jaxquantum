@@ -1,10 +1,31 @@
 ## Installation
 
-We recommend Python 3.11+.
+**We recommend Python 3.11+.**
 
-### Installing from source (recommended)
+### Installing from PyPI
 
-**Recommended:** As this is a rapidly evolving project, we recommend installing the latest version of `jaxquantum` from source as follows:
+`jaxquantum` is also published on PyPI. Simply run the following code to install the package:
+
+```bash
+pip install jaxquantum
+```
+
+If you are installing on a GPU (NVIDIA, CUDA12), then run this instead:
+```bash
+pip install 'jaxquantum[gpu]'
+```
+
+And, on a TPU, run this:
+```bash
+pip install 'jaxquantum[tpu]'
+```
+
+If you face issues running JAX on your hardware, visit this page: [https://docs.jax.dev/en/latest/installation.html](https://docs.jax.dev/en/latest/installation.html)
+
+
+### Installing from source
+
+**Recommended:** As this is a rapidly evolving project, you may wish to install the latest version of `jaxquantum` from source as follows:
 ```bash
 pip install git+https://github.com/EQuS/jaxquantum.git
 ```
@@ -29,25 +50,6 @@ pip install -e ".[dev,docs]"
 ```
 This will also install extras from the `dev` and `docs` flags, which can be useful when developing the package. Since this is installed in editable mode, the package will automatically be updated after pulling new changes in the repository. Again, add the `gpu` or `tpu` extra, if needed.
 
-### Installing from PyPI (not recommended)
-
-`jaxquantum` is also published on PyPI. Simply run the following code to install the package:
-
-```bash
-pip install jaxquantum
-```
-
-If you are installing on a GPU (NVIDIA, CUDA12), then run this instead:
-```bash
-pip install 'jaxquantum[gpu]'
-```
-
-And, on a TPU, run this:
-```bash
-pip install 'jaxquantum[tpu]'
-```
-
-If you face issues running JAX on your hardware, visit this page: [https://docs.jax.dev/en/latest/installation.html](https://docs.jax.dev/en/latest/installation.html)
 
 ## Check Hardware
 
