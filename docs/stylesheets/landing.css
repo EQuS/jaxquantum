@@ -15,6 +15,24 @@
         grid-template-columns: 1fr;
         gap: 2rem;
     }
+
+    /* CSS-grid cells default to their content's intrinsic min-width;
+       a code block with one long line refuses to shrink and overflows
+       the viewport on phones. `min-width: 0` overrides that.        */
+    .hero > *,
+    .demo > * {
+        min-width: 0;
+    }
+
+    /* Code blocks scroll horizontally inside their box, never push
+       the page wider on mobile.                                    */
+    .hero-code .highlight,
+    .hero-code pre,
+    .demo-code .highlight,
+    .demo-code pre {
+        max-width: 100%;
+        overflow-x: auto;
+    }
 }
 
 /* Left column: title + tagline + install + buttons
