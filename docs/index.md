@@ -111,8 +111,11 @@ dexpect_n = jax.jit(jax.vmap(jax.grad(expect_n)))
 
 ### Master equation, batched over decay rates
 
-Solve the Lindblad equation for a driven oscillator at two photon-loss rates **in a single call** — `jaxquantum` automatically batches over the array-valued `kappa`:
+Solve the Lindblad equation for a driven oscillator at two photon-loss rates **in a single call** — `jaxquantum` automatically batches over the array-valued `kappa`.
 
+<div class="demo" markdown>
+
+<div class="demo-code" markdown>
 ```python
 from jax import jit
 import jaxquantum as jqt
@@ -131,16 +134,24 @@ def H(t):
     return omega * jqt.num(N)
 
 states = jqt.mesolve(H, rho0, ts, c_ops=c_ops)
-n_t    = jnp.real(jqt.overlap(jqt.num(N), states))   # shape (101, 2)
-a_t    = jqt.overlap(jqt.destroy(N), states)         # shape (101, 2)
+n_t    = jnp.real(jqt.overlap(jqt.num(N), states))   # (101, 2)
+a_t    = jqt.overlap(jqt.destroy(N), states)         # (101, 2)
 ```
+</div>
 
+<div class="demo-plot" markdown>
 ![Batched master equation output](assets/readme_demo.png)
+</div>
+
+</div>
 
 ### Tunable transmon spectrum via `vmap`
 
-Sweep 200 flux values through a SQUID transmon in one compiled call:
+Sweep 200 flux values through a SQUID transmon in one compiled call.
 
+<div class="demo demo--reverse" markdown>
+
+<div class="demo-code" markdown>
 ```python
 import jaxquantum.devices as jqtd
 import jax, jax.numpy as jnp
@@ -158,8 +169,13 @@ def get_freqs(phi_ext):
 # 200 flux points, one compiled call
 all_freqs = jax.vmap(get_freqs)(jnp.linspace(0, 1, 200))
 ```
+</div>
 
+<div class="demo-plot" markdown>
 ![Tunable transmon spectrum vs flux](assets/transmon_flux_sweep.png)
+</div>
+
+</div>
 
 ---
 
@@ -204,8 +220,8 @@ If `jaxquantum` is useful in your research, please cite:
   author  = {Shantanu R. Jha and Shoumik Chowdhury and Gabriele Rolleri and Max Hays and Jeff A. Grover and William D. Oliver},
   title   = {JAXQuantum: An auto-differentiable and hardware-accelerated toolkit for quantum hardware design, simulation, and control},
   url     = {https://jaxquantum.org},
-  version = {0.2.2},
-  year    = {2025},
+  version = {0.3.0},
+  year    = {2024},
 }
 ```
 

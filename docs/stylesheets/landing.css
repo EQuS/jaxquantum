@@ -90,3 +90,54 @@
         font-size: 0.85em;
     }
 }
+
+/* ================================================================
+   "See it in action" demo rows — code + plot side-by-side
+   Use .demo--reverse to swap which side the code is on for variety.
+   ================================================================ */
+
+.demo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.5rem;
+    align-items: center;
+    margin: 1.5rem 0 2rem;
+}
+
+@media screen and (max-width: 960px) {
+    .demo {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+}
+
+.demo-code .highlight {
+    margin: 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08),
+                0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.demo-plot {
+    text-align: center;
+}
+
+.demo-plot img {
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+}
+
+.demo-plot p {
+    margin: 0;
+}
+
+/* Alternating layout: code on the right, plot on the left */
+.demo--reverse .demo-code { order: 2; }
+.demo--reverse .demo-plot { order: 1; }
+
+/* On mobile, always stack code-then-plot regardless of variant */
+@media screen and (max-width: 960px) {
+    .demo--reverse .demo-code { order: 1; }
+    .demo--reverse .demo-plot { order: 2; }
+}

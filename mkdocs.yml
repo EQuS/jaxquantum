@@ -4,6 +4,9 @@ use_directory_urls: false
 repo_url: https://github.com/EQuS/jaxquantum
 repo_name: jaxquantum
 
+exclude_docs: |
+  scripts/
+
 theme:
   name: material
   features:
@@ -47,6 +50,7 @@ plugins:
   - search
   - mkdocs-jupyter:
       execute: false
+      include: ["*.ipynb"]
   - gen-files:
       scripts:
       - docs/gen_ref_pages.py
