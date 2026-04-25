@@ -1,5 +1,6 @@
 ## Installation
 
+We recommend Python 3.11+.
 
 ### Installing from source (recommended)
 

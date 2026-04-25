@@ -5,90 +5,44 @@
 
 [![License](https://img.shields.io/github/license/EQuS/jaxquantum.svg)](https://opensource.org/license/apache-2-0) [![](https://img.shields.io/github/release/EQuS/jaxquantum.svg)](https://github.com/EQuS/jaxquantum/releases) [![](https://img.shields.io/pypi/dm/jaxquantum.svg)](https://pypi.org/project/jaxquantum/)
 
-[![code coverage](https://jaxquantum.org/test-results/coverage.svg?raw=true)](https://jaxquantum.org/test-results/cov_html/) [![tests](https://github.com/EQuS/jaxquantum/actions/workflows/pytest.yml/badge.svg)](https://github.com/EQuS/jaxquantum/actions/workflows/pytest.yml) [![ruff](https://github.com/EQuS/jaxquantum/actions/workflows/ruff.yml/badge.svg)](https://github.com/EQuS/jaxquantum/actions/workflows/ruff.yml) [![docs](https://github.com/EQuS/jaxquantum/actions/workflows/docs.yml/badge.svg)](https://github.com/EQuS/jaxquantum/actions/workflows/docs.yml) 
+[![code coverage](https://jaxquantum.org/test-results/coverage.svg?raw=true)](https://jaxquantum.org/test-results/cov_html/) [![tests](https://github.com/EQuS/jaxquantum/actions/workflows/pytest.yml/badge.svg)](https://github.com/EQuS/jaxquantum/actions/workflows/pytest.yml) [![ruff](https://github.com/EQuS/jaxquantum/actions/workflows/ruff.yml/badge.svg)](https://github.com/EQuS/jaxquantum/actions/workflows/ruff.yml) [![docs](https://github.com/EQuS/jaxquantum/actions/workflows/docs.yml/badge.svg)](https://github.com/EQuS/jaxquantum/actions/workflows/docs.yml)
 
 [S. R. Jha](https://github.com/Phionx), [S. Chowdhury](https://github.com/shoumikdc), [G. Rolleri](https://github.com/GabrieleRolleri), [M. Hays](https://scholar.google.com/citations?user=06z0MjwAAAAJ), [J. A. Grover](https://scholar.google.com/citations?user=igewch8AAAAJ), [W. D. Oliver](https://scholar.google.com/citations?user=4vNbnqcAAAAJ&hl=en)
 
-**Docs:** [equs.github.io/jaxquantum](https://equs.github.io/jaxquantum)
+**Docs:** [jaxquantum.org](https://jaxquantum.org) &nbsp;|&nbsp; **Discord:** [discord.gg/frWqbjvZ4s](https://discord.gg/frWqbjvZ4s)
 
-**Community Discord:** [discord.gg/frWqbjvZ4s](https://discord.gg/frWqbjvZ4s)
+`jaxquantum` is a unified [JAX](https://github.com/google/jax)-native toolkit for quantum hardware design, simulation, and control — auto-differentiable and accelerated on CPU, GPU, and TPU. It serves as a QuTiP drop-in replacement and absorbs the prior [`bosonic`](https://github.com/EQuS/bosonic) and [`qcsys`](https://github.com/EQuS/qcsys) projects.
 
-`jaxquantum` leverages [JAX](https://github.com/google/jax) to enable the auto differentiable and (CPU, GPU, TPU) accelerated simulation of quantum dynamical systems, including tooling such as operator construction, unitary evolution and master equation solving. As such, `jaxquantum` serves as a QuTiP drop-in replacement written entirely in JAX.
 
-Moreover, `jaxquantum` has recently absorbed [`bosonic`](https://github.com/EQuS/bosonic) and [`qcsys`](https://github.com/EQuS/qcsys). As such, it is now a unified toolkit for quantum circuit design, simulation and control. 
+## Highlights
+
+- **Superconducting devices** — ready-to-use Transmon, Fluxonium, and Resonator models with eigenspectrum, wavefunctions, and parameter sweeps. See the [devices tutorial](https://jaxquantum.org/documentation/tutorials/devices.html).
+- **Bosonic codes** — Cat, GKP, and Binomial qubit encodings with logical gates and phase-space visualization. See the [bosonic codes tutorial](https://jaxquantum.org/documentation/tutorials/bosonic_codes.html).
+- **Gate-based circuits** — hierarchical circuits with unitary, Hamiltonian, and Kraus simulation modes; gradient-based gate optimization. See the [circuits tutorial](https://jaxquantum.org/documentation/tutorials/circuits.html).
+- **Sparse backends** — `SparseDIA` and `BCOO` storage for large Hilbert spaces with the same API as dense. See the [sparse backends tutorial](https://jaxquantum.org/documentation/tutorials/sparse_backends.html).
+- **First-class JAX** — use `jax.vmap` for parameter sweeps, `jax.jit` for compiled simulation, and `jax.grad` for differentiable physics out of the box.
 
 
 ## Installation
-
-
-### Installing from source (recommended)
-
-**Recommended:** As this is a rapidly evolving project, we recommend installing the latest version of `jaxquantum` from source as follows:
-```bash
-pip install git+https://github.com/EQuS/jaxquantum.git
-```
-
-If you are installing on a GPU (NVIDIA, CUDA12), then run this instead:
-```bash
-pip install 'git+https://github.com/EQuS/jaxquantum.git#egg=jaxquantum[gpu]'
-```
-
-And, on a TPU, run this:
-```bash
-pip install 'git+https://github.com/EQuS/jaxquantum.git#egg=jaxquantum[tpu]'
-```
-
-If you face issues running JAX on your hardware, visit this page: [https://docs.jax.dev/en/latest/installation.html](https://docs.jax.dev/en/latest/installation.html)
-
-
-### Installing from source in editable mode (recommended for developers)
-
-If you are interested in contributing to the package, please clone this repository and install this package in editable mode after changing into the root directory of this repository:
-```bash
-pip install -e ".[dev,docs]"
-```
-This will also install extras from the `dev` and `docs` flags, which can be useful when developing the package. Since this is installed in editable mode, the package will automatically be updated after pulling new changes in the repository. Again, add the `gpu` or `tpu` extra, if needed.
-
-### Installing from PyPI (not recommended)
-
-`jaxquantum` is also published on PyPI. Simply run the following code to install the package:
 
 ```bash
 pip install jaxquantum
 ```
 
-If you are installing on a GPU (NVIDIA, CUDA12), then run this instead:
+For GPU (NVIDIA, CUDA12) or TPU, use the `[gpu]` or `[tpu]` extras. For the latest development version, install directly from source:
+
 ```bash
-pip install 'jaxquantum[gpu]'
+pip install git+https://github.com/EQuS/jaxquantum.git
 ```
 
-And, on a TPU, run this:
-```bash
-pip install 'jaxquantum[tpu]'
-```
-
-If you face issues running JAX on your hardware, visit this page: [https://docs.jax.dev/en/latest/installation.html](https://docs.jax.dev/en/latest/installation.html)
+For development (editable + dev/docs extras): `pip install -e ".[dev,docs]"`. See the [installation guide](https://jaxquantum.org/documentation/getting_started/installation.html) for full details, hardware checks, and troubleshooting.
 
 
-For more details, please visit the getting started > installation section of our [docs](https://equs.github.io/jaxquantum/getting_started/installation.html).
-
-### Check Hardware
-
-To check which hardware JAX is running on, run the following python code:
-```python
-import jax.numpy as jnp
-x = jnp.array([1.0, 2.0, 3.0])
-print(x.device)
-```
-This will, for example, print out `cuda:0` if running on a GPU.
-
-## An Example
-
-Here's an example of how to set up a simulation in jaxquantum.
+## Quick Start
 
 ```python
 from jax import jit
-import jaxquantum as jqt 
+import jaxquantum as jqt
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
@@ -111,7 +65,7 @@ def Ht(t):
     return H0
 
 solver_options = jqt.SolverOptions.create(progress_meter=True)
-states = jqt.mesolve(Ht, initial_state_dm, ts, c_ops=c_ops, solver_options=solver_options) 
+states = jqt.mesolve(Ht, initial_state_dm, ts, c_ops=c_ops, solver_options=solver_options)
 nt = jnp.real(jqt.overlap(n, states))
 a_real = jnp.real(jqt.overlap(a, states))
 a_imag = jnp.imag(jqt.overlap(a, states))
@@ -134,7 +88,7 @@ ax.set_ylabel("Expectations")
 ax.legend()
 fig.tight_layout()
 ```
-![Output of above code.](docs/assets/readme_demo.png)
+![Output of above code.](https://github.com/EQuS/jaxquantum/raw/main/docs/assets/readme_demo.png)
 
 
 ## Acknowledgements & History
@@ -142,7 +96,7 @@ fig.tight_layout()
 **Core Devs:** [Shantanu R. Jha](https://github.com/Phionx), [Shoumik Chowdhury](https://github.com/shoumikdc), [Gabriele Rolleri](https://github.com/GabrieleRolleri)
 
 
-This package was initially a small part of [`bosonic`](https://github.com/EQuS/bosonic). In early 2022, `jaxquantum` was extracted and made into its own package. This package was briefly announced to the world at APS March Meeting 2023 and released to a select few academic groups shortly after. Since then, this package has been open sourced and developed while conducting research in the Engineering Quantum Systems Group at MIT with advice and support from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/). 
+This package was initially a small part of [`bosonic`](https://github.com/EQuS/bosonic). In early 2022, `jaxquantum` was extracted and made into its own package. This package was briefly announced to the world at APS March Meeting 2023 and released to a select few academic groups shortly after. Since then, this package has been open sourced and developed while conducting research in the Engineering Quantum Systems Group at MIT with advice and support from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/).
 
 ## Citation
 
@@ -162,4 +116,4 @@ Thank you for taking the time to try our package out. If you found it useful in 
 
 ## Contributions & Contact
 
-This package is open source and, as such, very open to contributions. Please don't hesitate to open an issue, report a bug, request a feature, or create a pull request. We are also open to deeper collaborations to create a tool that is more useful for everyone. If a discussion would be helpful, please email [shanjha@mit.edu](mailto:shanjha@mit.edu) to set up a meeting. 
+This package is open source and, as such, very open to contributions. Please don't hesitate to open an issue, report a bug, request a feature, or create a pull request. We are also open to deeper collaborations to create a tool that is more useful for everyone. If a discussion would be helpful, please email [shanjha@mit.edu](mailto:shanjha@mit.edu) to set up a meeting.

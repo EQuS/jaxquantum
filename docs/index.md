@@ -1,147 +1,191 @@
-# Welcome to jaxquantum
+---
+hide:
+  - navigation
+  - toc
+---
 
-[![License](https://img.shields.io/github/license/EQuS/jaxquantum.svg)](https://opensource.org/license/apache-2-0) [![](https://img.shields.io/github/release/EQuS/jaxquantum.svg)](https://github.com/EQuS/jaxquantum/releases) [![](https://img.shields.io/pypi/dm/jaxquantum.svg)](https://pypi.org/project/jaxquantum/)
+<div align="center" markdown>
 
-[![code coverage](https://jaxquantum.org/test-results/coverage.svg?raw=true)](https://jaxquantum.org/test-results/cov_html/) [![tests](https://github.com/EQuS/jaxquantum/actions/workflows/pytest.yml/badge.svg)](https://github.com/EQuS/jaxquantum/actions/workflows/pytest.yml) [![ruff](https://github.com/EQuS/jaxquantum/actions/workflows/ruff.yml/badge.svg)](https://github.com/EQuS/jaxquantum/actions/workflows/ruff.yml) [![docs](https://github.com/EQuS/jaxquantum/actions/workflows/docs.yml/badge.svg)](https://github.com/EQuS/jaxquantum/actions/workflows/docs.yml) 
+<!-- <img src="assets/logo.png" height="120" alt="jaxquantum logo"> -->
 
-[S. R. Jha](https://github.com/Phionx), [S. Chowdhury](https://github.com/shoumikdc), [G. Rolleri](https://github.com/GabrieleRolleri), [M. Hays](https://scholar.google.com/citations?user=06z0MjwAAAAJ), [J. A. Grover](https://scholar.google.com/citations?user=igewch8AAAAJ), [W. D. Oliver](https://scholar.google.com/citations?user=4vNbnqcAAAAJ&hl=en)
+# jaxquantum
 
-**Docs:** [equs.github.io/jaxquantum](https://equs.github.io/jaxquantum)
+**A JAX-native toolkit for quantum hardware design, simulation, and control.**
 
-**Community Discord:** [discord.gg/frWqbjvZ4s](https://discord.gg/frWqbjvZ4s)
+Auto-differentiable. Accelerated on CPU, GPU, and TPU.
 
-`jaxquantum` leverages [JAX](https://github.com/google/jax) to enable the auto differentiable and (CPU, GPU, TPU) accelerated simulation of quantum dynamical systems, including tooling such as operator construction, unitary evolution and master equation solving. As such, `jaxquantum` serves as a QuTiP drop-in replacement written entirely in JAX.
-
-Moreover, `jaxquantum` has recently absorbed [`bosonic`](https://github.com/EQuS/bosonic) and [`qcsys`](https://github.com/EQuS/qcsys). As such, it is now a unified toolkit for quantum circuit design, simulation and control. 
-
-
-## Installation
-
-
-### Installing from source (recommended)
-
-**Recommended:** As this is a rapidly evolving project, we recommend installing the latest version of `jaxquantum` from source as follows:
-```bash
-pip install git+https://github.com/EQuS/jaxquantum.git
-```
-
-If you are installing on a GPU (NVIDIA, CUDA12), then run this instead:
-```bash
-pip install 'git+https://github.com/EQuS/jaxquantum.git#egg=jaxquantum[gpu]'
-```
-
-And, on a TPU, run this:
-```bash
-pip install 'git+https://github.com/EQuS/jaxquantum.git#egg=jaxquantum[tpu]'
-```
-
-If you face issues running JAX on your hardware, visit this page: [https://docs.jax.dev/en/latest/installation.html](https://docs.jax.dev/en/latest/installation.html)
-
-### Installing from source in editable mode (recommended for developers)
-
-If you are interested in contributing to the package, please clone this repository and install this package in editable mode after changing into the root directory of this repository:
-```bash
-pip install -e ".[dev,docs]"
-```
-This will also install extras from the `dev` and `docs` flags, which can be useful when developing the package. Since this is installed in editable mode, the package will automatically be updated after pulling new changes in the repository. Again, add the `gpu` or `tpu` extra, if needed.
-
-### Installing from PyPI (not recommended)
-
-`jaxquantum` is also published on PyPI. Simply run the following code to install the package:
-
+<div style="max-width: 320px; margin: 1em auto;" markdown>
 ```bash
 pip install jaxquantum
 ```
+</div>
 
-If you are installing on a GPU (NVIDIA, CUDA12), then run this instead:
-```bash
-pip install 'jaxquantum[gpu]'
-```
+[Get Started :material-arrow-right:](documentation/getting_started/installation.md){ .md-button .md-button--primary }
+[Tutorials](documentation/tutorials/index.md){ .md-button }
+[GitHub](https://github.com/EQuS/jaxquantum){ .md-button }
 
-And, on a TPU, run this:
-```bash
-pip install 'jaxquantum[tpu]'
-```
+</div>
 
-If you face issues running JAX on your hardware, visit this page: [https://docs.jax.dev/en/latest/installation.html](https://docs.jax.dev/en/latest/installation.html)
+---
 
+## Why jaxquantum?
 
-For more details, please visit the getting started > installation section of our [docs](https://equs.github.io/jaxquantum/getting_started/installation.html).
+<div class="grid cards" markdown>
 
-### Check Hardware
+-   :material-flash: **JAX-native**
 
-To check which hardware JAX is running on, run the following python code:
-```python
-import jax.numpy as jnp
-x = jnp.array([1.0, 2.0, 3.0])
-print(x.device)
-```
-This will, for example, print out `cuda:0` if running on a GPU.
+    ---
 
+    Use `jax.vmap`, `jax.jit`, and `jax.grad` directly on quantum operators. Parameter sweeps become single compiled calls; fitting becomes autodiff.
 
-## An Example
+-   :material-circle-double: **QuTiP drop-in**
 
-Here's an example of how to set up a simulation in jaxquantum.
+    ---
+
+    Familiar API for operator construction, unitary evolution, and master equation solving — but everything is a JAX `Qarray`.
+
+-   :material-chip: **Superconducting devices**
+
+    ---
+
+    Ready-to-use Transmon, Fluxonium, and Resonator models. Diagonalize, sweep flux, and fit physical parameters with autodiff.
+
+    [:octicons-arrow-right-24: Devices tutorial](documentation/tutorials/devices.ipynb)
+
+-   :material-atom-variant: **Bosonic codes**
+
+    ---
+
+    Cat, GKP, and Binomial qubit encodings with logical gates and phase-space visualization.
+
+    [:octicons-arrow-right-24: Bosonic codes tutorial](documentation/tutorials/bosonic_codes.ipynb)
+
+-   :material-source-branch: **Gate-based circuits**
+
+    ---
+
+    Hierarchical circuits with unitary, Hamiltonian, and Kraus simulation modes. Optimize gate parameters end-to-end with `grad`.
+
+    [:octicons-arrow-right-24: Circuits tutorial](documentation/tutorials/circuits.ipynb)
+
+-   :material-database: **Sparse backends**
+
+    ---
+
+    `SparseDIA` and `BCOO` storage for large Hilbert spaces. Same API as dense; dramatic memory savings and faster `sesolve` at large $N$.
+
+    [:octicons-arrow-right-24: Sparse backends tutorial](documentation/tutorials/sparse_backends.ipynb)
+
+</div>
+
+---
+
+## See it in action
+
+### Master equation, batched over decay rates
+
+Solve the Lindblad equation for a driven oscillator at two photon-loss rates **in a single call** — `jaxquantum` automatically batches over the array-valued `kappa`:
 
 ```python
 from jax import jit
-import jaxquantum as jqt 
+import jaxquantum as jqt
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 
 N = 100
+omega = 2*jnp.pi*5.0
+kappa = 2*jnp.pi*jnp.array([1.0, 2.0])  # batch over two decay rates
 
-omega_a = 2.0*jnp.pi*5.0
-kappa = 2*jnp.pi*jnp.array([1,2]) # Batching to explore two different kappa values!
-initial_state = jqt.displace(N, 0.1) @ jqt.basis(N,0)
-initial_state_dm = initial_state.to_dm()
-ts = jnp.linspace(0, 4*2*jnp.pi/omega_a, 101)
-
-a = jqt.destroy(N)
-n = a.dag() @ a
-
-c_ops = jqt.Qarray.from_list([jnp.sqrt(kappa)*a])
+rho0 = (jqt.displace(N, 0.1) @ jqt.basis(N, 0)).to_dm()
+ts   = jnp.linspace(0, 4*2*jnp.pi/omega, 101)
+c_ops = jqt.Qarray.from_list([jnp.sqrt(kappa) * jqt.destroy(N)])
 
 @jit
-def Ht(t):
-    H0 = omega_a*n
-    return H0
+def H(t):
+    return omega * jqt.num(N)
 
-solver_options = jqt.SolverOptions.create(progress_meter=True)
-states = jqt.mesolve(Ht, initial_state_dm, ts, c_ops=c_ops, solver_options=solver_options) 
-nt = jnp.real(jqt.overlap(n, states))
-a_real = jnp.real(jqt.overlap(a, states))
-a_imag = jnp.imag(jqt.overlap(a, states))
-
-fig, axs = plt.subplots(2,1, dpi=200, figsize=(6,5))
-ax = axs[0]
-ax.plot(ts, a_real[:,0], label=r"$Re[\langle a(t)\rangle]$", color="blue") # Batch kappa value 0
-ax.plot(ts, a_real[:,1], "--", label=r"$Re[\langle a(t)\rangle]$", color="blue") # Batch kappa value 1
-ax.plot(ts, a_imag[:,0], label=r"$Re[\langle a(t)\rangle]$", color="red") # Batch kappa value 0
-ax.plot(ts, a_imag[:,1], "--", label=r"$Re[\langle a(t)\rangle]$", color="red") # Batch kappa value 1
-ax.set_xlabel("Time (ns)")
-ax.set_ylabel("Expectations")
-ax.legend()
-
-ax = axs[1]
-ax.plot(ts, nt[:,0], label=r"$Re[\langle n(t)\rangle]$", color="green") # Batch kappa value 0
-ax.plot(ts, nt[:,1], "--", label=r"$Re[\langle n(t)\rangle]$", color="green") # Batch kappa value 1
-ax.set_xlabel("Time (ns)")
-ax.set_ylabel("Expectations")
-ax.legend()
-fig.tight_layout()
+states = jqt.mesolve(H, rho0, ts, c_ops=c_ops)
+n_t    = jnp.real(jqt.overlap(jqt.num(N), states))   # shape (101, 2)
+a_t    = jqt.overlap(jqt.destroy(N), states)         # shape (101, 2)
 ```
-![Output of above code.](assets/readme_demo.png)
 
+![Batched master equation output](assets/readme_demo.png)
 
-## Acknowledgements & History
+### Tunable transmon spectrum via `vmap`
 
-**Core Devs:** [Shantanu R. Jha](https://github.com/Phionx), [Shoumik Chowdhury](https://github.com/shoumikdc), [Gabriele Rolleri](https://github.com/GabrieleRolleri)
+Sweep 200 flux values through a SQUID transmon in one compiled call:
 
+```python
+import jaxquantum.devices as jqtd
+import jax, jax.numpy as jnp
 
-This package was initially a small part of [`bosonic`](https://github.com/EQuS/bosonic). In early 2022, `jaxquantum` was extracted and made into its own package. This package was briefly announced to the world at APS March Meeting 2023 and released to a select few academic groups shortly after. Since then, this package has been open sourced and developed while conducting research in the Engineering Quantum Systems Group at MIT with advice and support from [Prof. William D. Oliver](https://equs.mit.edu/william-d-oliver/). 
+@jax.jit
+def get_freqs(phi_ext):
+    t = jqtd.TunableTransmon.create(
+        N=4,
+        params={"Ec": 0.3, "Ej1": 8.0, "Ej2": 7.0, "phi_ext": phi_ext},
+        N_pre_diag=41, basis=jqtd.BasisTypes.charge,
+    )
+    Es = t.eig_systems["vals"]
+    return Es - Es[0]
 
+# 200 flux points, one compiled call
+all_freqs = jax.vmap(get_freqs)(jnp.linspace(0, 1, 200))
+```
 
+![Tunable transmon spectrum vs flux](assets/transmon_flux_sweep.png)
 
+---
 
+## Explore the tutorials
 
+<div class="grid cards" markdown>
+
+-   :material-chip: __[Devices & Systems](documentation/tutorials/devices.ipynb)__
+
+    ---
+
+    Build a Transmon, sweep flux with `vmap`, and fit Ec/Ej to spectroscopy data with `grad`.
+
+-   :material-atom-variant: __[Bosonic Codes](documentation/tutorials/bosonic_codes.ipynb)__
+
+    ---
+
+    Construct cat, GKP, and binomial codes. Visualize codewords and run logical gate dynamics.
+
+-   :material-source-branch: __[Circuits](documentation/tutorials/circuits.ipynb)__
+
+    ---
+
+    Compose gate-based circuits with mixed unitary/Hamiltonian/Kraus evolution. Optimize with autodiff.
+
+-   :material-database: __[Sparse Backends](documentation/tutorials/sparse_backends.ipynb)__
+
+    ---
+
+    Efficiently scale to massive Hilbert spaces with Sparse Diagonal, BCOO, and other backends.
+
+</div>
+
+---
+
+## Citation
+
+If `jaxquantum` is useful in your research, please cite:
+
+```bibtex
+@software{jha2024jaxquantum,
+  author  = {Shantanu R. Jha and Shoumik Chowdhury and Gabriele Rolleri and Max Hays and Jeff A. Grover and William D. Oliver},
+  title   = {JAXQuantum: An auto-differentiable and hardware-accelerated toolkit for quantum hardware design, simulation, and control},
+  url     = {https://jaxquantum.org},
+  version = {0.2.2},
+  year    = {2025},
+}
+```
+
+## Community
+
+- [Discord](https://discord.gg/frWqbjvZ4s) — chat with users and developers
+- [GitHub Issues](https://github.com/EQuS/jaxquantum/issues) — bug reports and feature requests
+- [shanjha@mit.edu](mailto:shanjha@mit.edu) — for deeper collaborations
+
+Developed in the [Engineering Quantum Systems Group](https://equs.mit.edu) at MIT.
