@@ -1,0 +1,92 @@
+/* ================================================================
+   Landing page — two-column hero
+   ================================================================ */
+
+.hero {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: center;
+    margin: 2rem 0 4rem;
+}
+
+@media screen and (max-width: 960px) {
+    .hero {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+}
+
+/* Left column: title + tagline + install + buttons
+   ---------------------------------------------------------------- */
+
+.hero-text h1 {
+    font-size: 3.25rem;
+    line-height: 1.05;
+    margin: 0 0 0.75rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    background: linear-gradient(
+        135deg,
+        var(--md-primary-fg-color),
+        var(--md-accent-fg-color)
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.hero-tagline {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--md-default-fg-color);
+    margin: 0 0 0.5rem;
+    line-height: 1.4;
+}
+
+.hero-subline {
+    font-size: 0.95rem;
+    color: var(--md-default-fg-color--light);
+    margin: 0 0 1.75rem;
+}
+
+.hero-install {
+    max-width: 320px;
+    margin: 0 0 1.5rem;
+}
+
+.hero-install .highlight,
+.hero-install pre {
+    margin: 0;
+}
+
+.hero-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.25rem;
+}
+
+/* Remove the default paragraph-spacing md-button links pick up
+   when rendered inline in markdown. */
+.hero-buttons p {
+    margin: 0;
+    display: contents;
+}
+
+/* Right column: elevated code preview
+   ---------------------------------------------------------------- */
+
+.hero-code .highlight {
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08),
+                0 1px 3px rgba(0, 0, 0, 0.05);
+    margin: 0;
+}
+
+/* On mobile, give the code block a bit of breathing room from the edges */
+@media screen and (max-width: 960px) {
+    .hero-code {
+        font-size: 0.85em;
+    }
+}

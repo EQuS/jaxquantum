@@ -4,25 +4,52 @@ hide:
   - toc
 ---
 
-<div align="center" markdown>
+<div class="hero" markdown>
 
-<!-- <img src="assets/logo.png" height="120" alt="jaxquantum logo"> -->
+<div class="hero-text" markdown>
 
 # jaxquantum
 
-**A JAX-native toolkit for quantum hardware design, simulation, and control.**
+<p class="hero-tagline">A JAX-native toolkit for quantum hardware design, simulation, and control.</p>
 
-Auto-differentiable. Accelerated on CPU, GPU, and TPU.
+<p class="hero-subline">Auto-differentiable. Accelerated on CPU, GPU, and TPU.</p>
 
-<div style="max-width: 320px; margin: 1em auto;" markdown>
+<div class="hero-install" markdown>
 ```bash
 pip install jaxquantum
 ```
 </div>
 
+<div class="hero-buttons" markdown>
 [Get Started :material-arrow-right:](documentation/getting_started/installation.md){ .md-button .md-button--primary }
 [Tutorials](documentation/tutorials/index.md){ .md-button }
 [GitHub](https://github.com/EQuS/jaxquantum){ .md-button }
+</div>
+
+</div>
+
+<div class="hero-code" markdown>
+
+```python
+import jaxquantum as jqt
+import jax, jax.numpy as jnp
+
+def expect_n(alpha):
+    psi = jqt.displace(50, alpha) @ jqt.basis(50, 0)
+    return jnp.real(jqt.tr(jqt.num(50) @ psi.to_dm()))
+
+# auto-differentiate, vectorize, and jit-compile
+dexpect_n = jax.jit(jax.vmap(jax.grad(expect_n))) 
+
+%timeit -n1 -r1 dexpect_n(jnp.linspace(0, 3, 100))  # compile
+%timeit -n1 -r1 dexpect_n(jnp.linspace(0, 5, 100))  # much faster!
+```
+```text title="Output"
+813 ms ± 0 ns per loop (mean ± std. dev. of 1 run, 1 loop each)
+454 μs ± 0 ns per loop (mean ± std. dev. of 1 run, 1 loop each)
+```
+
+</div>
 
 </div>
 
