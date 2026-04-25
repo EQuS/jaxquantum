@@ -69,7 +69,7 @@ For linux users who wish to enable Nvidia GPU support, here are some steps ([ref
 
 1. Make sure you NVIDIA drivers by running:
    `cat /proc/driver/nvidia/version` or `sudo ubuntu-drivers list`
-2. If your driver version is >= 525.60.13 then run:
+2. If your driver version is >= 525.60.13 then run (may be out of date with cuda13):
    `pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html` otherwise, use `cuda11_pip`
 3. Test that GPU support is enabled:
 4. Enjoy!
