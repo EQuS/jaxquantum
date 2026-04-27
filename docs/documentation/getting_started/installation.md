@@ -63,7 +63,9 @@ This will, for example, print out `cuda:0` if running on a GPU.
 
 ## Common Issues
 
-### [April 27, 2026] orbax-checkpoint filename or extension is too long (Windows)
+### orbax-checkpoint filename or extension is too long (Windows)
+
+***Added April 27, 2026.***
 
 Due to a temporary fix in one of the dependencies of jaxquantum ([ref](https://github.com/google/flax/issues/5260)), you may run into this error on Windows:
 ```
@@ -76,7 +78,7 @@ The fix is to enable long paths in Windows, by:
 2. Run: `New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force`
 3. Restart your terminal and retry `pip install jaxquantum`.
 
-Hopefully, this will not be necessary once the `orbax` issue is resolved. 
+This will not be necessary once the `orbax` issue is resolved. 
 
 ### Errors installing with GPU support (Linux)
 
