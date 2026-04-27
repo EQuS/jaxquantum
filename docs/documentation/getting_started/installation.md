@@ -63,6 +63,21 @@ This will, for example, print out `cuda:0` if running on a GPU.
 
 ## Common Issues
 
+### [April 27, 2026] orbax-checkpoint filename or extension is too long (Windows)
+
+Due to a temporary fix in one of the dependencies of jaxquantum ([ref](https://github.com/google/flax/issues/5260)), you may run into this error on Windows:
+```
+Installing collected packages: zipp, wadler-lindig, typing-extensions, toolz, six, simplejson, PyYAML, pyparsing, pygments, psutil, protobuf, pillow, opt_einsum, numpy, nest_asyncio, msgpack, mdurl, kiwisolver, humanize, fsspec, fonttools, etils, cycler, colorama, aiofiles, absl-py, treescope, tqdm, scipy, python-dateutil, ml_dtypes, markdown-it-py, jaxtyping, contourpy, tensorstore, rich, qutip, matplotlib, jaxlib, jax, orbax-checkpoint, optax, equinox, chex, lineax, jax-tqdm, flax, optimistix, diffrax, jaxquantum
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╺━━━━━━━ 40/50 [orbax-checkpoint]ERROR: Could not install packages due to an OSError: [WinError 206] The filename or extension is too long: 'C:\\Users\\EQuS\\miniconda3\\envs\\jqt-env\\Lib\\site-packages\\orbax\\checkpoint\\experimental\\v1\\_src\\testing\\compatibility\\checkpoints\\v0_checkpoints\\composite_checkpoint\\checkpoint_metadata_missing\\pytree_checkpointable_has_metadata\\state\\array_metadatas'
+```
+
+The fix is to enable long paths in Windows, by:
+1. Opening PowerShell as Administrator.
+2. Run: `New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force`
+3. Restart your terminal and retry `pip install jaxquantum`.
+
+Hopefully, this will not be necessary once the `orbax` issue is resolved. 
+
 ### Errors installing with GPU support (Linux)
 
 For linux users who wish to enable Nvidia GPU support, here are some steps ([ref](https://jax.readthedocs.io/en/latest/installation.html#nvidia-gpu)):
