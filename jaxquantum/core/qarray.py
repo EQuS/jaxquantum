@@ -41,11 +41,13 @@ class QarrayImplType(Enum):
         DENSE: Standard JAX dense array (``jnp.ndarray``).
         SPARSE_BCOO: JAX experimental BCOO sparse array.
         SPARSE_DIA: Diagonal sparse array.
+        CUQUANTUM: cuQuantum ``OperatorTerm`` (mode-structured, GPU-only).
     """
 
     DENSE = "dense"
     SPARSE_BCOO = "sparse_bcoo"
     SPARSE_DIA = "sparse_dia"
+    CUQUANTUM = "cuquantum"
 
     @classmethod
     def register(cls, impl_class, member):
@@ -119,18 +121,23 @@ class QarrayImplType(Enum):
 
 
 def robust_asarray(data) -> Union[Array, sparse.BCOO]:
-    """Convert *data* to a JAX array, leaving sparse BCOO and SparseDiaData untouched.
+    """Convert *data* to a JAX array, leaving sparse / cuquantum containers untouched.
 
     Args:
-        data: Input data — any array-like, ``sparse.BCOO``, or ``SparseDiaData``.
+        data: Input data — any array-like, ``sparse.BCOO``, ``SparseDiaData``,
+            or ``CuquantumOpData``.
 
     Returns:
-        A ``jax.Array``, ``sparse.BCOO``, or ``SparseDiaData``.
+        A ``jax.Array``, ``sparse.BCOO``, ``SparseDiaData``, or
+        ``CuquantumOpData``.
     """
     if isinstance(data, sparse.BCOO):
         return data
     # SparseDiaData has a ``_is_sparse_dia`` marker; pass it through unchanged
     if getattr(data, "_is_sparse_dia", False):
+        return data
+    # CuquantumOpData has a ``_is_cuquantum_op`` marker; pass it through unchanged
+    if getattr(data, "_is_cuquantum_op", False):
         return data
     return jnp.asarray(data)
 
@@ -604,18 +611,24 @@ class DenseImpl(QarrayImpl):
 
     @classmethod
     def can_handle_data(cls, arr) -> bool:
-        """Return True for any non-BCOO, non-SparseDIA array.
+        """Return True for any non-BCOO, non-SparseDIA, non-cuquantum array.
 
-        ``SparseDiaData`` objects carry a ``_is_sparse_dia`` marker so we can
-        exclude them without a direct type import (which would be circular).
+        ``SparseDiaData`` and ``CuquantumOpData`` objects carry marker
+        attributes so we can exclude them without direct type imports (which
+        would be circular).
 
         Args:
             arr: Raw array.
 
         Returns:
-            True when *arr* is a plain dense array (not BCOO, not SparseDiaData).
+            True when *arr* is a plain dense array (not BCOO, not
+            SparseDiaData, not CuquantumOpData).
         """
-        return not isinstance(arr, sparse.BCOO) and not getattr(arr, "_is_sparse_dia", False)
+        return (
+            not isinstance(arr, sparse.BCOO)
+            and not getattr(arr, "_is_sparse_dia", False)
+            and not getattr(arr, "_is_cuquantum_op", False)
+        )
 
     @classmethod
     def dag_data(cls, arr) -> Array:
@@ -684,7 +697,7 @@ class Qarray(Generic[ImplT]):
         ...
 
     @classmethod
-    def create(cls, data, dims=None, bdims=None, implementation=QarrayImplType.DENSE):
+    def create(cls, data, dims=None, bdims=None, implementation=None):
         """Create a ``Qarray`` from raw data.
 
         Handles shape normalisation, dimension inference, and tidying of small
@@ -696,13 +709,17 @@ class Qarray(Generic[ImplT]):
                 Inferred from *data* shape when ``None``.
             bdims: Tuple of batch dimension sizes.  Inferred from the leading
                 dimensions of *data* when ``None``.
-            implementation: Storage backend — ``QarrayImplType.DENSE``
-                (default) or ``QarrayImplType.SPARSE_BCOO``, or the equivalent
-                string ``"dense"`` / ``"sparse_bcoo"``.
+            implementation: Storage backend — a ``QarrayImplType`` member or
+                the equivalent string (e.g. ``"dense"``, ``"sparse_bcoo"``,
+                ``"sparse_dia"``, ``"cuquantum"``).  When ``None`` (the
+                default), reads ``SETTINGS["default_backend"]``.
 
         Returns:
             A new ``Qarray`` backed by the requested implementation.
         """
+        if implementation is None:
+            implementation = SETTINGS.get("default_backend", QarrayImplType.DENSE)
+
         # Step 1: Prepare data ----
         data = robust_asarray(data)
 

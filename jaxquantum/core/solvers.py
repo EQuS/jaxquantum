@@ -18,7 +18,7 @@ import tqdm
 import logging
 
 
-from jaxquantum.core.qarray import Qarray, Qtypes, dag_data
+from jaxquantum.core.qarray import Qarray, Qtypes, QarrayImplType, dag_data
 from jaxquantum.core.conversions import jnp2jqt
 from jaxquantum.core.operators import identity_like, multi_mode_basis_set
 from jaxquantum.utils.utils import robust_isscalar
@@ -147,6 +147,13 @@ def mesolve(
         logging.warning(
             "Consider using `jqt.sesolve()` instead, as `c_ops` is an empty list and the initial state is not a density matrix."
         )
+
+    # Dispatch to the cuquantum solver path when H is cuquantum-backed.
+    # The cuquantum path needs the Qarray (for OperatorTerm + dims), so it
+    # branches *before* the .data extraction used by the dense / sparse path.
+    H_test = H if isinstance(H, Qarray) else (H(0.0) if callable(H) else None)
+    if isinstance(H_test, Qarray) and H_test.impl_type == QarrayImplType.CUQUANTUM:
+        return _mesolve_cuquantum(H, rho0, tlist, saveat_tlist, c_ops, solver_options)
 
     ρ0 = rho0.to_dm().to_dense()
 
@@ -304,6 +311,11 @@ def sesolve(
             "Please use `jqt.mesolve` for initial state inputs in density matrix form."
         )
 
+    # Dispatch to the cuquantum solver path when H is cuquantum-backed.
+    H_test = H if isinstance(H, Qarray) else (H(0.0) if callable(H) else None)
+    if isinstance(H_test, Qarray) and H_test.impl_type == QarrayImplType.CUQUANTUM:
+        return _sesolve_cuquantum(H, ψ, tlist, saveat_tlist, solver_options)
+
     ψ = ψ.to_ket().to_dense()
 
     if robust_isscalar(H):
@@ -359,6 +371,194 @@ def _sesolve_data(
 
     sol = solve(f, ψ, tlist, saveat_tlist, None, solver_options=solver_options)
     return sol.ys
+
+
+# ---------------------------------------------------------------------------
+# cuQuantum solver path
+# ---------------------------------------------------------------------------
+
+def _build_cuquantum_dissipator_terms(L_qarray):
+    """Generate Ls_term entries that encode ``D[L]ρ`` in cuquantum form.
+
+    Mirrors the dissipator recipe used in
+    ``local/lattice_2d_operator_action.py``:
+
+      D[L]ρ = LρL† − ½ L†L ρ − ½ ρ L†L
+
+    Yields ``(matrices, modes, duals, coeff)`` tuples that should be
+    appended to a single ``Ls_term`` ``OperatorTerm``.
+
+    Args:
+        L_qarray: Qarray[CuquantumImpl] holding the collapse operator.
+
+    Yields:
+        Successive term tuples ready to be passed to OperatorTerm.append
+        (after wrapping each matrix in an ElementaryOperator).
+    """
+    L_terms = L_qarray._impl._data.terms
+    LdagL = (L_qarray.dag() @ L_qarray)._impl._data.terms
+
+    # L ρ L† = sum over (a, b) of cₐ * conj(c_b) * (L_a) ρ (L_b)†
+    for (mats_a, modes_a, _duals_a, coeff_a) in L_terms:
+        for (mats_b, modes_b, _duals_b, coeff_b) in L_terms:
+            mats_b_dag_rev = tuple(_matrix_dag(m) for m in reversed(mats_b))
+            modes_b_rev = tuple(reversed(modes_b))
+            yield (
+                tuple(mats_a) + mats_b_dag_rev,
+                tuple(modes_a) + modes_b_rev,
+                (False,) * len(mats_a) + (True,) * len(mats_b_dag_rev),
+                coeff_a * jnp.conj(coeff_b),
+            )
+
+    # -½ L†L ρ : L†L applied on the left side (all duals=False).
+    # -½ ρ L†L : L†L applied on the right side (all duals=True).
+    for (mats, modes, _duals, coeff) in LdagL:
+        yield (mats, modes, (False,) * len(mats), -0.5 * coeff)
+        yield (mats, modes, (True,) * len(mats), -0.5 * coeff)
+
+
+def _matrix_dag(matrix):
+    return jnp.conj(jnp.swapaxes(matrix, -1, -2))
+
+
+def _mesolve_cuquantum(
+    H,
+    rho0: Qarray,
+    tlist: Array,
+    saveat_tlist: Array,
+    c_ops: Qarray,
+    solver_options: Optional[SolverOptions] = None,
+) -> Qarray:
+    """Master-equation solver dispatched to cuQuantum's ``operator_action``.
+
+    The Hamiltonian and (optional) collapse operators must be cuquantum-backed
+    Qarrays; the state ``ρ0`` is densified before being handed to diffrax.
+    Inside the RHS we build a fresh ``Operator`` each step, append the
+    Hamiltonian commutator and the dissipator superterm, and call
+    ``operator_action`` — exactly mirroring
+    ``local/lattice_2d_operator_action.py``.
+    """
+    from jaxquantum.core.cuquantum_impl import CuquantumImpl, _compose_per_mode
+    from cuquantum.densitymat.jax import (
+        ElementaryOperator,
+        OperatorTerm,
+        Operator,
+        operator_action,
+    )
+
+    # --- snapshot the static metadata we need outside the RHS ---
+    H_test = H if isinstance(H, Qarray) else H(0.0)
+    space_dims = tuple(int(d) for d in H_test.space_dims)
+
+    rho0_dense = rho0.to_dm().to_dense()
+    dims_meta = rho0_dense.dims
+    rho0_arr = rho0_dense.data
+
+    # Normalise c_ops to a Python list of cuquantum-backed Qarrays.
+    # ``Qarray.from_list`` does not preserve the cuquantum impl (no batched
+    # ``OperatorTerm`` exists), so cuquantum users should pass c_ops as a
+    # list directly:  ``mesolve(..., c_ops=[L1, L2])``.  We also accept an
+    # empty Qarray placeholder (which the public ``mesolve`` substitutes
+    # when c_ops is None).
+    if c_ops is None or (hasattr(c_ops, "__len__") and len(c_ops) == 0):
+        c_ops_list: list = []
+    elif isinstance(c_ops, (list, tuple)):
+        c_ops_list = list(c_ops)
+    elif isinstance(c_ops, Qarray) and c_ops.impl_type == QarrayImplType.CUQUANTUM:
+        c_ops_list = [c_ops[k] for k in range(len(c_ops))]
+    else:
+        raise TypeError(
+            "cuquantum mesolve requires c_ops to be a Python list of "
+            "cuquantum-backed Qarrays (Qarray.from_list densifies them)"
+        )
+
+    # Pre-build the dissipator OperatorTerm — it is static across t.
+    Ls_term: Optional["OperatorTerm"] = None
+    if c_ops_list:
+        Ls_term = OperatorTerm(space_dims)
+        for L in c_ops_list:
+            if not isinstance(L, Qarray) or L.impl_type != QarrayImplType.CUQUANTUM:
+                raise TypeError(
+                    "_mesolve_cuquantum requires every c_op to be a "
+                    "cuquantum-backed Qarray"
+                )
+            for (matrices, modes, duals, coeff) in _build_cuquantum_dissipator_terms(L):
+                elems_mats, out_modes, out_duals = _compose_per_mode(
+                    matrices, modes, duals
+                )
+                elems = [ElementaryOperator(m) for m in elems_mats]
+                Ls_term.append(elems, modes=out_modes, duals=out_duals, coeff=coeff)
+
+    # The Hamiltonian's OperatorTerm depends on t; build it inside the RHS.
+    if isinstance(H, Qarray):
+        H_qarray_fn = lambda t: H
+    else:
+        H_qarray_fn = lambda t: H(t)
+
+    def f(t, rho, args):
+        H_term = H_qarray_fn(t)._impl.to_operator_term()
+        liouvillian = Operator(space_dims)
+        liouvillian.append(H_term, dual=False, coeff=-1j)
+        liouvillian.append(H_term, dual=True,  coeff= 1j)
+        if Ls_term is not None:
+            liouvillian.append(Ls_term, dual=False, coeff=1.0)
+        rho_shape = rho.shape
+        rho_dot = operator_action(
+            liouvillian, rho.reshape(*space_dims, *space_dims)
+        )
+        return rho_dot.reshape(rho_shape)
+
+    sol = solve(
+        f, rho0_arr, tlist, saveat_tlist, args=None,
+        solver_options=solver_options,
+    )
+    return jnp2jqt(sol.ys, dims=dims_meta)
+
+
+def _sesolve_cuquantum(
+    H,
+    psi0: Qarray,
+    tlist: Array,
+    saveat_tlist: Array,
+    solver_options: Optional[SolverOptions] = None,
+) -> Qarray:
+    """Schrödinger-equation solver dispatched to cuQuantum's ``operator_action``.
+
+    Like ``_mesolve_cuquantum`` but evolves a ket: ``i ψ̇ = H ψ``.  No
+    dissipator is involved; the RHS reduces to a single ``-1j * H * ψ``
+    application.
+    """
+    from cuquantum.densitymat.jax import Operator, operator_action
+
+    H_test = H if isinstance(H, Qarray) else H(0.0)
+    space_dims = tuple(int(d) for d in H_test.space_dims)
+
+    psi0_ket = psi0.to_ket().to_dense()
+    dims_meta = psi0_ket.dims
+    psi0_arr = psi0_ket.data
+
+    if isinstance(H, Qarray):
+        H_qarray_fn = lambda t: H
+    else:
+        H_qarray_fn = lambda t: H(t)
+
+    def f(t, psi, args):
+        H_term = H_qarray_fn(t)._impl.to_operator_term()
+        op = Operator(space_dims)
+        op.append(H_term, dual=False, coeff=-1j)
+        psi_shape = psi.shape
+        # ψ has shape (*batch, full_dim, 1); collapse trailing 1 for the
+        # state grid then restore it after the action.
+        flat = psi.reshape(*psi.shape[:-2], *space_dims)
+        psi_dot = operator_action(op, flat)
+        return psi_dot.reshape(psi_shape)
+
+    sol = solve(
+        f, psi0_arr, tlist, saveat_tlist, args=None,
+        solver_options=solver_options,
+    )
+    return jnp2jqt(sol.ys, dims=dims_meta)
+
 
 # ----
 

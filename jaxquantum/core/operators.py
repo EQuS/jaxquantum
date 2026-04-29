@@ -33,6 +33,28 @@ def _make_sparsedia(offsets: tuple, diags: "jnp.ndarray", dims=None) -> Qarray:
     return Qarray.create(impl.get_data(), dims=dims, implementation=QarrayImplType.SPARSE_DIA)
 
 
+def _make_cuquantum_single_site(matrix: "jnp.ndarray", n: int, dims=None) -> Qarray:
+    """Build a ``Qarray[CuquantumImpl]`` directly from a single-site ``(n, n)`` matrix.
+
+    Wraps the matrix in an ``ElementaryOperator`` on a one-mode
+    ``OperatorTerm``.  Multi-mode operators are then assembled via
+    ``tensor`` / ``kron``, which dispatches to ``CuquantumImpl.kron`` and
+    shifts mode indices correctly.
+    """
+    from jaxquantum.core.cuquantum_impl import CuquantumImpl
+
+    impl = CuquantumImpl.single_site(matrix, n)
+    return Qarray.create(impl.get_data(), dims=dims, implementation=QarrayImplType.CUQUANTUM)
+
+
+def _make_cuquantum_identity(n: int, dims=None, dtype=None) -> Qarray:
+    """Identity on a single mode of size ``n`` as a ``Qarray[CuquantumImpl]``."""
+    from jaxquantum.core.cuquantum_impl import CuquantumImpl
+
+    impl = CuquantumImpl.identity_term(n, dtype=dtype)
+    return Qarray.create(impl.get_data(), dims=dims, implementation=QarrayImplType.CUQUANTUM)
+
+
 def sigmax(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     """σx
 
@@ -47,6 +69,8 @@ def sigmax(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
         # Offset +1: valid at [1:]  → diag[0] = 0 (leading zero), diag[1] = A[0,1] = 1.0
         diags = jnp.array([[1.0, 0.0], [0.0, 1.0]])
         return _make_sparsedia(offsets=(-1, 1), diags=diags)
+    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+        return _make_cuquantum_single_site(jnp.array([[0.0, 1.0], [1.0, 0.0]]), 2)
     return Qarray.create(jnp.array([[0.0, 1.0], [1.0, 0.0]]), implementation=implementation)
 
 
@@ -59,6 +83,8 @@ def sigmay(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
         diags = jnp.array([[1.0j, 0.0], [0.0, -1.0j]])
         return _make_sparsedia(offsets=(-1, 1), diags=diags)
+    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+        return _make_cuquantum_single_site(jnp.array([[0.0, -1.0j], [1.0j, 0.0]]), 2)
     return Qarray.create(jnp.array([[0.0, -1.0j], [1.0j, 0.0]]), implementation=implementation)
 
 
@@ -71,6 +97,8 @@ def sigmaz(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
         diags = jnp.array([[1.0, -1.0]])
         return _make_sparsedia(offsets=(0,), diags=diags)
+    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+        return _make_cuquantum_single_site(jnp.array([[1.0, 0.0], [0.0, -1.0]]), 2)
     return Qarray.create(jnp.array([[1.0, 0.0], [0.0, -1.0]]), implementation=implementation)
 
 
@@ -87,6 +115,10 @@ def hadamard(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
         # offset +1: valid at [1]   → diag[0]=0 (leading zero), diag[1]=A[0,1]=s
         diags = jnp.array([[s, 0.0], [s, -s], [0.0, s]])
         return _make_sparsedia(offsets=(-1, 0, 1), diags=diags)
+    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+        return _make_cuquantum_single_site(
+            jnp.array([[1.0, 1.0], [1.0, -1.0]]) / jnp.sqrt(2), 2
+        )
     return Qarray.create(jnp.array([[1, 1], [1, -1]]) / jnp.sqrt(2), implementation=implementation)
 
 
@@ -99,6 +131,8 @@ def sigmam(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
         diags = jnp.array([[1.0, 0.0]])
         return _make_sparsedia(offsets=(-1,), diags=diags)
+    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+        return _make_cuquantum_single_site(jnp.array([[0.0, 0.0], [1.0, 0.0]]), 2)
     return Qarray.create(jnp.array([[0.0, 0.0], [1.0, 0.0]]), implementation=implementation)
 
 
@@ -111,6 +145,8 @@ def sigmap(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
     if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
         diags = jnp.array([[0.0, 1.0]])
         return _make_sparsedia(offsets=(1,), diags=diags)
+    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+        return _make_cuquantum_single_site(jnp.array([[0.0, 1.0], [0.0, 0.0]]), 2)
     return Qarray.create(jnp.array([[0.0, 1.0], [0.0, 0.0]]), implementation=implementation)
 
 
@@ -146,6 +182,10 @@ def destroy(N, implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
         diags = jnp.zeros((1, N), dtype=jnp.float64)
         diags = diags.at[0, 1:].set(jnp.sqrt(jnp.arange(1, N, dtype=jnp.float64)))
         return _make_sparsedia(offsets=(1,), diags=diags)
+    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+        return _make_cuquantum_single_site(
+            jnp.diag(jnp.sqrt(jnp.arange(1, N, dtype=jnp.complex128)), k=1), N
+        )
     return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=1), implementation=implementation)
 
 
@@ -164,6 +204,10 @@ def create(N, implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
         diags = jnp.zeros((1, N), dtype=jnp.float64)
         diags = diags.at[0, :N - 1].set(jnp.sqrt(jnp.arange(1, N, dtype=jnp.float64)))
         return _make_sparsedia(offsets=(-1,), diags=diags)
+    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+        return _make_cuquantum_single_site(
+            jnp.diag(jnp.sqrt(jnp.arange(1, N, dtype=jnp.complex128)), k=-1), N
+        )
     return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=-1), implementation=implementation)
 
 
@@ -181,6 +225,10 @@ def num(N, implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
         # Main diagonal only; no leading/trailing zeros needed (offset 0).
         diags = jnp.arange(N, dtype=jnp.float64).reshape(1, N)
         return _make_sparsedia(offsets=(0,), diags=diags)
+    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+        return _make_cuquantum_single_site(
+            jnp.diag(jnp.arange(N, dtype=jnp.complex128)), N
+        )
     return Qarray.create(jnp.diag(jnp.arange(N)), implementation=implementation)
 
 
@@ -199,6 +247,10 @@ def identity(*args, implementation: QarrayImplType = QarrayImplType.DENSE, **kwa
         if n is not None and (len(args) <= 1) and not kwargs:
             diags = jnp.ones((1, int(n)), dtype=jnp.float64)
             return _make_sparsedia(offsets=(0,), diags=diags)
+    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+        n = args[0] if args else kwargs.get("N", kwargs.get("n", None))
+        if n is not None and (len(args) <= 1) and not kwargs:
+            return _make_cuquantum_identity(int(n))
     return Qarray.create(jnp.eye(*args, **kwargs), implementation=implementation)
 
 
@@ -216,6 +268,20 @@ def identity_like(A, implementation: QarrayImplType = QarrayImplType.DENSE) -> Q
     """
     space_dims = A.space_dims
     total_dim = prod(space_dims)
+    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+        # Build a multi-mode identity by kron'ing single-mode identities.
+        # Each one is an empty-product OperatorTerm on its mode.
+        identities = [_make_cuquantum_identity(int(d)) for d in space_dims]
+        result = identities[0]
+        for next_id in identities[1:]:
+            from jaxquantum.core.qarray import tensor as _tensor
+            result = _tensor(result, next_id)
+        # Re-tag dims to the (space_dims, space_dims) operator form.
+        return Qarray.create(
+            result._impl.get_data(),
+            dims=[space_dims, space_dims],
+            implementation=QarrayImplType.CUQUANTUM,
+        )
     return Qarray.create(jnp.eye(total_dim, total_dim), dims=[space_dims, space_dims], implementation=implementation)
 
 
