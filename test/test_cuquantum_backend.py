@@ -167,14 +167,15 @@ class TestArithmetic:
     def test_matmul_same_mode(self):
         # ad @ a on a 3-level system equals number operator
         n = self.ad @ self.a
-        a_mat = _destroy_mat(3).astype(jnp.float64)
-        ad_mat = _create_mat(3).astype(jnp.float64)
-        import numpy as np
-        import cupy as cp
-        breakpoint()
-        expected = cp.asarray(a_mat) @ cp.asarray(ad_mat)
-        # expected = self.ad_mat @ self.a_mat
-        assert jnp.allclose(n.to_dense().data, expected.get())
+        # cpu_device = jax.devices("cpu")[0]
+        # a_mat = jax.device_put(_destroy_mat(3).astype(jnp.float64), cpu_device)
+        # ad_mat = jax.device_put(_create_mat(3).astype(jnp.float64), cpu_device)
+        # import numpy as np
+        # import cupy as cp
+        # expected = np.asarray(ad_mat) @ np.asarray(a_mat)
+        # breakpoint()
+        expected = self.ad_mat @ self.a_mat
+        assert jnp.allclose(n.to_dense().data, expected)
 
     def test_dag(self):
         adag = self.a.dag()

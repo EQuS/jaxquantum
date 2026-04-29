@@ -40,6 +40,7 @@ from flax import struct
 # cuquantum is not installed; ``core/__init__.py`` catches that.
 from cuquantum.densitymat.jax import (  # noqa: E402
     ElementaryOperator,
+    MatrixOperator,
     OperatorTerm,
 )
 
@@ -51,7 +52,211 @@ from jaxquantum.core.qarray import (  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Free-function arithmetic on ``OperatorTerm``
+# ---------------------------------------------------------------------------
+# These mirror the ``__add__`` / ``__sub__`` / ``__matmul__`` / ``__and__`` /
+# ``dag()`` methods that exist on the development version of
+# ``cuquantum.densitymat.jax.OperatorTerm`` but are not in any released
+# ``cuquantum-python``.  Implementing them here against the public
+# ``OperatorTerm`` surface (``dims``, ``op_prods``, ``modes``, ``conjs``,
+# ``duals``, ``coeffs``, ``append``) lets jaxquantum work with any cuquantum
+# release that ships a basic ``OperatorTerm``.
+
+def _cuqnt_copy_base_op(op):
+    """Return a fresh ``ElementaryOperator`` / ``MatrixOperator`` wrapping the same data.
+
+    The original instance may have an associated cuDensityMat ``_ptr`` (after
+    its parent ``OperatorTerm`` has been used in an ``operator_action``) and we
+    don't want the new ``OperatorTerm`` to alias that pointer.  Constructing a
+    new wrapper around ``op.data`` produces an equivalent operator with
+    ``_ptr=None``.  Underlying JAX array storage is shared (immutable), which
+    is fine.
+    """
+    if isinstance(op, ElementaryOperator):
+        return ElementaryOperator(op.data, diag_offsets=op.diag_offsets)
+    return MatrixOperator(op.data)
+
+
+def _cuqnt_check_dims(left: OperatorTerm, right: OperatorTerm, op_name: str) -> None:
+    if left.dims != right.dims:
+        raise ValueError(
+            f"Cannot perform {op_name} between OperatorTerms with different dims: "
+            f"{left.dims} vs {right.dims}"
+        )
+
+
+def _cuqnt_append_copied_product(out, op_prod, modes, conjs, duals, coeff):
+    """Helper: dispatch on Elementary vs Matrix and append a copy of ``op_prod`` to ``out``."""
+    copied = tuple(_cuqnt_copy_base_op(op) for op in op_prod)
+    if isinstance(op_prod[0], ElementaryOperator):
+        out.append(copied, modes=modes, duals=duals, coeff=coeff)
+    else:
+        out.append(copied, conjs=conjs, duals=duals, coeff=coeff)
+
+
+def _cuqnt_add(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
+    """Sum of two ``OperatorTerm``s — concatenate their products into a fresh ``OperatorTerm``."""
+    _cuqnt_check_dims(left, right, "addition")
+    out = OperatorTerm(left.dims)
+    for op_term in (left, right):
+        for op_prod, modes, conjs, duals, coeff in zip(
+            op_term.op_prods, op_term.modes, op_term.conjs, op_term.duals, op_term.coeffs
+        ):
+            _cuqnt_append_copied_product(out, op_prod, modes, conjs, duals, coeff)
+    return out
+
+
+def _cuqnt_sub(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
+    """Difference of two ``OperatorTerm``s — append left's products, then right's with negated coeffs."""
+    _cuqnt_check_dims(left, right, "subtraction")
+    out = OperatorTerm(left.dims)
+    for op_term, sign in ((left, 1), (right, -1)):
+        for op_prod, modes, conjs, duals, coeff in zip(
+            op_term.op_prods, op_term.modes, op_term.conjs, op_term.duals, op_term.coeffs
+        ):
+            _cuqnt_append_copied_product(out, op_prod, modes, conjs, duals, sign * coeff)
+    return out
+
+
+def _cuqnt_scalar_mul(scalar, ot: OperatorTerm) -> OperatorTerm:
+    """Scale every product's coefficient by ``scalar`` (Python or JAX scalar)."""
+    out = OperatorTerm(ot.dims)
+    for op_prod, modes, conjs, duals, coeff in zip(
+        ot.op_prods, ot.modes, ot.conjs, ot.duals, ot.coeffs
+    ):
+        _cuqnt_append_copied_product(out, op_prod, modes, conjs, duals, scalar * coeff)
+    return out
+
+
+def _cuqnt_matmul(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
+    """Matrix product of two ``OperatorTerm``s — Cartesian product of their products.
+
+    The new product is ``(*left_prod, *right_prod)``: cuDensityMat composes the
+    operators in the order they appear in the product tuple, so a product
+    ``[A, B]`` on the same mode acts as the matrix ``A @ B``.  Hence
+    ``left @ right`` lays out ``left``'s factors before ``right``'s.
+    """
+    _cuqnt_check_dims(left, right, "matrix multiplication")
+    out = OperatorTerm(left.dims)
+    for left_prod, left_modes, left_conjs, left_duals, left_coeff in zip(
+        left.op_prods, left.modes, left.conjs, left.duals, left.coeffs
+    ):
+        for right_prod, right_modes, right_conjs, right_duals, right_coeff in zip(
+            right.op_prods, right.modes, right.conjs, right.duals, right.coeffs
+        ):
+            left_type = type(left_prod[0])
+            right_type = type(right_prod[0])
+            if left_type is not right_type:
+                raise TypeError(
+                    "Cannot matmul OperatorTerms with mixed ElementaryOperator and MatrixOperator products."
+                )
+            joined = tuple(_cuqnt_copy_base_op(op) for op in (*left_prod, *right_prod))
+            coeff = left_coeff * right_coeff
+            if left_type is ElementaryOperator:
+                out.append(
+                    joined,
+                    modes=(*left_modes, *right_modes),
+                    duals=(*left_duals, *right_duals),
+                    coeff=coeff,
+                )
+            else:
+                out.append(
+                    joined,
+                    conjs=(*left_conjs, *right_conjs),
+                    duals=(*left_duals, *right_duals),
+                    coeff=coeff,
+                )
+    return out
+
+
+def _cuqnt_kron(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
+    """Tensor product of two ``OperatorTerm``s — only ``ElementaryOperator`` products supported.
+
+    The result acts on the combined Hilbert space ``left.dims + right.dims``;
+    ``right``'s mode indices are shifted by ``len(left.dims)``.
+    """
+    combined_dims = tuple(left.dims) + tuple(right.dims)
+    n_left = len(left.dims)
+
+    left_padded = OperatorTerm(combined_dims)
+    for op_prod, modes, _conjs, duals, coeff in zip(
+        left.op_prods, left.modes, left.conjs, left.duals, left.coeffs
+    ):
+        if not isinstance(op_prod[0], ElementaryOperator):
+            raise NotImplementedError("kron is not supported for MatrixOperator products.")
+        left_padded.append(
+            tuple(_cuqnt_copy_base_op(op) for op in op_prod),
+            modes=modes,
+            duals=duals,
+            coeff=coeff,
+        )
+
+    right_padded = OperatorTerm(combined_dims)
+    for op_prod, modes, _conjs, duals, coeff in zip(
+        right.op_prods, right.modes, right.conjs, right.duals, right.coeffs
+    ):
+        if not isinstance(op_prod[0], ElementaryOperator):
+            raise NotImplementedError("kron is not supported for MatrixOperator products.")
+        right_padded.append(
+            tuple(_cuqnt_copy_base_op(op) for op in op_prod),
+            modes=tuple(m + n_left for m in modes),
+            duals=duals,
+            coeff=coeff,
+        )
+
+    return _cuqnt_matmul(left_padded, right_padded)
+
+
+def _cuqnt_dag_dense_data(data):
+    """Conjugate-transpose a dense operator data tensor of shape ``[batch, *modes, *modes]``."""
+    num_modes = (data.ndim - 1) // 2
+    perm = (
+        (0,)
+        + tuple(range(num_modes + 1, 2 * num_modes + 1))
+        + tuple(range(1, num_modes + 1))
+    )
+    return jnp.conj(jnp.transpose(data, perm))
+
+
+def _cuqnt_dag(ot: OperatorTerm) -> OperatorTerm:
+    """Hermitian conjugate of an ``OperatorTerm``.
+
+    For ``ElementaryOperator`` products the operator order is preserved
+    (elementary products are tensor products on disjoint modes — or commuting
+    ket/bra placements via ``duals`` — so they commute).  For
+    ``MatrixOperator`` products the order is reversed (matrix products are
+    sequential).  Multidiagonal ``ElementaryOperator`` products raise
+    ``NotImplementedError``.
+    """
+    out = OperatorTerm(ot.dims)
+    for op_prod, modes, conjs, duals, coeff in zip(
+        ot.op_prods, ot.modes, ot.conjs, ot.duals, ot.coeffs
+    ):
+        if isinstance(op_prod[0], ElementaryOperator):
+            for base_op in op_prod:
+                if base_op.diag_offsets != ():
+                    raise NotImplementedError(
+                        "_cuqnt_dag is not supported for multidiagonal ElementaryOperator."
+                    )
+            dagged = tuple(
+                ElementaryOperator(_cuqnt_dag_dense_data(base_op.data)) for base_op in op_prod
+            )
+            out.append(dagged, modes=modes, duals=duals, coeff=coeff.conj())
+        else:  # MatrixOperator: sequential, must reverse
+            dagged = tuple(
+                MatrixOperator(_cuqnt_dag_dense_data(mat_op.data)) for mat_op in reversed(op_prod)
+            )
+            out.append(
+                dagged,
+                conjs=tuple(reversed(conjs)),
+                duals=tuple(reversed(duals)),
+                coeff=coeff.conj(),
+            )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Local helpers used by ``CuquantumImpl``
 # ---------------------------------------------------------------------------
 
 def _materialize_if_empty(ot: OperatorTerm, dtype=None) -> OperatorTerm:
@@ -78,11 +283,11 @@ def _materialize_if_empty(ot: OperatorTerm, dtype=None) -> OperatorTerm:
 def _lift_with_mode_shift(ot: OperatorTerm, shift: int, combined_dims) -> OperatorTerm:
     """Embed ``ot`` into a larger Hilbert space with all elementary modes shifted by ``shift``."""
     out = OperatorTerm(combined_dims)
-    for op_prod, modes, conjs, duals, coeff, op_type in zip(
-        ot.op_prods, ot.modes, ot.conjs, ot.duals, ot.coeffs, ot._op_prod_types
+    for op_prod, modes, conjs, duals, coeff in zip(
+        ot.op_prods, ot.modes, ot.conjs, ot.duals, ot.coeffs
     ):
-        copied = tuple(op._copy() for op in op_prod)
-        if op_type is ElementaryOperator:
+        copied = tuple(_cuqnt_copy_base_op(op) for op in op_prod)
+        if isinstance(op_prod[0], ElementaryOperator):
             out.append(copied, modes=tuple(m + shift for m in modes), duals=duals, coeff=coeff)
         else:
             out.append(copied, conjs=conjs, duals=duals, coeff=coeff)
@@ -182,46 +387,31 @@ class CuquantumImpl(QarrayImpl):
         a, b = self._coerce(other)
         if a is not self:
             return a.add(b)
-        if a._data.dims != b._data.dims:
-            raise ValueError(
-                f"Cannot add CuquantumImpls with different dims: "
-                f"{a._data.dims} vs {b._data.dims}"
-            )
         a_data = _materialize_if_empty(a._data, dtype=a.dtype())
         b_data = _materialize_if_empty(b._data, dtype=b.dtype())
-        return CuquantumImpl(_data=a_data + b_data)
+        return CuquantumImpl(_data=_cuqnt_add(a_data, b_data))
 
     def sub(self, other: QarrayImpl) -> QarrayImpl:
         a, b = self._coerce(other)
         if a is not self:
             return a.sub(b)
-        if a._data.dims != b._data.dims:
-            raise ValueError(
-                f"Cannot subtract CuquantumImpls with different dims: "
-                f"{a._data.dims} vs {b._data.dims}"
-            )
         a_data = _materialize_if_empty(a._data, dtype=a.dtype())
         b_data = _materialize_if_empty(b._data, dtype=b.dtype())
-        return CuquantumImpl(_data=a_data - b_data)
+        return CuquantumImpl(_data=_cuqnt_sub(a_data, b_data))
 
     def mul(self, scalar) -> QarrayImpl:
         data = _materialize_if_empty(self._data, dtype=self.dtype())
-        return CuquantumImpl(_data=scalar * data)
+        return CuquantumImpl(_data=_cuqnt_scalar_mul(scalar, data))
 
     def matmul(self, other: QarrayImpl) -> QarrayImpl:
         a, b = self._coerce(other)
         if a is not self:
             return a.matmul(b)
-        if a._data.dims != b._data.dims:
-            raise ValueError(
-                f"Cannot matmul CuquantumImpls with different dims: "
-                f"{a._data.dims} vs {b._data.dims}"
-            )
         if not a._data.op_prods:  # I @ B = B
-            return CuquantumImpl(_data=b._data._copy())
+            return CuquantumImpl(_data=_lift_with_mode_shift(b._data, 0, b._data.dims))
         if not b._data.op_prods:  # A @ I = A
-            return CuquantumImpl(_data=a._data._copy())
-        return CuquantumImpl(_data=a._data @ b._data)
+            return CuquantumImpl(_data=_lift_with_mode_shift(a._data, 0, a._data.dims))
+        return CuquantumImpl(_data=_cuqnt_matmul(a._data, b._data))
 
     def kron(self, other: QarrayImpl) -> QarrayImpl:
         a, b = self._coerce(other)
@@ -234,11 +424,11 @@ class CuquantumImpl(QarrayImpl):
             )
         if not b._data.op_prods:  # A ⊗ I_b: lift A keeping modes
             return CuquantumImpl(_data=_lift_with_mode_shift(a._data, 0, combined_dims))
-        return CuquantumImpl(_data=a._data & b._data)
+        return CuquantumImpl(_data=_cuqnt_kron(a._data, b._data))
 
     def dag(self) -> QarrayImpl:
         # Empty OperatorTerm stays empty under dag(), which matches I† = I.
-        return CuquantumImpl(_data=self._data.dag())
+        return CuquantumImpl(_data=_cuqnt_dag(self._data))
 
     # ------------------------------------------------------------------
     # Conversions
@@ -317,8 +507,11 @@ class CuquantumImpl(QarrayImpl):
     # ------------------------------------------------------------------
 
     def __deepcopy__(self, memo=None):
-        # OperatorTerm has its own _copy() that handles the JAX-array bookkeeping.
-        return CuquantumImpl(_data=self._data._copy())
+        # Rebuild an equivalent OperatorTerm using the public surface so we
+        # don't depend on ``OperatorTerm._copy()`` (private API).
+        return CuquantumImpl(
+            _data=_lift_with_mode_shift(self._data, 0, self._data.dims)
+        )
 
     def tidy_up(self, atol):
         # Coefficient-level thresholding without densifying would change
@@ -346,7 +539,7 @@ class CuquantumImpl(QarrayImpl):
             raise TypeError(
                 f"CuquantumImpl.dag_data expects OperatorTerm, got {type(arr)}"
             )
-        return arr.dag()
+        return _cuqnt_dag(arr)
 
     def _promote_to(self, target_cls):
         """Refuse silent promotion *into* ``CuquantumImpl`` from a bare matrix.
