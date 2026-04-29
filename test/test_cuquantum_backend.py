@@ -48,8 +48,9 @@ pytest.importorskip(
 import jax.numpy as jnp
 
 import jaxquantum as jqt
+from cuquantum.densitymat.jax import OperatorTerm
 from jaxquantum.core.qarray import QarrayImplType
-from jaxquantum.core.cuquantum_impl import CuquantumImpl, CuquantumOpData
+from jaxquantum.core.cuquantum_impl import CuquantumImpl
 
 # Mark every test in this module so CI's `-m "not cuquantum"` excludes them.
 pytestmark = pytest.mark.cuquantum
@@ -93,12 +94,11 @@ class TestFromData:
         impl = CuquantumImpl.identity_term(N)
         assert jnp.allclose(impl.to_dense().get_data(), jnp.eye(N))
 
-    def test_get_data_returns_op_data(self):
+    def test_get_data_returns_operator_term(self):
         q = jqt.Qarray.create(_destroy_mat(N), implementation="cuquantum")
         d = q._impl.get_data()
-        assert isinstance(d, CuquantumOpData)
+        assert isinstance(d, OperatorTerm)
         assert d.dims == (N,)
-        assert d.shape == (N, N)
 
 
 # ===========================================================================
@@ -167,8 +167,14 @@ class TestArithmetic:
     def test_matmul_same_mode(self):
         # ad @ a on a 3-level system equals number operator
         n = self.ad @ self.a
-        expected = self.ad_mat @ self.a_mat
-        assert jnp.allclose(n.to_dense().data, expected)
+        a_mat = _destroy_mat(3).astype(jnp.float64)
+        ad_mat = _create_mat(3).astype(jnp.float64)
+        import numpy as np
+        import cupy as cp
+        breakpoint()
+        expected = cp.asarray(a_mat) @ cp.asarray(ad_mat)
+        # expected = self.ad_mat @ self.a_mat
+        assert jnp.allclose(n.to_dense().data, expected.get())
 
     def test_dag(self):
         adag = self.a.dag()

@@ -395,12 +395,26 @@ def _build_cuquantum_dissipator_terms(L_qarray):
         Successive term tuples ready to be passed to OperatorTerm.append
         (after wrapping each matrix in an ElementaryOperator).
     """
-    L_terms = L_qarray._impl._data.terms
-    LdagL = (L_qarray.dag() @ L_qarray)._impl._data.terms
+    L_data = L_qarray._impl._data            # OperatorTerm
+    LdagL_data = (L_qarray.dag() @ L_qarray)._impl._data  # OperatorTerm
 
-    # L ρ L† = sum over (a, b) of cₐ * conj(c_b) * (L_a) ρ (L_b)†
-    for (mats_a, modes_a, _duals_a, coeff_a) in L_terms:
-        for (mats_b, modes_b, _duals_b, coeff_b) in L_terms:
+    def _iter_products(op_term):
+        """Yield ``(matrices, modes, coeff_scalar)`` for each product in op_term."""
+        for op_prod, modes, coeff_arr in zip(
+            op_term.op_prods, op_term.modes, op_term.coeffs
+        ):
+            mats = tuple(jnp.squeeze(elem.data, axis=0) for elem in op_prod)
+            yield mats, tuple(modes), coeff_arr[0] if coeff_arr.ndim else coeff_arr
+
+    # L ρ L† = sum over (a, b) of cₐ * conj(c_b) * (L_a) ρ (L_b)†.
+    # In cuQuantum's elementary product convention, ``[X, Y]`` on the same mode
+    # acts as the matrix ``X @ Y`` — i.e. operators are composed left-to-right
+    # in the tuple — so to encode ``L_a ρ L_b†`` we put ``L_a``'s factors with
+    # ``dual=False`` then ``L_b``'s daggered factors (in reverse order) with
+    # ``dual=True``.
+    L_products = list(_iter_products(L_data))
+    for (mats_a, modes_a, coeff_a) in L_products:
+        for (mats_b, modes_b, coeff_b) in L_products:
             mats_b_dag_rev = tuple(_matrix_dag(m) for m in reversed(mats_b))
             modes_b_rev = tuple(reversed(modes_b))
             yield (
@@ -412,7 +426,7 @@ def _build_cuquantum_dissipator_terms(L_qarray):
 
     # -½ L†L ρ : L†L applied on the left side (all duals=False).
     # -½ ρ L†L : L†L applied on the right side (all duals=True).
-    for (mats, modes, _duals, coeff) in LdagL:
+    for (mats, modes, coeff) in _iter_products(LdagL_data):
         yield (mats, modes, (False,) * len(mats), -0.5 * coeff)
         yield (mats, modes, (True,) * len(mats), -0.5 * coeff)
 
@@ -438,7 +452,7 @@ def _mesolve_cuquantum(
     ``operator_action`` — exactly mirroring
     ``local/lattice_2d_operator_action.py``.
     """
-    from jaxquantum.core.cuquantum_impl import CuquantumImpl, _compose_per_mode
+    from jaxquantum.core.cuquantum_impl import CuquantumImpl
     from cuquantum.densitymat.jax import (
         ElementaryOperator,
         OperatorTerm,
@@ -483,11 +497,8 @@ def _mesolve_cuquantum(
                     "cuquantum-backed Qarray"
                 )
             for (matrices, modes, duals, coeff) in _build_cuquantum_dissipator_terms(L):
-                elems_mats, out_modes, out_duals = _compose_per_mode(
-                    matrices, modes, duals
-                )
-                elems = [ElementaryOperator(m) for m in elems_mats]
-                Ls_term.append(elems, modes=out_modes, duals=out_duals, coeff=coeff)
+                elems = [ElementaryOperator(m) for m in matrices]
+                Ls_term.append(elems, modes=modes, duals=duals, coeff=coeff)
 
     # The Hamiltonian's OperatorTerm depends on t; build it inside the RHS.
     if isinstance(H, Qarray):
