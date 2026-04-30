@@ -455,10 +455,11 @@ def _mesolve_cuquantum(
     from jaxquantum.core.cuquantum_impl import CuquantumImpl
     from cuquantum.densitymat.jax import (
         ElementaryOperator,
-        OperatorTerm,
         Operator,
         operator_action,
     )
+
+    from jaxquantum.utils.cuquantum_util import OperatorTerm 
 
     # --- snapshot the static metadata we need outside the RHS ---
     H_test = H if isinstance(H, Qarray) else H(0.0)

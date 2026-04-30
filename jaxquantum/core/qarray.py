@@ -136,9 +136,11 @@ def robust_asarray(data) -> Union[Array, sparse.BCOO]:
     # SparseDiaData has a ``_is_sparse_dia`` marker; pass it through unchanged
     if getattr(data, "_is_sparse_dia", False):
         return data
-    # CuquantumOpData has a ``_is_cuquantum_op`` marker; pass it through unchanged
-    if getattr(data, "_is_cuquantum_op", False):
+
+    # cuquantum backend
+    if type(data).__name__ == "OperatorTerm":
         return data
+
     return jnp.asarray(data)
 
 
@@ -627,7 +629,7 @@ class DenseImpl(QarrayImpl):
         return (
             not isinstance(arr, sparse.BCOO)
             and not getattr(arr, "_is_sparse_dia", False)
-            and not getattr(arr, "_is_cuquantum_op", False)
+            and not (type(arr).__name__ == "OperatorTerm")
         )
 
     @classmethod

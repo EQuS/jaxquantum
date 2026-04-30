@@ -173,7 +173,7 @@ class TestArithmetic:
         # import numpy as np
         # import cupy as cp
         # expected = np.asarray(ad_mat) @ np.asarray(a_mat)
-        # breakpoint()
+
         expected = self.ad_mat @ self.a_mat
         assert jnp.allclose(n.to_dense().data, expected)
 
@@ -265,15 +265,17 @@ class TestSolverParity:
 
         ref = jqt.mesolve(
             H_dense, rho0, tlist,
-            c_ops=jqt.Qarray.from_list([L_dense]),
+            # c_ops=jqt.Qarray.from_list([L_dense]),
             solver_options=opts,
         )
         # cuquantum c_ops must be passed as a Python list — Qarray.from_list
         # densifies cuquantum impls (no batched OperatorTerm exists).
         cu = jqt.mesolve(
             H_cu, rho0, tlist,
-            c_ops=[L_cu],
+            # c_ops=[L_cu],
             solver_options=opts,
         )
+
+        breakpoint()
 
         assert jnp.allclose(cu.data, ref.data, atol=1e-5)

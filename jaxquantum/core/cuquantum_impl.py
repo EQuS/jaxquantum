@@ -41,14 +41,18 @@ from flax import struct
 from cuquantum.densitymat.jax import (  # noqa: E402
     ElementaryOperator,
     MatrixOperator,
-    OperatorTerm,
 )
+
+from jaxquantum.utils.cuquantum_util import OperatorTerm 
 
 from jaxquantum.core.qarray import (  # noqa: E402
     DenseImpl,
     QarrayImpl,
     QarrayImplType,
 )
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -526,7 +530,7 @@ class CuquantumImpl(QarrayImpl):
 
     @classmethod
     def can_handle_data(cls, arr) -> bool:
-        return isinstance(arr, OperatorTerm) or getattr(arr, "_is_cuquantum_op", False)
+        return isinstance(arr, OperatorTerm) # or getattr(arr, "_is_cuquantum_op", False)
 
     @classmethod
     def dag_data(cls, arr) -> "OperatorTerm":
