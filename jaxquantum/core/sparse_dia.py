@@ -41,6 +41,8 @@ if TYPE_CHECKING:
     from jaxquantum.core.qarray import DenseImpl, QarrayImplType
     from jaxquantum.core.sparse_bcoo import SparseBCOOImpl
 
+from jaxquantum.core.settings import _maybe_shard
+
 
 # ---------------------------------------------------------------------------
 # Slice helper
@@ -204,6 +206,23 @@ class SparseDiaImpl(QarrayImpl):
     # Construction
     # ------------------------------------------------------------------
 
+    # NOTE (potential future optimization):
+    # `_diags` has shape (*batch, n_diags, n) where n_diags is typically 1-5.
+    # Sharding the n axis aligns reasonably with dense ops, but for tightly
+    # coupled SparseDIA-only chains it may be cheaper to *always replicate*
+    # `_diags` (small relative to dense (n, n) storage) and rely on the dense
+    # state's sharding to drive parallelism. Benchmark before committing — this
+    # is a behavior change for users who want SparseDIA sharding intentionally.
+    @classmethod
+    def _make(cls, offsets: tuple, diags: Array) -> "SparseDiaImpl":
+        """Construct a ``SparseDiaImpl``, applying the configured default sharding.
+
+        All internal construction sites route through this so every Qarray
+        (including intermediates produced by ``add``, ``matmul``, ``kron``,
+        etc.) satisfies the user's sharding invariant.
+        """
+        return cls(_offsets=offsets, _diags=_maybe_shard(diags))
+
     @classmethod
     def from_data(cls, data) -> "SparseDiaImpl":
         """Wrap *data* in a new ``SparseDiaImpl``.
@@ -220,9 +239,9 @@ class SparseDiaImpl(QarrayImpl):
             A new ``SparseDiaImpl`` instance.
         """
         if isinstance(data, SparseDiaData):
-            return cls(_offsets=data.offsets, _diags=data.diags)
+            return cls._make(data.offsets, data.diags)
         offsets, diags_np = _dense_to_sparsedia(np.asarray(data))
-        return cls(_offsets=offsets, _diags=jnp.array(diags_np))
+        return cls._make(offsets, jnp.array(diags_np))
 
     @classmethod
     def from_diags(cls, offsets: tuple, diags: Array) -> "SparseDiaImpl":
@@ -240,7 +259,7 @@ class SparseDiaImpl(QarrayImpl):
         Returns:
             A new ``SparseDiaImpl`` instance.
         """
-        return cls(_offsets=tuple(sorted(offsets)), _diags=diags)
+        return cls._make(tuple(sorted(offsets)), diags)
 
     # ------------------------------------------------------------------
     # QarrayImpl abstract methods
@@ -260,10 +279,7 @@ class SparseDiaImpl(QarrayImpl):
         return self._diags.dtype
 
     def __deepcopy__(self, memo=None):
-        return SparseDiaImpl(
-            _offsets=deepcopy(self._offsets),
-            _diags=self._diags,
-        )
+        return SparseDiaImpl._make(deepcopy(self._offsets), self._diags)
 
     # ------------------------------------------------------------------
     # Arithmetic
@@ -271,11 +287,11 @@ class SparseDiaImpl(QarrayImpl):
 
     def mul(self, scalar) -> "SparseDiaImpl":
         """Scalar multiplication — scales all diagonal values."""
-        return SparseDiaImpl(_offsets=self._offsets, _diags=scalar * self._diags)
+        return SparseDiaImpl._make(self._offsets, scalar * self._diags)
 
     def neg(self) -> "SparseDiaImpl":
         """Negation."""
-        return SparseDiaImpl(_offsets=self._offsets, _diags=-self._diags)
+        return SparseDiaImpl._make(self._offsets, -self._diags)
 
     def add(self, other: QarrayImpl) -> QarrayImpl:
         """Element-wise addition.
@@ -307,7 +323,7 @@ class SparseDiaImpl(QarrayImpl):
         * Others               → coerce then delegate
         """
         if isinstance(other, DenseImpl):
-            return DenseImpl(_sparsedia_matmul_dense(
+            return DenseImpl._make(_sparsedia_matmul_dense(
                 self._offsets, self._diags, other._data
             ))
         if isinstance(other, SparseDiaImpl):
@@ -315,7 +331,7 @@ class SparseDiaImpl(QarrayImpl):
                 self._offsets, self._diags,
                 other._offsets, other._diags,
             )
-            return SparseDiaImpl(_offsets=offsets, _diags=diags)
+            return SparseDiaImpl._make(offsets, diags)
         a, b = self._coerce(other)
         if a is not self:
             return a.matmul(b)
@@ -333,7 +349,7 @@ class SparseDiaImpl(QarrayImpl):
             s = _dia_slice(k)    # valid data slice for offset k
             sm = _dia_slice(-k)  # valid data slice for offset -k (the new position)
             new_diags = new_diags.at[..., i, sm].set(jnp.conj(self._diags[..., i, s]))
-        return SparseDiaImpl(_offsets=new_offsets, _diags=new_diags)
+        return SparseDiaImpl._make(new_offsets, new_diags)
 
     def kron(self, other: QarrayImpl) -> QarrayImpl:
         """Kronecker product.
@@ -358,7 +374,7 @@ class SparseDiaImpl(QarrayImpl):
             new_diags = (real_part + 1j * imag_part).astype(diags.dtype)
         else:
             new_diags = real_part.astype(diags.dtype)
-        return SparseDiaImpl(_offsets=self._offsets, _diags=new_diags)
+        return SparseDiaImpl._make(self._offsets, new_diags)
 
     # ------------------------------------------------------------------
     # Conversions
@@ -378,7 +394,7 @@ class SparseDiaImpl(QarrayImpl):
             row_idx = jnp.arange(length) + max(-k, 0)
             col_idx = row_idx + k
             result = result.at[..., row_idx, col_idx].set(vals)
-        return DenseImpl(result)
+        return DenseImpl._make(result)
 
     def to_sparse_bcoo(self) -> "SparseBCOOImpl":
         """Convert to a ``SparseBCOOImpl`` (BCOO) via dense."""
@@ -409,7 +425,7 @@ class SparseDiaImpl(QarrayImpl):
     @classmethod
     def dag_data(cls, arr: SparseDiaData) -> SparseDiaData:
         """Conjugate transpose of raw :class:`SparseDiaData` without densification."""
-        impl = SparseDiaImpl(_offsets=arr.offsets, _diags=arr.diags)
+        impl = SparseDiaImpl._make(arr.offsets, arr.diags)
         result = impl.dag()
         return result.get_data()
 
@@ -434,21 +450,21 @@ class SparseDiaImpl(QarrayImpl):
 
     def real(self) -> "SparseDiaImpl":
         """Element-wise real part of stored values."""
-        return SparseDiaImpl(
-            _offsets=self._offsets,
-            _diags=jnp.real(self._diags).astype(self._diags.dtype),
+        return SparseDiaImpl._make(
+            self._offsets,
+            jnp.real(self._diags).astype(self._diags.dtype),
         )
 
     def imag(self) -> "SparseDiaImpl":
         """Element-wise imaginary part of stored values."""
-        return SparseDiaImpl(
-            _offsets=self._offsets,
-            _diags=jnp.imag(self._diags).astype(self._diags.dtype),
+        return SparseDiaImpl._make(
+            self._offsets,
+            jnp.imag(self._diags).astype(self._diags.dtype),
         )
 
     def conj(self) -> "SparseDiaImpl":
         """Element-wise complex conjugate of stored values."""
-        return SparseDiaImpl(_offsets=self._offsets, _diags=jnp.conj(self._diags))
+        return SparseDiaImpl._make(self._offsets, jnp.conj(self._diags))
 
     def powm(self, n: int) -> "SparseDiaImpl":
         """Integer matrix power staying SparseDIA via binary exponentiation.
@@ -470,7 +486,7 @@ class SparseDiaImpl(QarrayImpl):
         if n == 0:
             size = self._diags.shape[-1]
             eye_diags = jnp.ones((*self._diags.shape[:-2], 1, size), dtype=self._diags.dtype)
-            return SparseDiaImpl(_offsets=(0,), _diags=eye_diags)
+            return SparseDiaImpl._make((0,), eye_diags)
         if n == 1:
             return self
         half = self.powm(n // 2)
@@ -511,7 +527,7 @@ def _sparsedia_add(
             val = val + sign * b._diags[..., b_idx[k], :]
         out_diags = out_diags.at[..., oi, :].set(val)
 
-    return SparseDiaImpl(_offsets=out_offsets, _diags=out_diags)
+    return SparseDiaImpl._make(out_offsets, out_diags)
 
 
 def _sparsedia_matmul_dense(
@@ -688,7 +704,7 @@ def _sparsedia_kron(a: SparseDiaImpl, b: SparseDiaImpl) -> SparseDiaImpl:
 
     out_offsets = tuple(sorted(out_accum.keys()))
     out_diags = jnp.stack([out_accum[k] for k in out_offsets], axis=-2)
-    return SparseDiaImpl(_offsets=out_offsets, _diags=out_diags)
+    return SparseDiaImpl._make(out_offsets, out_diags)
 
 
 # ---------------------------------------------------------------------------

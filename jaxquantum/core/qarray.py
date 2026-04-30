@@ -17,7 +17,7 @@ from copy import deepcopy
 from math import prod
 from enum import Enum
 
-from jaxquantum.core.settings import SETTINGS
+from jaxquantum.core.settings import SETTINGS, _maybe_shard
 from jaxquantum.utils.utils import robust_isscalar
 from jaxquantum.core.dims import Qtypes, Qdims, check_dims, ket_from_op_dims
 
@@ -409,6 +409,16 @@ class DenseImpl(QarrayImpl):
     PROMOTION_ORDER = 2  # noqa: RUF012 — not a struct field; no annotation intentional
 
     @classmethod
+    def _make(cls, data) -> "DenseImpl":
+        """Construct a ``DenseImpl``, applying the configured default sharding.
+
+        All internal construction sites route through this so that every
+        Qarray (including intermediates produced by ``matmul``, ``kron``,
+        etc.) satisfies the user's sharding invariant.
+        """
+        return cls(_data=_maybe_shard(data))
+
+    @classmethod
     def from_data(cls, data) -> "DenseImpl":
         """Wrap *data* in a new ``DenseImpl``.
 
@@ -418,7 +428,7 @@ class DenseImpl(QarrayImpl):
         Returns:
             A ``DenseImpl`` wrapping ``robust_asarray(data)``.
         """
-        return cls(_data=robust_asarray(data))
+        return cls._make(robust_asarray(data))
 
     def get_data(self) -> Array:
         """Return the underlying dense array."""
@@ -436,7 +446,7 @@ class DenseImpl(QarrayImpl):
         a, b = self._coerce(other)
         if a is not self:
             return a.matmul(b)
-        return DenseImpl(self._data @ b._data)
+        return DenseImpl._make(self._data @ b._data)
 
     def add(self, other: QarrayImpl) -> QarrayImpl:
         """Element-wise addition ``self + other``, coercing types as needed.
@@ -450,7 +460,7 @@ class DenseImpl(QarrayImpl):
         a, b = self._coerce(other)
         if a is not self:
             return a.add(b)
-        return DenseImpl(self._data + b._data)
+        return DenseImpl._make(self._data + b._data)
 
     def sub(self, other: QarrayImpl) -> QarrayImpl:
         """Element-wise subtraction ``self - other``, coercing types as needed.
@@ -464,7 +474,7 @@ class DenseImpl(QarrayImpl):
         a, b = self._coerce(other)
         if a is not self:
             return a.sub(b)
-        return DenseImpl(self._data - b._data)
+        return DenseImpl._make(self._data - b._data)
 
     def mul(self, scalar) -> QarrayImpl:
         """Scalar multiplication.
@@ -475,7 +485,7 @@ class DenseImpl(QarrayImpl):
         Returns:
             A ``DenseImpl`` with each element multiplied by *scalar*.
         """
-        return DenseImpl(scalar * self._data)
+        return DenseImpl._make(scalar * self._data)
 
     def dag(self) -> QarrayImpl:
         """Conjugate transpose.
@@ -483,7 +493,7 @@ class DenseImpl(QarrayImpl):
         Returns:
             A ``DenseImpl`` containing the conjugate transpose.
         """
-        return DenseImpl(jnp.moveaxis(jnp.conj(self._data), -1, -2))
+        return DenseImpl._make(jnp.moveaxis(jnp.conj(self._data), -1, -2))
 
     def to_dense(self) -> "DenseImpl":
         """Return self (already dense).
@@ -532,7 +542,7 @@ class DenseImpl(QarrayImpl):
         Returns:
             A ``DenseImpl`` containing the real parts.
         """
-        return DenseImpl(jnp.real(self._data))
+        return DenseImpl._make(jnp.real(self._data))
 
     def imag(self) -> QarrayImpl:
         """Element-wise imaginary part.
@@ -540,7 +550,7 @@ class DenseImpl(QarrayImpl):
         Returns:
             A ``DenseImpl`` containing the imaginary parts.
         """
-        return DenseImpl(jnp.imag(self._data))
+        return DenseImpl._make(jnp.imag(self._data))
 
     def conj(self) -> QarrayImpl:
         """Element-wise complex conjugate.
@@ -548,12 +558,10 @@ class DenseImpl(QarrayImpl):
         Returns:
             A ``DenseImpl`` containing the complex-conjugated values.
         """
-        return DenseImpl(jnp.conj(self._data))
+        return DenseImpl._make(jnp.conj(self._data))
 
     def __deepcopy__(self, memo=None):
-        return DenseImpl(
-            _data=deepcopy(self._data, memo)
-        )
+        return DenseImpl._make(deepcopy(self._data, memo))
 
     def tidy_up(self, atol):
         """Zero out real/imaginary parts whose magnitude is below *atol*.
@@ -571,9 +579,7 @@ class DenseImpl(QarrayImpl):
         data_im_mask = jnp.abs(data_im) > atol
         data_new = data_re * data_re_mask + 1j * data_im * data_im_mask
 
-        return DenseImpl(
-            _data=data_new
-        )
+        return DenseImpl._make(data_new)
 
     def kron(self, other: "QarrayImpl") -> "QarrayImpl":
         """Kronecker product using ``jnp.kron``.
@@ -587,7 +593,7 @@ class DenseImpl(QarrayImpl):
         a, b = self._coerce(other)
         if a is not self:
             return a.kron(b)
-        return DenseImpl(jnp.kron(self._data, b._data))
+        return DenseImpl._make(jnp.kron(self._data, b._data))
 
     @classmethod
     def _eye_data(cls, n: int, dtype=None):
