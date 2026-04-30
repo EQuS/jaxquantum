@@ -377,58 +377,58 @@ def _sesolve_data(
 # cuQuantum solver path
 # ---------------------------------------------------------------------------
 
-def _build_cuquantum_dissipator_terms(L_qarray):
-    """Generate Ls_term entries that encode ``D[L]ρ`` in cuquantum form.
+# def _build_cuquantum_dissipator_terms(L_qarray):
+#     """Generate Ls_term entries that encode ``D[L]ρ`` in cuquantum form.
 
-    Mirrors the dissipator recipe used in
-    ``local/lattice_2d_operator_action.py``:
+#     Mirrors the dissipator recipe used in
+#     ``local/lattice_2d_operator_action.py``:
 
-      D[L]ρ = LρL† − ½ L†L ρ − ½ ρ L†L
+#       D[L]ρ = LρL† − ½ L†L ρ − ½ ρ L†L
 
-    Yields ``(matrices, modes, duals, coeff)`` tuples that should be
-    appended to a single ``Ls_term`` ``OperatorTerm``.
+#     Yields ``(matrices, modes, duals, coeff)`` tuples that should be
+#     appended to a single ``Ls_term`` ``OperatorTerm``.
 
-    Args:
-        L_qarray: Qarray[CuquantumImpl] holding the collapse operator.
+#     Args:
+#         L_qarray: Qarray[CuquantumImpl] holding the collapse operator.
 
-    Yields:
-        Successive term tuples ready to be passed to OperatorTerm.append
-        (after wrapping each matrix in an ElementaryOperator).
-    """
-    L_data = L_qarray._impl._data            # OperatorTerm
-    LdagL_data = (L_qarray.dag() @ L_qarray)._impl._data  # OperatorTerm
+#     Yields:
+#         Successive term tuples ready to be passed to OperatorTerm.append
+#         (after wrapping each matrix in an ElementaryOperator).
+#     """
+#     L_data = L_qarray._impl._data            # OperatorTerm
+#     LdagL_data = (L_qarray.dag() @ L_qarray)._impl._data  # OperatorTerm
 
-    def _iter_products(op_term):
-        """Yield ``(matrices, modes, coeff_scalar)`` for each product in op_term."""
-        for op_prod, modes, coeff_arr in zip(
-            op_term.op_prods, op_term.modes, op_term.coeffs
-        ):
-            mats = tuple(jnp.squeeze(elem.data, axis=0) for elem in op_prod)
-            yield mats, tuple(modes), coeff_arr[0] if coeff_arr.ndim else coeff_arr
+#     def _iter_products(op_term):
+#         """Yield ``(matrices, modes, coeff_scalar)`` for each product in op_term."""
+#         for op_prod, modes, coeff_arr in zip(
+#             op_term.op_prods, op_term.modes, op_term.coeffs
+#         ):
+#             mats = tuple(jnp.squeeze(elem.data, axis=0) for elem in op_prod)
+#             yield mats, tuple(modes), coeff_arr[0] if coeff_arr.ndim else coeff_arr
 
-    # L ρ L† = sum over (a, b) of cₐ * conj(c_b) * (L_a) ρ (L_b)†.
-    # In cuQuantum's elementary product convention, ``[X, Y]`` on the same mode
-    # acts as the matrix ``X @ Y`` — i.e. operators are composed left-to-right
-    # in the tuple — so to encode ``L_a ρ L_b†`` we put ``L_a``'s factors with
-    # ``dual=False`` then ``L_b``'s daggered factors (in reverse order) with
-    # ``dual=True``.
-    L_products = list(_iter_products(L_data))
-    for (mats_a, modes_a, coeff_a) in L_products:
-        for (mats_b, modes_b, coeff_b) in L_products:
-            mats_b_dag_rev = tuple(_matrix_dag(m) for m in reversed(mats_b))
-            modes_b_rev = tuple(reversed(modes_b))
-            yield (
-                tuple(mats_a) + mats_b_dag_rev,
-                tuple(modes_a) + modes_b_rev,
-                (False,) * len(mats_a) + (True,) * len(mats_b_dag_rev),
-                coeff_a * jnp.conj(coeff_b),
-            )
+#     # L ρ L† = sum over (a, b) of cₐ * conj(c_b) * (L_a) ρ (L_b)†.
+#     # In cuQuantum's elementary product convention, ``[X, Y]`` on the same mode
+#     # acts as the matrix ``X @ Y`` — i.e. operators are composed left-to-right
+#     # in the tuple — so to encode ``L_a ρ L_b†`` we put ``L_a``'s factors with
+#     # ``dual=False`` then ``L_b``'s daggered factors (in reverse order) with
+#     # ``dual=True``.
+#     L_products = list(_iter_products(L_data))
+#     for (mats_a, modes_a, coeff_a) in L_products:
+#         for (mats_b, modes_b, coeff_b) in L_products:
+#             mats_b_dag_rev = tuple(_matrix_dag(m) for m in reversed(mats_b))
+#             modes_b_rev = tuple(reversed(modes_b))
+#             yield (
+#                 tuple(mats_a) + mats_b_dag_rev,
+#                 tuple(modes_a) + modes_b_rev,
+#                 (False,) * len(mats_a) + (True,) * len(mats_b_dag_rev),
+#                 coeff_a * jnp.conj(coeff_b),
+#             )
 
-    # -½ L†L ρ : L†L applied on the left side (all duals=False).
-    # -½ ρ L†L : L†L applied on the right side (all duals=True).
-    for (mats, modes, coeff) in _iter_products(LdagL_data):
-        yield (mats, modes, (False,) * len(mats), -0.5 * coeff)
-        yield (mats, modes, (True,) * len(mats), -0.5 * coeff)
+#     # -½ L†L ρ : L†L applied on the left side (all duals=False).
+#     # -½ ρ L†L : L†L applied on the right side (all duals=True).
+#     for (mats, modes, coeff) in _iter_products(LdagL_data):
+#         yield (mats, modes, (False,) * len(mats), -0.5 * coeff)
+#         yield (mats, modes, (True,) * len(mats), -0.5 * coeff)
 
 
 def _matrix_dag(matrix):
@@ -452,7 +452,7 @@ def _mesolve_cuquantum(
     ``operator_action`` — exactly mirroring
     ``local/lattice_2d_operator_action.py``.
     """
-    from jaxquantum.core.cuquantum_impl import CuquantumImpl
+    from jaxquantum.core.cuquantum_impl import CuquantumImpl, _cuqnt_dag
     from cuquantum.densitymat.jax import (
         ElementaryOperator,
         Operator,
@@ -460,6 +460,7 @@ def _mesolve_cuquantum(
     )
 
     from jaxquantum.utils.cuquantum_util import OperatorTerm 
+
 
     # --- snapshot the static metadata we need outside the RHS ---
     H_test = H if isinstance(H, Qarray) else H(0.0)
@@ -491,15 +492,31 @@ def _mesolve_cuquantum(
     Ls_term: Optional["OperatorTerm"] = None
     if c_ops_list:
         Ls_term = OperatorTerm(space_dims)
-        for L in c_ops_list:
-            if not isinstance(L, Qarray) or L.impl_type != QarrayImplType.CUQUANTUM:
+        for c_op in c_ops_list:
+            if not isinstance(c_op, Qarray) or c_op.impl_type != QarrayImplType.CUQUANTUM:
                 raise TypeError(
                     "_mesolve_cuquantum requires every c_op to be a "
                     "cuquantum-backed Qarray"
                 )
-            for (matrices, modes, duals, coeff) in _build_cuquantum_dissipator_terms(L):
-                elems = [ElementaryOperator(m) for m in matrices]
-                Ls_term.append(elems, modes=modes, duals=duals, coeff=coeff)
+            _l = c_op._impl._data
+            _ld = _cuqnt_dag(c_op._impl._data)
+            
+            if len(_l.op_prods) > 1:
+                raise ValueError("currently, only one term is allowed in the collapse operator") 
+
+            l = _l[0]
+            ld =_ld[0]
+
+            # l = ElementaryOperator((_l[0][0].data * _l.coeffs[0]).astype(_l[0][0].dtype))
+            # ld = ElementaryOperator(_ld[0][0].data * _ld.coeffs[0])
+
+            modes = c_op._impl._data.modes[0]
+            coeff = 1.0 * _l.coeffs[0] * jnp.conj(_l.coeffs[0])
+            
+            Ls_term.append([*l, *ld], modes=modes+modes, duals=[False, True], coeff=1.0 * coeff)
+            Ls_term.append([*ld, *l], modes=modes+modes, duals=[True, True], coeff=-0.5 * coeff)
+            Ls_term.append([*l, *ld], modes=modes+modes, duals=[False, False], coeff=-0.5 * coeff)
+
 
     # The Hamiltonian's OperatorTerm depends on t; build it inside the RHS.
     if isinstance(H, Qarray):

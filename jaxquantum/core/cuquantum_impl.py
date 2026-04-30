@@ -125,9 +125,14 @@ def _cuqnt_sub(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
 def _cuqnt_scalar_mul(scalar, ot: OperatorTerm) -> OperatorTerm:
     """Scale every product's coefficient by ``scalar`` (Python or JAX scalar)."""
     out = OperatorTerm(ot.dims)
+    
     for op_prod, modes, conjs, duals, coeff in zip(
         ot.op_prods, ot.modes, ot.conjs, ot.duals, ot.coeffs
     ):
+
+        if jnp.iscomplexobj(scalar):
+            op_prod = [ElementaryOperator(op.data + 0.0j) for op in op_prod]
+
         _cuqnt_append_copied_product(out, op_prod, modes, conjs, duals, scalar * coeff)
     return out
 

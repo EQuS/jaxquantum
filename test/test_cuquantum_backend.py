@@ -265,17 +265,45 @@ class TestSolverParity:
 
         ref = jqt.mesolve(
             H_dense, rho0, tlist,
-            # c_ops=jqt.Qarray.from_list([L_dense]),
+            c_ops=jqt.Qarray.from_list([L_dense]),
             solver_options=opts,
         )
         # cuquantum c_ops must be passed as a Python list — Qarray.from_list
         # densifies cuquantum impls (no batched OperatorTerm exists).
         cu = jqt.mesolve(
             H_cu, rho0, tlist,
-            # c_ops=[L_cu],
+            c_ops=[L_cu],
             solver_options=opts,
         )
 
-        breakpoint()
+        assert jnp.allclose(cu.data, ref.data, atol=1e-5)
+
+    def test_mesolve_amplitude_decay_complex_H_real_L(self):
+        # Single-qubit amplitude damping with σx drive.
+        gamma = 0.05
+        
+        L_dense = (jnp.sqrt(gamma) + 0.0j) * jqt.sigmam()
+        L_cu = (jnp.sqrt(gamma) + 0.0j) * jqt.sigmam(implementation="cuquantum")
+        
+        H_dense = 0.5 * jqt.sigmay()
+        H_cu = 0.5 * jqt.sigmay(implementation="cuquantum")
+        
+        rho0 = jqt.basis(2, 0).to_dm()
+        tlist = jnp.linspace(0, 1.0, 11)
+        opts = jqt.SolverOptions.create(progress_meter=False)
+
+        ref = jqt.mesolve(
+            H_dense, rho0, tlist,
+            c_ops=jqt.Qarray.from_list([L_dense]),
+            solver_options=opts,
+        )
+        
+        # cuquantum c_ops must be passed as a Python list — Qarray.from_list
+        # densifies cuquantum impls (no batched OperatorTerm exists).
+        cu = jqt.mesolve(
+            H_cu, rho0, tlist,
+            c_ops=[L_cu],
+            solver_options=opts,
+        )
 
         assert jnp.allclose(cu.data, ref.data, atol=1e-5)
