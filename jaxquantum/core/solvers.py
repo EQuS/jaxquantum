@@ -8,6 +8,8 @@ from diffrax import (
     TqdmProgressMeter,
     NoProgressMeter,
 )
+import diffrax as dx
+
 from flax import struct
 from jax import Array
 from typing import Callable, Optional, Union
@@ -33,6 +35,7 @@ class SolverOptions:
     max_steps: int = (struct.field(pytree_node=False),)
     rtol: float = (struct.field(pytree_node=False),)
     atol: float = (struct.field(pytree_node=False),)
+    stepsize_controller: str =(struct.field(pytree_node=False),)
 
     @classmethod
     def create(
@@ -42,8 +45,9 @@ class SolverOptions:
         max_steps: int = 100_000,
         rtol: float = 1e-7,
         atol: float = 1e-9,
+        stepsize_controller: Optional[str] = None,
     ):
-        return cls(progress_meter, solver, max_steps, rtol, atol)
+        return cls(progress_meter, solver, max_steps, rtol, atol, stepsize_controller)
 
 
 class CustomProgressMeter(TqdmProgressMeter):
@@ -85,7 +89,11 @@ def solve(f, ρ0, tlist, saveat_tlist, args, solver_options: Optional[
 
     solver_name = solver_options.solver
     solver = getattr(diffrax, solver_name)()
-    stepsize_controller = PIDController(rtol=solver_options.rtol, atol=solver_options.atol)
+    
+    if solver_options.stepsize_controller is not None:
+        stepsize_controller = getattr(dx, solver_options.stepsize_controller)()
+    else:
+        stepsize_controller = PIDController(rtol=solver_options.rtol, atol=solver_options.atol)
 
     # solve!
     with warnings.catch_warnings():
