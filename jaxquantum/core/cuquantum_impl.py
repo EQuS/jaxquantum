@@ -129,7 +129,6 @@ def _cuqnt_scalar_mul(scalar, ot: OperatorTerm) -> OperatorTerm:
     for op_prod, modes, conjs, duals, coeff in zip(
         ot.op_prods, ot.modes, ot.conjs, ot.duals, ot.coeffs
     ):
-
         if jnp.iscomplexobj(scalar):
             op_prod = [ElementaryOperator(op.data + 0.0j) for op in op_prod]
 

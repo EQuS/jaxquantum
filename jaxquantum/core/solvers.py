@@ -537,10 +537,18 @@ def _mesolve_cuquantum(
         )
         return rho_dot.reshape(rho_shape)
 
-    sol = solve(
-        f, rho0_arr, tlist, saveat_tlist, args=None,
-        solver_options=solver_options,
-    )
+    try:
+        sol = solve(
+            f, rho0_arr, tlist, saveat_tlist, args=None,
+            solver_options=solver_options,
+        )
+    except ValueError as e:
+        if "operator terms" in str(e):
+            raise ValueError(
+                "please make sure the Hamiltonian and collapse operators are of the same dtype"
+            )
+        else:
+            raise e
     return jnp2jqt(sol.ys, dims=dims_meta)
 
 

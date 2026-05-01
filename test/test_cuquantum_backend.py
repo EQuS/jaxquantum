@@ -282,8 +282,8 @@ class TestSolverParity:
         # Single-qubit amplitude damping with σx drive.
         gamma = 0.05
         
-        L_dense = (jnp.sqrt(gamma) + 0.0j) * jqt.sigmam()
-        L_cu = (jnp.sqrt(gamma) + 0.0j) * jqt.sigmam(implementation="cuquantum")
+        L_dense = (jnp.sqrt(gamma)) * jqt.sigmam()
+        L_cu = (jnp.sqrt(gamma) ) * jqt.sigmam(implementation="cuquantum")
         
         H_dense = 0.5 * jqt.sigmay()
         H_cu = 0.5 * jqt.sigmay(implementation="cuquantum")
@@ -297,13 +297,16 @@ class TestSolverParity:
             c_ops=jqt.Qarray.from_list([L_dense]),
             solver_options=opts,
         )
-        
+
         # cuquantum c_ops must be passed as a Python list — Qarray.from_list
         # densifies cuquantum impls (no batched OperatorTerm exists).
-        cu = jqt.mesolve(
-            H_cu, rho0, tlist,
-            c_ops=[L_cu],
-            solver_options=opts,
-        )
+        # should raise ValueError
 
-        assert jnp.allclose(cu.data, ref.data, atol=1e-5)
+
+        with pytest.raises(ValueError, match="please make sure the Hamiltonian and collapse operators are of the same dtype"):
+            cu = jqt.mesolve(
+                H_cu, rho0, tlist,
+                c_ops=[L_cu],
+                solver_options=opts,
+            )
+

@@ -1212,7 +1212,7 @@ class Qarray(Generic[ImplT]):
         if isinstance(other, Qarray):
             return self.__matmul__(other)
 
-        other = other + 0.0j
+        other = other #+ 0.0j
         if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
             other = other.reshape(other.shape + (1, 1))
 
