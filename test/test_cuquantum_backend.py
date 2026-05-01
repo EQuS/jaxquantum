@@ -310,3 +310,103 @@ class TestSolverParity:
                 solver_options=opts,
             )
 
+
+# ===========================================================================
+# Operator construction with implementation="cuquantum"
+# ===========================================================================
+
+
+class TestOperatorImplementationFlagCuquantum:
+    """All primitives expose ``implementation="cuquantum"`` and produce
+    CUQUANTUM-backed Qarrays whose dense form matches the reference."""
+
+    @pytest.mark.parametrize(
+        "op_factory, ref_factory",
+        [
+            (lambda: jqt.sigmax(implementation="cuquantum"), lambda: jqt.sigmax()),
+            (lambda: jqt.sigmay(implementation="cuquantum"), lambda: jqt.sigmay()),
+            (lambda: jqt.sigmaz(implementation="cuquantum"), lambda: jqt.sigmaz()),
+            (lambda: jqt.hadamard(implementation="cuquantum"), lambda: jqt.hadamard()),
+            (lambda: jqt.sigmam(implementation="cuquantum"), lambda: jqt.sigmam()),
+            (lambda: jqt.sigmap(implementation="cuquantum"), lambda: jqt.sigmap()),
+            (lambda: jqt.destroy(N, implementation="cuquantum"), lambda: jqt.destroy(N)),
+            (lambda: jqt.create(N, implementation="cuquantum"), lambda: jqt.create(N)),
+            (lambda: jqt.num(N, implementation="cuquantum"), lambda: jqt.num(N)),
+            (lambda: jqt.identity(N, implementation="cuquantum"), lambda: jqt.identity(N)),
+        ],
+    )
+    def test_primitive_matches_dense(self, op_factory, ref_factory):
+        op = op_factory()
+        ref = ref_factory()
+        assert op.impl_type == QarrayImplType.CUQUANTUM
+        assert jnp.allclose(op.to_dense().data, ref.to_dense().data)
+
+    def test_displace_round_trips_to_cuquantum(self):
+        # ``expm`` densifies internally; the result must still come back as
+        # CUQUANTUM thanks to ``Qarray.to_backend``.
+        ref = jqt.displace(N, 0.4)
+        op = jqt.displace(N, 0.4, implementation="cuquantum")
+        assert op.impl_type == QarrayImplType.CUQUANTUM
+        assert jnp.allclose(op.to_dense().data, ref.to_dense().data)
+
+    def test_squeeze_round_trips_to_cuquantum(self):
+        ref = jqt.squeeze(N, 0.3)
+        op = jqt.squeeze(N, 0.3, implementation="cuquantum")
+        assert op.impl_type == QarrayImplType.CUQUANTUM
+        assert jnp.allclose(op.to_dense().data, ref.to_dense().data)
+
+    def test_qubit_rotation_cuquantum(self):
+        ref = jqt.qubit_rotation(0.7, 1, 0, 0)
+        op = jqt.qubit_rotation(0.7, 1, 0, 0, implementation="cuquantum")
+        assert op.impl_type == QarrayImplType.CUQUANTUM
+        assert jnp.allclose(op.to_dense().data, ref.to_dense().data)
+
+    def test_thermal_dm_cuquantum(self):
+        ref = jqt.thermal_dm(N, 0.5)
+        op = jqt.thermal_dm(N, 0.5, implementation="cuquantum")
+        assert op.impl_type == QarrayImplType.CUQUANTUM
+        assert jnp.allclose(op.to_dense().data, ref.to_dense().data)
+
+    def test_basis_falls_back_to_dense_for_cuquantum(self):
+        # Kets aren't representable as cuquantum OperatorTerms — fall back.
+        ket = jqt.basis(N, 1, implementation="cuquantum")
+        assert ket.impl_type == QarrayImplType.DENSE
+
+    def test_coherent_falls_back_to_dense_for_cuquantum(self):
+        ket = jqt.coherent(N, 0.3, implementation="cuquantum")
+        assert ket.impl_type == QarrayImplType.DENSE
+        assert jnp.allclose(ket.data, jqt.coherent(N, 0.3).to_dense().data)
+
+    def test_identity_like_cuquantum(self):
+        a = jqt.tensor(jqt.destroy(N, implementation="cuquantum"),
+                       jqt.identity(N, implementation="cuquantum"))
+        eye = jqt.identity_like(a, implementation="cuquantum")
+        assert eye.impl_type == QarrayImplType.CUQUANTUM
+        assert jnp.allclose(eye.to_dense().data, jnp.eye(N * N))
+
+
+class TestToBackendCuquantum:
+    """``to_backend('cuquantum')`` from non-cuquantum sources goes through
+    dense (no direct ``to_cuquantum`` method exists)."""
+
+    def test_dense_to_cuquantum(self):
+        q = jqt.destroy(N)
+        cu = q.to_backend("cuquantum")
+        assert cu.impl_type == QarrayImplType.CUQUANTUM
+        assert jnp.allclose(cu.to_dense().data, q.data)
+
+    def test_sparse_dia_to_cuquantum(self):
+        q = jqt.destroy(N, implementation="sparse_dia")
+        cu = q.to_backend("cuquantum")
+        assert cu.impl_type == QarrayImplType.CUQUANTUM
+        assert jnp.allclose(cu.to_dense().data, q.to_dense().data)
+
+    def test_cuquantum_to_dense(self):
+        q = jqt.destroy(N, implementation="cuquantum")
+        d = q.to_backend("dense")
+        assert d.impl_type == QarrayImplType.DENSE
+        assert jnp.allclose(d.data, q.to_dense().data)
+
+    def test_noop_when_already_cuquantum(self):
+        q = jqt.destroy(N, implementation="cuquantum")
+        assert q.to_backend("cuquantum") is q

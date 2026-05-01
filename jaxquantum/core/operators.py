@@ -12,145 +12,139 @@ from jaxquantum.core.qarray import Qarray, tensor, QarrayImplType
 config.update("jax_enable_x64", True)
 
 
-def _make_sparsedia(offsets: tuple, diags: "jnp.ndarray", dims=None) -> Qarray:
-    """Build a ``Qarray[SparseDiaImpl]`` directly from padded diagonal arrays.
+def _impl_from(impl_type: QarrayImplType, factory: str, *args, **kwargs) -> Qarray:
+    """Build a ``Qarray`` by calling a classmethod on the registered impl class.
 
-    Avoids going through a dense intermediate (no ``jnp.diag`` round-trip).
-    ``diags`` must already follow Convention A: diagonal at offset k has
-    leading zeros at [0:k] (k ≥ 0) or trailing zeros at [n+k:] (k < 0).
+    Looks up the impl class via ``QarrayImplType.get_impl_class()`` (so
+    ``operators.py`` never imports a specific ``*Impl`` class), invokes
+    ``factory`` on it with the provided args, and wraps the result.
 
-    Args:
-        offsets: Sorted tuple of integer diagonal offsets.
-        diags:   JAX array of shape (n_diags, n) with padded values.
-        dims:    Optional quantum dims tuple.
+    Example::
 
-    Returns:
-        A ``Qarray`` backed by ``SparseDiaImpl``.
+        _impl_from(QarrayImplType.SPARSE_DIA, "from_diags",
+                   offsets=(1,), diags=...)
     """
-    from jaxquantum.core.sparse_dia import SparseDiaImpl
-
-    impl = SparseDiaImpl.from_diags(offsets=offsets, diags=diags)
-    return Qarray.create(impl.get_data(), dims=dims, implementation=QarrayImplType.SPARSE_DIA)
-
-
-def _make_cuquantum_single_site(matrix: "jnp.ndarray", n: int, dims=None) -> Qarray:
-    """Build a ``Qarray[CuquantumImpl]`` directly from a single-site ``(n, n)`` matrix.
-
-    Wraps the matrix in an ``ElementaryOperator`` on a one-mode
-    ``OperatorTerm``.  Multi-mode operators are then assembled via
-    ``tensor`` / ``kron``, which dispatches to ``CuquantumImpl.kron`` and
-    shifts mode indices correctly.
-    """
-    from jaxquantum.core.cuquantum_impl import CuquantumImpl
-
-    impl = CuquantumImpl.single_site(matrix, n)
-    return Qarray.create(impl.get_data(), dims=dims, implementation=QarrayImplType.CUQUANTUM)
+    impl_class = QarrayImplType(impl_type).get_impl_class()
+    impl = getattr(impl_class, factory)(*args, **kwargs)
+    return Qarray.from_impl(impl)
 
 
-def _make_cuquantum_identity(n: int, dims=None, dtype=None) -> Qarray:
-    """Identity on a single mode of size ``n`` as a ``Qarray[CuquantumImpl]``."""
-    from jaxquantum.core.cuquantum_impl import CuquantumImpl
+def _impl_type(implementation):
+    """Coerce ``implementation`` to a ``QarrayImplType`` member, or ``None``."""
+    if implementation is None:
+        return None
+    return QarrayImplType(implementation)
 
-    impl = CuquantumImpl.identity_term(n, dtype=dtype)
-    return Qarray.create(impl.get_data(), dims=dims, implementation=QarrayImplType.CUQUANTUM)
 
-
-def sigmax(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
+def sigmax(implementation=None) -> Qarray:
     """σx
 
     Args:
-        implementation: Qarray implementation type, e.g. "sparse" or "dense".
+        implementation: Qarray implementation type (e.g. ``"dense"``,
+            ``"sparse_dia"``, ``"cuquantum"``).  When ``None``, falls back to
+            ``SETTINGS["default_backend"]``.
 
     Returns:
         σx Pauli Operator
     """
-    if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
+    impl_type = _impl_type(implementation)
+    if impl_type == QarrayImplType.SPARSE_DIA:
         # Offset -1: valid at [0:1] → diag[0] = A[1,0] = 1.0, diag[1] = 0 (trailing zero)
         # Offset +1: valid at [1:]  → diag[0] = 0 (leading zero), diag[1] = A[0,1] = 1.0
         diags = jnp.array([[1.0, 0.0], [0.0, 1.0]])
-        return _make_sparsedia(offsets=(-1, 1), diags=diags)
-    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
-        return _make_cuquantum_single_site(jnp.array([[0.0, 1.0], [1.0, 0.0]]), 2)
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1, 1), diags=diags)
+    if impl_type == QarrayImplType.CUQUANTUM:
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site",
+                          jnp.array([[0.0, 1.0], [1.0, 0.0]]), 2)
     return Qarray.create(jnp.array([[0.0, 1.0], [1.0, 0.0]]), implementation=implementation)
 
 
-def sigmay(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
+def sigmay(implementation=None) -> Qarray:
     """σy
 
     Returns:
         σy Pauli Operator
     """
-    if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
+    impl_type = _impl_type(implementation)
+    if impl_type == QarrayImplType.SPARSE_DIA:
         diags = jnp.array([[1.0j, 0.0], [0.0, -1.0j]])
-        return _make_sparsedia(offsets=(-1, 1), diags=diags)
-    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
-        return _make_cuquantum_single_site(jnp.array([[0.0, -1.0j], [1.0j, 0.0]]), 2)
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1, 1), diags=diags)
+    if impl_type == QarrayImplType.CUQUANTUM:
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site",
+                          jnp.array([[0.0, -1.0j], [1.0j, 0.0]]), 2)
     return Qarray.create(jnp.array([[0.0, -1.0j], [1.0j, 0.0]]), implementation=implementation)
 
 
-def sigmaz(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
+def sigmaz(implementation=None) -> Qarray:
     """σz
 
     Returns:
         σz Pauli Operator
     """
-    if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
+    impl_type = _impl_type(implementation)
+    if impl_type == QarrayImplType.SPARSE_DIA:
         diags = jnp.array([[1.0, -1.0]])
-        return _make_sparsedia(offsets=(0,), diags=diags)
-    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
-        return _make_cuquantum_single_site(jnp.array([[1.0, 0.0], [0.0, -1.0]]), 2)
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(0,), diags=diags)
+    if impl_type == QarrayImplType.CUQUANTUM:
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site",
+                          jnp.array([[1.0, 0.0], [0.0, -1.0]]), 2)
     return Qarray.create(jnp.array([[1.0, 0.0], [0.0, -1.0]]), implementation=implementation)
 
 
-def hadamard(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
+def hadamard(implementation=None) -> Qarray:
     """H
 
     Returns:
         H: Hadamard gate
     """
-    if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
+    impl_type = _impl_type(implementation)
+    if impl_type == QarrayImplType.SPARSE_DIA:
         s = 1.0 / jnp.sqrt(2.0)
         # offset -1: valid at [0]   → diag[0]=A[1,0]=s, diag[1]=0 (trailing zero)
         # offset  0: valid at [0:2] → diag[0]=A[0,0]=s, diag[1]=A[1,1]=-s
         # offset +1: valid at [1]   → diag[0]=0 (leading zero), diag[1]=A[0,1]=s
         diags = jnp.array([[s, 0.0], [s, -s], [0.0, s]])
-        return _make_sparsedia(offsets=(-1, 0, 1), diags=diags)
-    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
-        return _make_cuquantum_single_site(
-            jnp.array([[1.0, 1.0], [1.0, -1.0]]) / jnp.sqrt(2), 2
-        )
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags",
+                          offsets=(-1, 0, 1), diags=diags)
+    if impl_type == QarrayImplType.CUQUANTUM:
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site",
+                          jnp.array([[1.0, 1.0], [1.0, -1.0]]) / jnp.sqrt(2), 2)
     return Qarray.create(jnp.array([[1, 1], [1, -1]]) / jnp.sqrt(2), implementation=implementation)
 
 
-def sigmam(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
+def sigmam(implementation=None) -> Qarray:
     """σ-
 
     Returns:
         σ- Pauli Operator
     """
-    if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
+    impl_type = _impl_type(implementation)
+    if impl_type == QarrayImplType.SPARSE_DIA:
         diags = jnp.array([[1.0, 0.0]])
-        return _make_sparsedia(offsets=(-1,), diags=diags)
-    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
-        return _make_cuquantum_single_site(jnp.array([[0.0, 0.0], [1.0, 0.0]]), 2)
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1,), diags=diags)
+    if impl_type == QarrayImplType.CUQUANTUM:
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site",
+                          jnp.array([[0.0, 0.0], [1.0, 0.0]]), 2)
     return Qarray.create(jnp.array([[0.0, 0.0], [1.0, 0.0]]), implementation=implementation)
 
 
-def sigmap(implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
+def sigmap(implementation=None) -> Qarray:
     """σ+
 
     Returns:
         σ+ Pauli Operator
     """
-    if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
+    impl_type = _impl_type(implementation)
+    if impl_type == QarrayImplType.SPARSE_DIA:
         diags = jnp.array([[0.0, 1.0]])
-        return _make_sparsedia(offsets=(1,), diags=diags)
-    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
-        return _make_cuquantum_single_site(jnp.array([[0.0, 1.0], [0.0, 0.0]]), 2)
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(1,), diags=diags)
+    if impl_type == QarrayImplType.CUQUANTUM:
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site",
+                          jnp.array([[0.0, 1.0], [0.0, 0.0]]), 2)
     return Qarray.create(jnp.array([[0.0, 1.0], [0.0, 0.0]]), implementation=implementation)
 
 
-def qubit_rotation(theta: float, nx, ny, nz) -> Qarray:
+def qubit_rotation(theta: float, nx, ny, nz, implementation=None) -> Qarray:
     """Single qubit rotation.
 
     Args:
@@ -158,218 +152,285 @@ def qubit_rotation(theta: float, nx, ny, nz) -> Qarray:
         nx: rotation axis x component.
         ny: rotation axis y component.
         nz: rotation axis z component.
+        implementation: Qarray implementation type.
 
     Returns:
         Single qubit rotation operator.
     """
-    return jnp.cos(theta / 2) * identity(2) - 1j * jnp.sin(theta / 2) * (
-        nx * sigmax() + ny * sigmay() + nz * sigmaz()
+    impl_type = _impl_type(implementation)
+    if impl_type == QarrayImplType.CUQUANTUM:
+        # ``CuquantumImpl.identity_term`` carries no dtype, so adding it to a
+        # complex single-site op fails in cuquantum's OperatorTerm arithmetic.
+        # Build dense and convert at the end.
+        result = jnp.cos(theta / 2) * identity(2) - 1j * jnp.sin(theta / 2) * (
+            nx * sigmax() + ny * sigmay() + nz * sigmaz()
+        )
+        return result.to_backend(implementation)
+    return jnp.cos(theta / 2) * identity(2, implementation=implementation) - 1j * jnp.sin(theta / 2) * (
+        nx * sigmax(implementation=implementation)
+        + ny * sigmay(implementation=implementation)
+        + nz * sigmaz(implementation=implementation)
     )
 
 
-def destroy(N, implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
+def destroy(N, implementation=None) -> Qarray:
     """annihilation operator
 
     Args:
         N: Hilbert space size
-        implementation: Qarray implementation type, e.g. "sparse" or "dense".
+        implementation: Qarray implementation type.
 
     Returns:
-        annilation operator in Hilber Space of size N
+        annihilation operator in Hilbert Space of size N
     """
-    if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
+    impl_type = _impl_type(implementation)
+    if impl_type == QarrayImplType.SPARSE_DIA:
         # Single superdiagonal at offset +1; Convention A: 1 leading zero.
         diags = jnp.zeros((1, N), dtype=jnp.float64)
         diags = diags.at[0, 1:].set(jnp.sqrt(jnp.arange(1, N, dtype=jnp.float64)))
-        return _make_sparsedia(offsets=(1,), diags=diags)
-    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
-        return _make_cuquantum_single_site(
-            jnp.diag(jnp.sqrt(jnp.arange(1, N, dtype=jnp.complex128)), k=1), N
-        )
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(1,), diags=diags)
+    if impl_type == QarrayImplType.CUQUANTUM:
+        matrix = jnp.diag(jnp.sqrt(jnp.arange(1, N, dtype=jnp.complex128)), k=1)
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site", matrix, N)
     return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=1), implementation=implementation)
 
 
-def create(N, implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
+def create(N, implementation=None) -> Qarray:
     """creation operator
 
     Args:
         N: Hilbert space size
-        implementation: Qarray implementation type, e.g. "sparse" or "dense".
+        implementation: Qarray implementation type.
 
     Returns:
-        creation operator in Hilber Space of size N
+        creation operator in Hilbert Space of size N
     """
-    if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
+    impl_type = _impl_type(implementation)
+    if impl_type == QarrayImplType.SPARSE_DIA:
         # Single subdiagonal at offset -1; Convention A: 1 trailing zero.
         diags = jnp.zeros((1, N), dtype=jnp.float64)
         diags = diags.at[0, :N - 1].set(jnp.sqrt(jnp.arange(1, N, dtype=jnp.float64)))
-        return _make_sparsedia(offsets=(-1,), diags=diags)
-    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
-        return _make_cuquantum_single_site(
-            jnp.diag(jnp.sqrt(jnp.arange(1, N, dtype=jnp.complex128)), k=-1), N
-        )
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1,), diags=diags)
+    if impl_type == QarrayImplType.CUQUANTUM:
+        matrix = jnp.diag(jnp.sqrt(jnp.arange(1, N, dtype=jnp.complex128)), k=-1)
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site", matrix, N)
     return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=-1), implementation=implementation)
 
 
-def num(N, implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
+def num(N, implementation=None) -> Qarray:
     """Number operator
 
     Args:
         N: Hilbert Space size
-        implementation: Qarray implementation type, e.g. "sparse" or "dense".
+        implementation: Qarray implementation type.
 
     Returns:
-        number operator in Hilber Space of size N
+        number operator in Hilbert Space of size N
     """
-    if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
+    impl_type = _impl_type(implementation)
+    if impl_type == QarrayImplType.SPARSE_DIA:
         # Main diagonal only; no leading/trailing zeros needed (offset 0).
         diags = jnp.arange(N, dtype=jnp.float64).reshape(1, N)
-        return _make_sparsedia(offsets=(0,), diags=diags)
-    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
-        return _make_cuquantum_single_site(
-            jnp.diag(jnp.arange(N, dtype=jnp.complex128)), N
-        )
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(0,), diags=diags)
+    if impl_type == QarrayImplType.CUQUANTUM:
+        matrix = jnp.diag(jnp.arange(N, dtype=jnp.complex128))
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site", matrix, N)
     return Qarray.create(jnp.diag(jnp.arange(N)), implementation=implementation)
 
 
-def identity(*args, implementation: QarrayImplType = QarrayImplType.DENSE, **kwargs) -> Qarray:
+def identity(*args, implementation=None, **kwargs) -> Qarray:
     """Identity matrix.
 
     Args:
-        implementation: Qarray implementation type, e.g. "sparse" or "dense".
+        implementation: Qarray implementation type.
 
     Returns:
         Identity matrix.
     """
-    if QarrayImplType(implementation) == QarrayImplType.SPARSE_DIA:
-        # jnp.eye(*args) is typically eye(N) or eye(N, N); extract N from args.
+    impl_type = _impl_type(implementation)
+    if impl_type == QarrayImplType.SPARSE_DIA:
         n = args[0] if args else kwargs.get("N", kwargs.get("n", None))
         if n is not None and (len(args) <= 1) and not kwargs:
             diags = jnp.ones((1, int(n)), dtype=jnp.float64)
-            return _make_sparsedia(offsets=(0,), diags=diags)
-    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+            return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags",
+                              offsets=(0,), diags=diags)
+    if impl_type == QarrayImplType.CUQUANTUM:
         n = args[0] if args else kwargs.get("N", kwargs.get("n", None))
         if n is not None and (len(args) <= 1) and not kwargs:
-            return _make_cuquantum_identity(int(n))
+            return _impl_from(QarrayImplType.CUQUANTUM, "identity_term", int(n))
     return Qarray.create(jnp.eye(*args, **kwargs), implementation=implementation)
 
 
 qeye = identity
 
-def identity_like(A, implementation: QarrayImplType = QarrayImplType.DENSE) -> Qarray:
+
+def identity_like(A, implementation=None) -> Qarray:
     """Identity matrix with the same shape as A.
 
     Args:
         A: Matrix.
-        implementation: Qarray implementation type, e.g. "sparse" or "dense".
+        implementation: Qarray implementation type.
 
     Returns:
         Identity matrix with the same shape as A.
     """
     space_dims = A.space_dims
     total_dim = prod(space_dims)
-    if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+    impl_type = _impl_type(implementation)
+    if impl_type == QarrayImplType.CUQUANTUM:
         # Build a multi-mode identity by kron'ing single-mode identities.
         # Each one is an empty-product OperatorTerm on its mode.
-        identities = [_make_cuquantum_identity(int(d)) for d in space_dims]
+        identities = [
+            _impl_from(QarrayImplType.CUQUANTUM, "identity_term", int(d))
+            for d in space_dims
+        ]
         result = identities[0]
         for next_id in identities[1:]:
-            from jaxquantum.core.qarray import tensor as _tensor
-            result = _tensor(result, next_id)
+            result = tensor(result, next_id)
         # Re-tag dims to the (space_dims, space_dims) operator form.
         return Qarray.create(
             result._impl.get_data(),
             dims=[space_dims, space_dims],
             implementation=QarrayImplType.CUQUANTUM,
         )
-    return Qarray.create(jnp.eye(total_dim, total_dim), dims=[space_dims, space_dims], implementation=implementation)
+    return Qarray.create(
+        jnp.eye(total_dim, total_dim),
+        dims=[space_dims, space_dims],
+        implementation=implementation,
+    )
 
 
-def displace(N, α) -> Qarray:
+def displace(N, α, implementation=None) -> Qarray:
     """Displacement operator
 
     Args:
         N: Hilbert Space Size
         α: Phase space displacement
+        implementation: Qarray implementation type.  ``expm`` densifies
+            internally; the result is converted back to the requested
+            backend before returning.
 
     Returns:
         Displace operator D(α)
     """
-    a = destroy(N)
-    return (α * a.dag() - jnp.conj(α) * a).expm()
+    a = destroy(N, implementation=implementation)
+    result = (α * a.dag() - jnp.conj(α) * a).expm()
+    if implementation is None:
+        return result
+    return result.to_backend(implementation)
 
-def squeeze(N, z):
+
+def squeeze(N, z, implementation=None) -> Qarray:
     """Single-mode Squeezing operator.
-
 
     Args:
         N: Hilbert Space Size
         z: squeezing parameter
+        implementation: Qarray implementation type.  ``expm`` densifies
+            internally; the result is converted back to the requested
+            backend before returning.
 
     Returns:
-        Sqeezing operator
+        Squeezing operator
     """
-    
-    a = destroy(N)
+    a = destroy(N, implementation=implementation)
     op = (1 / 2.0) * jnp.conj(z) * (a @ a) - (1 / 2.0) * z * (a.dag() @ a.dag())
-    return op.expm()
+    result = op.expm()
+    if implementation is None:
+        return result
+    return result.to_backend(implementation)
 
 
 def squeezing_linear_to_dB(z):
     return 20 * jnp.log10(jnp.exp(jnp.abs(z)))
 
+
 def squeezing_dB_to_linear(z_dB):
-    return jnp.log(10**(z_dB/20))
+    return jnp.log(10**(z_dB / 20))
 
 # States ---------------------------------------------------------------------
 
 
-def basis(N: int, k: int, implementation: QarrayImplType = QarrayImplType.DENSE):
+_KET_INCOMPATIBLE = frozenset({QarrayImplType.SPARSE_DIA, QarrayImplType.CUQUANTUM})
+
+
+def _ket_safe_impl(implementation):
+    """Return ``implementation`` unless it can't represent a ket; then ``None``.
+
+    SPARSE_DIA stores diagonals of square matrices and CUQUANTUM is mode-
+    structured; neither has a meaningful representation for a column vector
+    ``(N, 1)``.  Falls back to the default backend (dense unless overridden
+    in SETTINGS) so the resulting state is usable in matmul.
+    """
+    if implementation is None:
+        return None
+    return None if QarrayImplType(implementation) in _KET_INCOMPATIBLE else implementation
+
+
+def basis(N: int, k: int, implementation=None):
     """Creates a |k> (i.e. fock state) ket in a specified Hilbert Space.
 
     Args:
         N: Hilbert space dimension
         k: fock number
-        implementation: Qarray implementation type, e.g. "sparse" or "dense".
+        implementation: Qarray implementation type.  Kets are stored densely
+            for backends that can't represent non-square data
+            (``sparse_dia``, ``cuquantum``).
 
     Returns:
         Fock State |k>
     """
-    return Qarray.create(one_hot(k, N).reshape(N, 1), implementation=implementation)
+    return Qarray.create(
+        one_hot(k, N).reshape(N, 1),
+        implementation=_ket_safe_impl(implementation),
+    )
 
-def multi_mode_basis_set(Ns: List[int]) -> Qarray:
+
+def multi_mode_basis_set(Ns: List[int], implementation=None) -> Qarray:
     """Creates a multi-mode basis set.
 
     Args:
         Ns: List of Hilbert space dimensions for each mode.
+        implementation: Qarray implementation type.  Stored densely for
+            ket-incompatible backends.
 
     Returns:
         Multi-mode basis set.
     """
     data = jnp.eye(prod(Ns))
     dims = (tuple(Ns), tuple([1 for _ in Ns]))
-    return Qarray.create(data, dims=dims, bdims=(prod(Ns),))
+    return Qarray.create(
+        data,
+        dims=dims,
+        bdims=(prod(Ns),),
+        implementation=_ket_safe_impl(implementation),
+    )
 
 
-def coherent(N: int, α: complex) -> Qarray:
+def coherent(N: int, α: complex, implementation=None) -> Qarray:
     """Coherent state.
 
     Args:
         N: Hilbert Space Size.
         α: coherent state amplitude.
+        implementation: Qarray implementation type.  The result is a ket; for
+            backends without a ket representation (``sparse_dia``,
+            ``cuquantum``) the entire computation falls back to dense.
 
     Return:
         Coherent state |α⟩.
     """
-    return displace(N, α) @ basis(N, 0)
+    safe = _ket_safe_impl(implementation)
+    return displace(N, α, implementation=safe) @ basis(N, 0, implementation=safe)
 
 
-def thermal_dm(N: int, n: float) -> Qarray:
+def thermal_dm(N: int, n: float, implementation=None) -> Qarray:
     """Thermal state.
 
     Args:
         N: Hilbert Space Size.
         n: average photon number.
+        implementation: Qarray implementation type.
 
     Return:
         Thermal state.
@@ -382,16 +443,18 @@ def thermal_dm(N: int, n: float) -> Qarray:
             jnp.isposinf(beta),
             basis(N, 0).to_dm().data,
             jnp.diag(jnp.exp(-beta * jnp.linspace(0, N - 1, N))),
-        )
+        ),
+        implementation=implementation,
     ).unit()
 
 
-def basis_like(A: Qarray, ks: List[int]) -> Qarray:
+def basis_like(A: Qarray, ks: List[int], implementation=None) -> Qarray:
     """Creates a |k> (i.e. fock state) ket with the same space dims as A.
 
     Args:
         A: state or operator.
-        k: fock number.
+        ks: fock numbers.
+        implementation: Qarray implementation type.
 
     Returns:
         Fock State |k> with the same space dims as A.
@@ -401,5 +464,5 @@ def basis_like(A: Qarray, ks: List[int]) -> Qarray:
 
     kets = []
     for j, k in enumerate(ks):
-        kets.append(basis(space_dims[j], k))
+        kets.append(basis(space_dims[j], k, implementation=implementation))
     return tensor(*kets)

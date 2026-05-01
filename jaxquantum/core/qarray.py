@@ -809,6 +809,46 @@ class Qarray(Generic[ImplT]):
         return cls.create(data, dims=dims, bdims=bdims, implementation=QarrayImplType.SPARSE_DIA)
 
     @classmethod
+    def from_impl(cls, impl: "QarrayImpl", dims=None, bdims=None) -> "Qarray":
+        """Wrap an already-constructed impl in a ``Qarray``.
+
+        Use when a smart constructor (e.g. ``SparseDiaImpl.from_diags`` or
+        ``CuquantumImpl.single_site``) has already built the impl and the
+        raw-data normalisation in :meth:`create` would be wasted work.
+
+        Args:
+            impl: A constructed :class:`QarrayImpl` instance.
+            dims: Quantum dimensions ``((row_dims...), (col_dims...))``.
+                Inferred from ``impl.shape()`` when ``None``.
+            bdims: Batch dimension sizes. Inferred from ``impl.shape()`` when
+                ``None``.
+
+        Returns:
+            A ``Qarray`` wrapping ``impl``.
+        """
+        shape = impl.shape()
+
+        if bdims is None:
+            bdims = tuple(shape[:-2])
+
+        if dims is None:
+            dims = ((shape[-2],), (shape[-1],))
+        elif not isinstance(dims[0], (list, tuple)):
+            if shape[-1] == 1:
+                dims = (tuple(dims), tuple([1 for _ in dims]))
+            elif shape[-2] == 1:
+                dims = (tuple([1 for _ in dims]), tuple(dims))
+            else:
+                dims = (tuple(dims), tuple(dims))
+        else:
+            dims = (tuple(dims[0]), tuple(dims[1]))
+
+        check_dims(dims, bdims, shape)
+        qdims = Qdims(dims)
+        impl = impl.tidy_up(SETTINGS["auto_tidyup_atol"])
+        return cls(impl, qdims, bdims)
+
+    @classmethod
     @overload
     def from_list(cls, qarr_list: List["Qarray[DenseImpl]"]) -> "Qarray[DenseImpl]":
         ...
@@ -1049,6 +1089,31 @@ class Qarray(Generic[ImplT]):
         if self.is_dense:
             return self
         new_impl = self._impl.to_dense()
+        return Qarray(new_impl, self._qdims, self._bdims)
+
+    def to_backend(self, implementation) -> "Qarray":
+        """Return a ``Qarray`` with the same data on a different impl backend.
+
+        Tries a direct ``to_<name>`` method on the current impl when available,
+        otherwise routes through dense. No-op when already on the target.
+
+        Args:
+            implementation: The target backend — a ``QarrayImplType`` member
+                or its string equivalent.
+
+        Returns:
+            A ``Qarray`` whose ``impl_type`` matches the requested backend.
+        """
+        target_type = QarrayImplType(implementation)
+        if self.impl_type == target_type:
+            return self
+        target_class = target_type.get_impl_class()
+        method_name = f"to_{target_type.value}"
+        if hasattr(self._impl, method_name):
+            new_impl = getattr(self._impl, method_name)()
+        else:
+            # No direct path (e.g. anything → cuquantum) — densify first.
+            new_impl = target_class.from_data(self._impl.to_dense().data)
         return Qarray(new_impl, self._qdims, self._bdims)
 
     def __getitem__(self, index):
