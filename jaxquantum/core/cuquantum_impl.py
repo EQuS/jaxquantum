@@ -397,7 +397,7 @@ class CuquantumImpl(QarrayImpl):
             return a.add(b)
         a_data = _materialize_if_empty(a._data, dtype=a.dtype())
         b_data = _materialize_if_empty(b._data, dtype=b.dtype())
-        return CuquantumImpl(_data=_cuqnt_add(a_data, b_data))
+        return CuquantumImpl(_data=a_data + b_data)
 
     def sub(self, other: QarrayImpl) -> QarrayImpl:
         a, b = self._coerce(other)
@@ -405,11 +405,11 @@ class CuquantumImpl(QarrayImpl):
             return a.sub(b)
         a_data = _materialize_if_empty(a._data, dtype=a.dtype())
         b_data = _materialize_if_empty(b._data, dtype=b.dtype())
-        return CuquantumImpl(_data=_cuqnt_sub(a_data, b_data))
+        return CuquantumImpl(_data=a_data - b_data)
 
     def mul(self, scalar) -> QarrayImpl:
         data = _materialize_if_empty(self._data, dtype=self.dtype())
-        return CuquantumImpl(_data=_cuqnt_scalar_mul(scalar, data))
+        return CuquantumImpl(_data=data * scalar)
 
     def matmul(self, other: QarrayImpl) -> QarrayImpl:
         a, b = self._coerce(other)
@@ -419,7 +419,7 @@ class CuquantumImpl(QarrayImpl):
             return CuquantumImpl(_data=_lift_with_mode_shift(b._data, 0, b._data.dims))
         if not b._data.op_prods:  # A @ I = A
             return CuquantumImpl(_data=_lift_with_mode_shift(a._data, 0, a._data.dims))
-        return CuquantumImpl(_data=_cuqnt_matmul(a._data, b._data))
+        return CuquantumImpl(_data=a._data @ b._data)
 
     def kron(self, other: QarrayImpl) -> QarrayImpl:
         a, b = self._coerce(other)
@@ -432,11 +432,11 @@ class CuquantumImpl(QarrayImpl):
             )
         if not b._data.op_prods:  # A ⊗ I_b: lift A keeping modes
             return CuquantumImpl(_data=_lift_with_mode_shift(a._data, 0, combined_dims))
-        return CuquantumImpl(_data=_cuqnt_kron(a._data, b._data))
+        return CuquantumImpl(_data=a._data & b._data)
 
     def dag(self) -> QarrayImpl:
         # Empty OperatorTerm stays empty under dag(), which matches I† = I.
-        return CuquantumImpl(_data=_cuqnt_dag(self._data))
+        return CuquantumImpl(_data=self._data.dag())
 
     # ------------------------------------------------------------------
     # Conversions
