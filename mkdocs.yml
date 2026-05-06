@@ -110,4 +110,5 @@ nav:
       - Bosonic Codes: documentation/tutorials/bosonic_codes.ipynb
       - Circuits: documentation/tutorials/circuits.ipynb
       - Sparse Backends: documentation/tutorials/sparse_backends.ipynb
+      - cuQuantum Backend: documentation/tutorials/cuquantum.ipynb
   - Code Reference: reference/

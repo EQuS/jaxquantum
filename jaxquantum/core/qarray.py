@@ -41,11 +41,13 @@ class QarrayImplType(Enum):
         DENSE: Standard JAX dense array (``jnp.ndarray``).
         SPARSE_BCOO: JAX experimental BCOO sparse array.
         SPARSE_DIA: Diagonal sparse array.
+        CUQUANTUM: cuQuantum ``OperatorTerm`` (mode-structured, GPU-only).
     """
 
     DENSE = "dense"
     SPARSE_BCOO = "sparse_bcoo"
     SPARSE_DIA = "sparse_dia"
+    CUQUANTUM = "cuquantum"
 
     @classmethod
     def register(cls, impl_class, member):
@@ -119,19 +121,26 @@ class QarrayImplType(Enum):
 
 
 def robust_asarray(data) -> Union[Array, sparse.BCOO]:
-    """Convert *data* to a JAX array, leaving sparse BCOO and SparseDiaData untouched.
+    """Convert *data* to a JAX array, leaving sparse / cuquantum containers untouched.
 
     Args:
-        data: Input data — any array-like, ``sparse.BCOO``, or ``SparseDiaData``.
+        data: Input data — any array-like, ``sparse.BCOO``, ``SparseDiaData``,
+            or ``CuquantumOpData``.
 
     Returns:
-        A ``jax.Array``, ``sparse.BCOO``, or ``SparseDiaData``.
+        A ``jax.Array``, ``sparse.BCOO``, ``SparseDiaData``, or
+        ``CuquantumOpData``.
     """
     if isinstance(data, sparse.BCOO):
         return data
     # SparseDiaData has a ``_is_sparse_dia`` marker; pass it through unchanged
     if getattr(data, "_is_sparse_dia", False):
         return data
+
+    # cuquantum backend
+    if type(data).__name__ == "OperatorTerm":
+        return data
+
     return jnp.asarray(data)
 
 
@@ -604,18 +613,24 @@ class DenseImpl(QarrayImpl):
 
     @classmethod
     def can_handle_data(cls, arr) -> bool:
-        """Return True for any non-BCOO, non-SparseDIA array.
+        """Return True for any non-BCOO, non-SparseDIA, non-cuquantum array.
 
-        ``SparseDiaData`` objects carry a ``_is_sparse_dia`` marker so we can
-        exclude them without a direct type import (which would be circular).
+        ``SparseDiaData`` and ``CuquantumOpData`` objects carry marker
+        attributes so we can exclude them without direct type imports (which
+        would be circular).
 
         Args:
             arr: Raw array.
 
         Returns:
-            True when *arr* is a plain dense array (not BCOO, not SparseDiaData).
+            True when *arr* is a plain dense array (not BCOO, not
+            SparseDiaData, not CuquantumOpData).
         """
-        return not isinstance(arr, sparse.BCOO) and not getattr(arr, "_is_sparse_dia", False)
+        return (
+            not isinstance(arr, sparse.BCOO)
+            and not getattr(arr, "_is_sparse_dia", False)
+            and not (type(arr).__name__ == "OperatorTerm")
+        )
 
     @classmethod
     def dag_data(cls, arr) -> Array:
@@ -684,7 +699,7 @@ class Qarray(Generic[ImplT]):
         ...
 
     @classmethod
-    def create(cls, data, dims=None, bdims=None, implementation=QarrayImplType.DENSE):
+    def create(cls, data, dims=None, bdims=None, implementation=None):
         """Create a ``Qarray`` from raw data.
 
         Handles shape normalisation, dimension inference, and tidying of small
@@ -696,13 +711,17 @@ class Qarray(Generic[ImplT]):
                 Inferred from *data* shape when ``None``.
             bdims: Tuple of batch dimension sizes.  Inferred from the leading
                 dimensions of *data* when ``None``.
-            implementation: Storage backend — ``QarrayImplType.DENSE``
-                (default) or ``QarrayImplType.SPARSE_BCOO``, or the equivalent
-                string ``"dense"`` / ``"sparse_bcoo"``.
+            implementation: Storage backend — a ``QarrayImplType`` member or
+                the equivalent string (e.g. ``"dense"``, ``"sparse_bcoo"``,
+                ``"sparse_dia"``, ``"cuquantum"``).  When ``None`` (the
+                default), reads ``SETTINGS["default_backend"]``.
 
         Returns:
             A new ``Qarray`` backed by the requested implementation.
         """
+        if implementation is None:
+            implementation = SETTINGS.get("default_backend", QarrayImplType.DENSE)
+
         # Step 1: Prepare data ----
         data = robust_asarray(data)
 
@@ -788,6 +807,46 @@ class Qarray(Generic[ImplT]):
             A ``Qarray`` backed by ``SparseDiaImpl``.
         """
         return cls.create(data, dims=dims, bdims=bdims, implementation=QarrayImplType.SPARSE_DIA)
+
+    @classmethod
+    def from_impl(cls, impl: "QarrayImpl", dims=None, bdims=None) -> "Qarray":
+        """Wrap an already-constructed impl in a ``Qarray``.
+
+        Use when a smart constructor (e.g. ``SparseDiaImpl.from_diags`` or
+        ``CuquantumImpl.single_site``) has already built the impl and the
+        raw-data normalisation in :meth:`create` would be wasted work.
+
+        Args:
+            impl: A constructed :class:`QarrayImpl` instance.
+            dims: Quantum dimensions ``((row_dims...), (col_dims...))``.
+                Inferred from ``impl.shape()`` when ``None``.
+            bdims: Batch dimension sizes. Inferred from ``impl.shape()`` when
+                ``None``.
+
+        Returns:
+            A ``Qarray`` wrapping ``impl``.
+        """
+        shape = impl.shape()
+
+        if bdims is None:
+            bdims = tuple(shape[:-2])
+
+        if dims is None:
+            dims = ((shape[-2],), (shape[-1],))
+        elif not isinstance(dims[0], (list, tuple)):
+            if shape[-1] == 1:
+                dims = (tuple(dims), tuple([1 for _ in dims]))
+            elif shape[-2] == 1:
+                dims = (tuple([1 for _ in dims]), tuple(dims))
+            else:
+                dims = (tuple(dims), tuple(dims))
+        else:
+            dims = (tuple(dims[0]), tuple(dims[1]))
+
+        check_dims(dims, bdims, shape)
+        qdims = Qdims(dims)
+        impl = impl.tidy_up(SETTINGS["auto_tidyup_atol"])
+        return cls(impl, qdims, bdims)
 
     @classmethod
     @overload
@@ -1032,6 +1091,31 @@ class Qarray(Generic[ImplT]):
         new_impl = self._impl.to_dense()
         return Qarray(new_impl, self._qdims, self._bdims)
 
+    def to_backend(self, implementation) -> "Qarray":
+        """Return a ``Qarray`` with the same data on a different impl backend.
+
+        Tries a direct ``to_<name>`` method on the current impl when available,
+        otherwise routes through dense. No-op when already on the target.
+
+        Args:
+            implementation: The target backend — a ``QarrayImplType`` member
+                or its string equivalent.
+
+        Returns:
+            A ``Qarray`` whose ``impl_type`` matches the requested backend.
+        """
+        target_type = QarrayImplType(implementation)
+        if self.impl_type == target_type:
+            return self
+        target_class = target_type.get_impl_class()
+        method_name = f"to_{target_type.value}"
+        if hasattr(self._impl, method_name):
+            new_impl = getattr(self._impl, method_name)()
+        else:
+            # No direct path (e.g. anything → cuquantum) — densify first.
+            new_impl = target_class.from_data(self._impl.to_dense().data)
+        return Qarray(new_impl, self._qdims, self._bdims)
+
     def __getitem__(self, index):
         if len(self.bdims) > 0:
             return Qarray.create(
@@ -1193,7 +1277,7 @@ class Qarray(Generic[ImplT]):
         if isinstance(other, Qarray):
             return self.__matmul__(other)
 
-        other = other + 0.0j
+        # other = other + 0.0j
         if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
             other = other.reshape(other.shape + (1, 1))
 
@@ -1248,7 +1332,7 @@ class Qarray(Generic[ImplT]):
             return self.copy()
 
         if self.data.shape[-2] == self.data.shape[-1]:
-            other = other + 0.0j
+            # other = other + 0.0j
             if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
                 other = other.reshape(other.shape + (1, 1))
             eye_data = self._impl._eye_data(self.data.shape[-2], dtype=self.data.dtype)
@@ -1285,7 +1369,7 @@ class Qarray(Generic[ImplT]):
             return self.copy()
 
         if self.data.shape[-2] == self.data.shape[-1]:
-            other = other + 0.0j
+            # other = other + 0.0j
 
             if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
                 other = other.reshape(other.shape + (1, 1))
