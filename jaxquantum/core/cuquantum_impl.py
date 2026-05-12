@@ -271,24 +271,24 @@ def _cuqnt_dag(ot: OperatorTerm) -> OperatorTerm:
 # Local helpers used by ``CuquantumImpl``
 # ---------------------------------------------------------------------------
 
-def _materialize_if_empty(ot: OperatorTerm, dtype=None) -> OperatorTerm:
+def _materialize_if_empty(ot: OperatorTerm, modes=None, dtype=None) -> OperatorTerm:
     """Replace an identity-encoded (empty) ``OperatorTerm`` with an explicit eye factor.
 
     ``OperatorTerm.append`` rejects an empty ``op_prod`` tuple, so the empty
     ``OperatorTerm`` cannot be scaled or added to anything via the native
-    arithmetic.  This helper materialises it as a single-factor product
-    ``[ElementaryOperator(eye(dims[0]))]`` on mode 0 — cuQuantum's elementary
-    product convention treats unspecified modes as implicit identity, so this
-    one factor is enough to act as the full-space identity.
+    arithmetic.  This helper materialises it as a single-factor identity product
+    on ``modes``.  When ``modes`` is ``None`` all modes are used.  Callers
+    should pass the modes of the other operand so the identity acts on the same
+    subspace.
     """
     if ot.op_prods:
         return ot
+    if modes is None:
+        modes = tuple(range(len(ot.dims)))
+    mode_dims = tuple(ot.dims[m] for m in modes)
+    identity_data = jnp.eye(prod(mode_dims), dtype=dtype or jnp.complex128).reshape(*mode_dims, *mode_dims)
     out = OperatorTerm(ot.dims)
-    out.append(
-        [ElementaryOperator(jnp.eye(ot.dims[0], dtype=dtype or jnp.complex128))],
-        modes=(0,),
-        coeff=1.0,
-    )
+    out.append([ElementaryOperator(identity_data)], modes=modes, coeff=1.0)
     return out
 
 
@@ -399,16 +399,20 @@ class CuquantumImpl(QarrayImpl):
         a, b = self._coerce(other)
         if a is not self:
             return a.add(b)
-        a_data = _materialize_if_empty(a._data, dtype=a.dtype())
-        b_data = _materialize_if_empty(b._data, dtype=b.dtype())
+        b_modes = b._data.modes[0] if b._data.op_prods else None
+        a_modes = a._data.modes[0] if a._data.op_prods else None
+        a_data = _materialize_if_empty(a._data, modes=b_modes, dtype=a.dtype())
+        b_data = _materialize_if_empty(b._data, modes=a_modes, dtype=b.dtype())
         return CuquantumImpl(_data=a_data + b_data if _HAS_NATIVE_OPS else _cuqnt_add(a_data, b_data))
 
     def sub(self, other: QarrayImpl) -> QarrayImpl:
         a, b = self._coerce(other)
         if a is not self:
             return a.sub(b)
-        a_data = _materialize_if_empty(a._data, dtype=a.dtype())
-        b_data = _materialize_if_empty(b._data, dtype=b.dtype())
+        b_modes = b._data.modes[0] if b._data.op_prods else None
+        a_modes = a._data.modes[0] if a._data.op_prods else None
+        a_data = _materialize_if_empty(a._data, modes=b_modes, dtype=a.dtype())
+        b_data = _materialize_if_empty(b._data, modes=a_modes, dtype=b.dtype())
         return CuquantumImpl(_data=a_data - b_data if _HAS_NATIVE_OPS else _cuqnt_sub(a_data, b_data))
 
     def mul(self, scalar) -> QarrayImpl:
