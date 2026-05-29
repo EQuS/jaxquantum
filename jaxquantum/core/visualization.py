@@ -573,6 +573,78 @@ def plot_qfunc(
     )
 
 
+def _render_cf_grid(
+    axs,
+    QP,
+    pts_x,
+    pts_y,
+    *,
+    contour,
+    cmap,
+    vmin,
+    vmax,
+    x_ticks,
+    y_ticks,
+    z_ticks,
+    cbar_label,
+    plot_cbar,
+    plot_grid,
+    subtitles,
+    decorate=True,
+):
+    """Per-frame characteristic-function grid: real | imag column pairs."""
+    rows, cols = QP.shape[0], QP.shape[1]
+    im = None
+    for row in range(rows):
+        for col in range(cols):
+            for subcol in range(2):
+                ax = axs[row, 2 * col + subcol]
+                data = (
+                    jnp.real(QP[row, col])
+                    if subcol == 0
+                    else jnp.imag(QP[row, col])
+                )
+                if contour:
+                    im = ax.contourf(
+                        pts_x,
+                        pts_y,
+                        data,
+                        cmap=cmap,
+                        vmin=vmin,
+                        vmax=vmax,
+                        levels=np.linspace(vmin, vmax, 101),
+                    )
+                else:
+                    im = ax.pcolormesh(
+                        pts_x,
+                        pts_y,
+                        data,
+                        cmap=cmap,
+                        vmin=vmin,
+                        vmax=vmax,
+                    )
+                if decorate:
+                    ax.set_xticks(x_ticks)
+                    ax.set_yticks(y_ticks)
+                    if plot_grid:
+                        ax.grid()
+                    ax.set_aspect("equal", adjustable="box")
+                    if plot_cbar:
+                        cbar = plt.colorbar(
+                            im,
+                            ax=ax,
+                            orientation="vertical",
+                            ticks=np.linspace(-1, 1, 11),
+                        )
+                        cbar.ax.set_title(cbar_label[subcol])
+                        cbar.set_ticks(z_ticks)
+                    ax.set_xlabel(r"Re[$\alpha$]")
+                    ax.set_ylabel(r"Im[$\alpha$]")
+                if subtitles is not None:
+                    ax.set_title(subtitles[row, col])
+    return im
+
+
 def plot_cf(
         state,
         pts_x,
@@ -589,6 +661,8 @@ def plot_cf(
         z_ticks=None,
         subtitles=None,
         figtitle=None,
+        gif=False,
+        gif_params=None,
 ):
     """Plot characteristic function.
 
@@ -609,14 +683,39 @@ def plot_cf(
         z_ticks: tick position for the z-axis
         subtitles: subtitles for the subplots
         figtitle: figure title
+        gif: if True, render an animation over one batch axis instead of a
+            tiled grid. Returns a ``matplotlib.animation.FuncAnimation``.
+        gif_params: dict of options for the gif path (same keys as
+            ``plot_qp``: ``save_path``, ``interval_ms``, ``ts``,
+            ``batch_animation_axis``).
 
     Returns:
-        axis on which the plot was plotted.
+        ``(axs, im)`` in the static case, or a ``FuncAnimation`` when
+        ``gif=True``.
     """
     if pts_y is None:
         pts_y = pts_x
     pts_x = jnp.array(pts_x)
     pts_y = jnp.array(pts_y)
+
+    if gif:
+        return _plot_cf_gif(
+            state=state,
+            pts_x=pts_x,
+            pts_y=pts_y,
+            axs=axs,
+            contour=contour,
+            qp_type=qp_type,
+            axis_scale_factor=axis_scale_factor,
+            plot_cbar=plot_cbar,
+            plot_grid=plot_grid,
+            x_ticks=x_ticks,
+            y_ticks=y_ticks,
+            z_ticks=z_ticks,
+            subtitles=subtitles,
+            figtitle=figtitle,
+            gif_params=gif_params or {},
+        )
 
     bdims = state.bdims
     added_baxes = 0
@@ -688,60 +787,199 @@ def plot_cf(
                      5) if y_ticks is None else y_ticks
     )
     z_ticks = jnp.linspace(vmin, vmax, 11) if z_ticks is None else z_ticks
-    print(axs.shape)
-    for row in range(bdims[0]):
-        for col in range(bdims[1]):
-            for subcol in range(2):
-                ax = axs[row, 2 * col + subcol]
-                if contour:
-                    im = ax.contourf(
-                        pts_x,
-                        pts_y,
-                        jnp.real(QP[row, col]) if subcol==0 else jnp.imag(QP[
-                                                                           row, col]),
-                        cmap=cmap,
-                        vmin=vmin,
-                        vmax=vmax,
-                        levels=np.linspace(vmin, vmax, 101),
-                    )
-                else:
-                    im = ax.pcolormesh(
-                        pts_x,
-                        pts_y,
-                        jnp.real(QP[row, col]) if subcol == 0 else jnp.imag(QP[
-                                                                                row, col]),
-                        cmap=cmap,
-                        vmin=vmin,
-                        vmax=vmax,
-                    )
-                ax.set_xticks(x_ticks)
-                ax.set_yticks(y_ticks)
-                # ax.axhline(0, linestyle="-", color="black", alpha=0.7)
-                # ax.axvline(0, linestyle="-", color="black", alpha=0.7)
 
-                if plot_grid:
-                    ax.grid()
-                
-                ax.set_aspect("equal", adjustable="box")
+    im = _render_cf_grid(
+        axs,
+        QP,
+        pts_x,
+        pts_y,
+        contour=contour,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        x_ticks=x_ticks,
+        y_ticks=y_ticks,
+        z_ticks=z_ticks,
+        cbar_label=cbar_label,
+        plot_cbar=plot_cbar,
+        plot_grid=plot_grid,
+        subtitles=subtitles,
+        decorate=True,
+    )
 
-                if plot_cbar:
-                    cbar = plt.colorbar(
-                        im, ax=ax, orientation="vertical",
-                        ticks=np.linspace(-1, 1, 11)
-                    )
-                    cbar.ax.set_title(cbar_label[subcol])
-                    cbar.set_ticks(z_ticks)
-
-                ax.set_xlabel(r"Re[$\alpha$]")
-                ax.set_ylabel(r"Im[$\alpha$]")
-                if subtitles is not None:
-                    ax.set_title(subtitles[row, col])
-
-    fig = ax.get_figure()
+    fig = axs[0, 0].get_figure()
     fig.tight_layout()
     if figtitle is not None:
         fig.suptitle(figtitle, y=1.04)
     return axs, im
+
+
+def _plot_cf_gif(
+    state,
+    pts_x,
+    pts_y,
+    *,
+    axs,
+    contour,
+    qp_type,
+    axis_scale_factor,
+    plot_cbar,
+    plot_grid,
+    x_ticks,
+    y_ticks,
+    z_ticks,
+    subtitles,
+    figtitle,
+    gif_params,
+):
+    """Animation path for ``plot_cf(gif=True)``."""
+    save_path = gif_params.get("save_path", None)
+    interval_ms = gif_params.get("interval_ms", 200)
+    ts = gif_params.get("ts", None)
+    batch_animation_axis = gif_params.get("batch_animation_axis", 0)
+
+    bdims = state.bdims
+    if len(bdims) < 1:
+        raise ValueError(
+            "gif=True requires the state to have at least one batch dimension"
+        )
+    if not 0 <= batch_animation_axis < len(bdims):
+        raise ValueError(
+            f"batch_animation_axis={batch_animation_axis} is out of range "
+            f"for state.bdims={bdims}"
+        )
+    N = bdims[batch_animation_axis]
+    if ts is not None and len(ts) != N:
+        raise ValueError(
+            f"ts has length {len(ts)} but animation axis has length {N}"
+        )
+
+    if qp_type == WIGNER:
+        vmin, vmax, scale = -1, 1, 1
+        cmap = "seismic"
+        cbar_label = [
+            r"$\mathcal{Re}(\chi_W(\alpha))$",
+            r"$\mathcal{Im}(\chi_W(\alpha))$",
+        ]
+        QP = scale * cf_wigner(state, pts_x, pts_y)
+
+    QP = jnp.moveaxis(QP, batch_animation_axis, 0)
+    rest_bdims = tuple(d for i, d in enumerate(bdims) if i != batch_animation_axis)
+
+    grid_dims = list(rest_bdims)
+    if len(grid_dims) == 0:
+        grid_dims = [1]
+    if len(grid_dims) == 1:
+        grid_dims = [1, grid_dims[0]]
+    extras = grid_dims[2:]
+    rows = grid_dims[0] * int(np.prod(extras)) if extras else grid_dims[0]
+    cols = grid_dims[1]
+
+    h, w = QP.shape[-2], QP.shape[-1]
+    QP_anim = QP.reshape((N, rows, cols, h, w))
+
+    if subtitles is not None:
+        subtitles = np.asarray(subtitles)
+        if subtitles.shape != rest_bdims:
+            raise ValueError(
+                f"subtitles shape {subtitles.shape} must match per-frame "
+                f"batch dims {rest_bdims} (state.bdims minus the animation axis)"
+            )
+        subtitles = subtitles.reshape(rows, cols)
+
+    pts_x_scaled = pts_x * axis_scale_factor
+    pts_y_scaled = pts_y * axis_scale_factor
+    x_ticks = (
+        jnp.linspace(jnp.min(pts_x_scaled), jnp.max(pts_x_scaled), 5)
+        if x_ticks is None
+        else x_ticks
+    )
+    y_ticks = (
+        jnp.linspace(jnp.min(pts_y_scaled), jnp.max(pts_y_scaled), 5)
+        if y_ticks is None
+        else y_ticks
+    )
+    z_ticks = jnp.linspace(vmin, vmax, 11) if z_ticks is None else z_ticks
+
+    if axs is None:
+        _, axs = plt.subplots(
+            rows, 2 * cols, figsize=(4 * 2 * cols, 3 * rows), dpi=200
+        )
+    axs_arr = np.asarray(axs)
+    if axs_arr.ndim == 1:
+        axs_arr = axs_arr.reshape(1, -1)
+    axs_arr = axs_arr.reshape(rows, 2 * cols)
+    fig = axs_arr[0, 0].get_figure()
+
+    has_suptitle = figtitle is not None or ts is not None
+
+    def _set_suptitle(k):
+        if ts is not None:
+            t_str = f"t = {float(ts[k]):.3g}"
+            title = f"{figtitle} | {t_str}" if figtitle else t_str
+            fig.suptitle(title, y=0.98)
+        elif figtitle is not None:
+            fig.suptitle(figtitle, y=0.98)
+
+    _render_cf_grid(
+        axs_arr,
+        QP_anim[0],
+        pts_x_scaled,
+        pts_y_scaled,
+        contour=contour,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        x_ticks=x_ticks,
+        y_ticks=y_ticks,
+        z_ticks=z_ticks,
+        cbar_label=cbar_label,
+        plot_cbar=plot_cbar,
+        plot_grid=plot_grid,
+        subtitles=subtitles,
+        decorate=True,
+    )
+    _set_suptitle(0)
+    if has_suptitle:
+        fig.tight_layout(rect=[0, 0, 1, 0.92])
+    else:
+        fig.tight_layout()
+
+    def update(k):
+        for r in range(rows):
+            for c in range(2 * cols):
+                for coll in list(axs_arr[r, c].collections):
+                    coll.remove()
+        _render_cf_grid(
+            axs_arr,
+            QP_anim[k],
+            pts_x_scaled,
+            pts_y_scaled,
+            contour=contour,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            x_ticks=x_ticks,
+            y_ticks=y_ticks,
+            z_ticks=z_ticks,
+            cbar_label=cbar_label,
+            plot_cbar=plot_cbar,
+            plot_grid=plot_grid,
+            subtitles=subtitles,
+            decorate=False,
+        )
+        _set_suptitle(k)
+        return []
+
+    anim = FuncAnimation(fig, update, frames=N, interval=interval_ms, blit=False)
+    if save_path is not None:
+        fps = max(1, round(1000 / interval_ms))
+        anim.save(save_path, writer=PillowWriter(fps=fps))
+
+    anim._repr_html_ = lambda a=anim: a.to_jshtml()
+    plt.close(fig)
+    return anim
+
 
 def plot_cf_wigner(
     state,
@@ -758,6 +996,8 @@ def plot_cf_wigner(
     z_ticks=None,
     subtitles=None,
     figtitle=None,
+    gif=False,
+    gif_params=None,
 ):
     """Plot the Wigner characteristic function of the state.
 
@@ -797,4 +1037,6 @@ def plot_cf_wigner(
         z_ticks=z_ticks,
         subtitles=subtitles,
         figtitle=figtitle,
+        gif=gif,
+        gif_params=gif_params,
     )
