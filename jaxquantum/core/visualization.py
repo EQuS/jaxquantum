@@ -32,11 +32,16 @@ def _render_qp_grid(
     subtitles,
     decorate=True,
 ):
-    """Draw the per-frame quasi-probability grid onto a 2D array of axes.
+    """Render one quasi-probability frame onto a ``(rows, cols)`` axes grid.
 
-    When ``decorate`` is False the cosmetic setup (ticks, axis lines, grid,
-    labels, colorbar) is skipped — used for subsequent gif frames after the
-    first, where these have already been laid out.
+    ``QP`` has shape ``(rows, cols, len(pts_y), len(pts_x))``. Used by both
+    the static ``plot_qp`` path (called once, ``decorate=True``) and the gif
+    path (called once per frame; ``decorate=True`` on frame 0 to lay out
+    ticks, gridlines, axhline/axvline, labels, and colorbars, then
+    ``decorate=False`` thereafter so those non-idempotent artists aren't
+    duplicated as frames advance).
+
+    Returns the last ``contourf`` / ``pcolormesh`` artist created.
     """
     rows, cols = QP.shape[0], QP.shape[1]
     im = None
@@ -103,40 +108,55 @@ def plot_qp(
     gif=False,
     gif_params=None,
 ):
-    """Plot quasi-probability distribution.
+    """Plot a quasi-probability distribution (Wigner or Husimi-Q).
 
+    The state may carry an arbitrary number of batch dimensions; they are
+    flattened to a 2D ``(rows, cols)`` grid of subplots. With ``gif=True``,
+    one batch axis is animated instead and the remaining batch dims form
+    the per-frame subplot grid.
 
     Args:
-        state: state with arbitrary number of batch dimensions, result will
-        be flattened to a 2d grid to allow for plotting
-        pts_x: x points to evaluate quasi-probability distribution at
-        pts_y: y points to evaluate quasi-probability distribution at
-        g : float, default: 2
-        Scaling factor for ``a = 0.5 * g * (x + iy)``.  The value of `g` is
-        related to the value of :math:`\\hbar` in the commutation relation
-        :math:`[x,\,y] = i\\hbar` via :math:`\\hbar=2/g^2`.
-        axs: matplotlib axes to plot on
-        contour: make the plot use contouring
-        qp_type: type of quasi probability distribution ("wigner", "qfunc")
-        cbar_label: label for the cbar
-        axis_scale_factor: scale of the axes labels relative
-        plot_cbar: whether to plot cbar
-        x_ticks: tick position for the x-axis
-        y_ticks: tick position for the y-axis
-        z_ticks: tick position for the z-axis
-        subtitles: subtitles for the subplots
+        state: state with arbitrary number of batch dimensions; result will
+            be flattened to a 2d grid to allow for plotting
+        pts_x: x points to evaluate the quasi-probability distribution at
+        pts_y: y points to evaluate the quasi-probability distribution at;
+            defaults to ``pts_x``
+        g: float, default 2. Scaling factor for ``a = 0.5 * g * (x + iy)``.
+            The value of ``g`` is related to the value of :math:`\\hbar` in
+            the commutation relation :math:`[x,\,y] = i\\hbar` via
+            :math:`\\hbar=2/g^2`.
+        axs: matplotlib axes to plot on (created if None)
+        contour: use ``contourf`` if True, otherwise ``pcolormesh``
+        qp_type: type of quasi-probability distribution
+            (``"wigner"`` or ``"husimi"``)
+        cbar_label: label for the cbar (overridden internally based on
+            ``qp_type``)
+        axis_scale_factor: multiplicative scale applied to the axis tick
+            positions and labels
+        plot_cbar: whether to draw a colorbar on each subplot
+        x_ticks: tick positions for the x-axis (auto if None)
+        y_ticks: tick positions for the y-axis (auto if None)
+        z_ticks: tick positions for the colorbar (auto if None)
+        subtitles: subtitles for the subplots; shape must match
+            ``state.bdims`` (or the per-frame batch dims when ``gif=True``)
         figtitle: figure title
         gif: if True, render an animation over one batch axis instead of a
-            tiled subplot grid. Returns a ``matplotlib.animation.FuncAnimation``.
-        gif_params: dict of options for the gif path (ignored if gif=False):
-            ``save_path`` (default None) — if set, save the animation here via
-            PillowWriter; ``interval_ms`` (default 200) — milliseconds per
-            frame; ``ts`` (default None) — optional 1D array of timestamps
-            matching the animation axis length; when set, each frame's
-            suptitle gets a ``t = ...`` label; ``batch_animation_axis``
-            (default 0) — index into ``state.bdims`` selecting which axis
-            becomes the animation/time axis (remaining batch dims form the
-            per-frame subplot grid).
+            tiled subplot grid. Returns a
+            ``matplotlib.animation.FuncAnimation`` that auto-renders inline
+            in Jupyter (its ``_repr_html_`` is patched to ``to_jshtml``).
+        gif_params: dict of options for the gif path (ignored if
+            ``gif=False``). Recognized keys:
+
+            - ``save_path`` (default ``None``) — if set, save the animation
+              to this path via ``matplotlib.animation.PillowWriter``.
+            - ``interval_ms`` (default ``200``) — milliseconds per frame;
+              also derives ``fps = round(1000 / interval_ms)`` for the writer.
+            - ``ts`` (default ``None``) — optional 1D array of timestamps
+              matching the animation-axis length; when set, each frame's
+              suptitle gets a ``t = …`` label.
+            - ``batch_animation_axis`` (default ``0``) — index into
+              ``state.bdims`` selecting which axis becomes the animation
+              axis. The remaining batch dims form the per-frame subplot grid.
 
     Returns:
         ``(axs, im)`` in the static case, or a ``FuncAnimation`` when
@@ -286,7 +306,19 @@ def _plot_qp_gif(
     figtitle,
     gif_params,
 ):
-    """Animation path for ``plot_qp(gif=True)``."""
+    """Build the ``FuncAnimation`` for ``plot_qp(gif=True)``.
+
+    Moves ``state.bdims[batch_animation_axis]`` to the front, tiles the
+    remaining batch dims as a ``(rows, cols)`` per-frame subplot grid, and
+    reuses ``_render_qp_grid`` per frame (clearing prior ``contourf`` /
+    ``pcolormesh`` collections each update so the colorbars laid out on
+    frame 0 are preserved).
+
+    Optionally saves the animation to ``gif_params['save_path']`` via
+    ``PillowWriter``. Patches ``anim._repr_html_`` to ``anim.to_jshtml`` and
+    closes the figure so the animation auto-renders inline in Jupyter
+    without an extra static last-frame image.
+    """
     save_path = gif_params.get("save_path", None)
     interval_ms = gif_params.get("interval_ms", 200)
     ts = gif_params.get("ts", None)
@@ -463,16 +495,17 @@ def plot_wigner(
 ):
     """Plot the wigner function of the state.
 
+    Thin wrapper around :func:`plot_qp` with ``qp_type='wigner'``.
 
     Args:
         state: state with arbitrary number of batch dimensions, result will
-        be flattened to a 2d grid to allow for plotting
+            be flattened to a 2d grid to allow for plotting
         pts_x: x points to evaluate quasi-probability distribution at
         pts_y: y points to evaluate quasi-probability distribution at
-        g : float, default: 2
-        Scaling factor for ``a = 0.5 * g * (x + iy)``.  The value of `g` is
-        related to the value of :math:`\\hbar` in the commutation relation
-        :math:`[x,\,y] = i\\hbar` via :math:`\\hbar=2/g^2`.
+        g: float, default 2. Scaling factor for ``a = 0.5 * g * (x + iy)``.
+            The value of ``g`` is related to the value of :math:`\\hbar` in
+            the commutation relation :math:`[x,\,y] = i\\hbar` via
+            :math:`\\hbar=2/g^2`.
         axs: matplotlib axes to plot on
         contour: make the plot use contouring
         cbar_label: label for the cbar
@@ -483,9 +516,16 @@ def plot_wigner(
         z_ticks: tick position for the z-axis
         subtitles: subtitles for the subplots
         figtitle: figure title
+        gif: if True, render an animation over one batch axis instead of a
+            tiled subplot grid. See :func:`plot_qp` for details.
+        gif_params: dict of options for the gif path. Recognized keys:
+            ``save_path`` (default None), ``interval_ms`` (default 200),
+            ``ts`` (default None — adds a ``t = …`` label per frame),
+            ``batch_animation_axis`` (default 0).
 
     Returns:
-        axis on which the plot was plotted.
+        ``(axs, im)`` in the static case, or a ``matplotlib.animation.FuncAnimation``
+        when ``gif=True``.
     """
     return plot_qp(
         state=state,
@@ -526,18 +566,19 @@ def plot_qfunc(
     gif=False,
     gif_params=None,
 ):
-    """Plot the husimi function of the state.
+    """Plot the husimi (Q) function of the state.
 
+    Thin wrapper around :func:`plot_qp` with ``qp_type='husimi'``.
 
     Args:
         state: state with arbitrary number of batch dimensions, result will
-        be flattened to a 2d grid to allow for plotting
+            be flattened to a 2d grid to allow for plotting
         pts_x: x points to evaluate quasi-probability distribution at
         pts_y: y points to evaluate quasi-probability distribution at
-        g : float, default: 2
-        Scaling factor for ``a = 0.5 * g * (x + iy)``.  The value of `g` is
-        related to the value of :math:`\\hbar` in the commutation relation
-        :math:`[x,\,y] = i\\hbar` via :math:`\\hbar=2/g^2`.
+        g: float, default 2. Scaling factor for ``a = 0.5 * g * (x + iy)``.
+            The value of ``g`` is related to the value of :math:`\\hbar` in
+            the commutation relation :math:`[x,\,y] = i\\hbar` via
+            :math:`\\hbar=2/g^2`.
         axs: matplotlib axes to plot on
         contour: make the plot use contouring
         cbar_label: label for the cbar
@@ -548,9 +589,16 @@ def plot_qfunc(
         z_ticks: tick position for the z-axis
         subtitles: subtitles for the subplots
         figtitle: figure title
+        gif: if True, render an animation over one batch axis instead of a
+            tiled subplot grid. See :func:`plot_qp` for details.
+        gif_params: dict of options for the gif path. Recognized keys:
+            ``save_path`` (default None), ``interval_ms`` (default 200),
+            ``ts`` (default None — adds a ``t = …`` label per frame),
+            ``batch_animation_axis`` (default 0).
 
     Returns:
-        axis on which the plot was plotted.
+        ``(axs, im)`` in the static case, or a ``matplotlib.animation.FuncAnimation``
+        when ``gif=True``.
     """
     return plot_qp(
         state=state,
@@ -592,7 +640,14 @@ def _render_cf_grid(
     subtitles,
     decorate=True,
 ):
-    """Per-frame characteristic-function grid: real | imag column pairs."""
+    """Render one characteristic-function frame onto a ``(rows, 2*cols)`` axes grid.
+
+    Each batch element ``QP[row, col]`` is drawn as two adjacent subplots:
+    the real part at column ``2*col``, the imaginary part at ``2*col + 1``.
+    ``decorate=False`` skips the colorbar/ticks/labels block, used for gif
+    frames after the first so colorbars laid out on frame 0 aren't
+    duplicated. Returns the last ``contourf`` / ``pcolormesh`` artist.
+    """
     rows, cols = QP.shape[0], QP.shape[1]
     im = None
     for row in range(rows):
@@ -664,30 +719,42 @@ def plot_cf(
         gif=False,
         gif_params=None,
 ):
-    """Plot characteristic function.
+    """Plot a characteristic function as paired real/imag subplots.
 
+    Each batch element produces two adjacent subplots — real part followed
+    by imaginary part — so the rendered grid has shape ``(rows, 2 * cols)``.
 
     Args:
         state: state with arbitrary number of batch dimensions, result will
-        be flattened to a 2d grid to allow for plotting
-        pts_x: x points to evaluate quasi-probability distribution at
-        pts_y: y points to evaluate quasi-probability distribution at
+            be flattened to a 2d grid to allow for plotting
+        pts_x: x points to evaluate the characteristic function at
+        pts_y: y points to evaluate the characteristic function at
         axs: matplotlib axes to plot on
         contour: make the plot use contouring
-        qp_type: type of quasi probability distribution ("wigner")
-        cbar_label: labels for the real and imaginary cbar
+        qp_type: type of characteristic function. Currently only
+            ``"wigner"`` is supported.
+        cbar_label: labels for the real and imaginary cbar (overridden
+            internally based on ``qp_type``)
         axis_scale_factor: scale of the axes labels relative
         plot_cbar: whether to plot cbar
+        plot_grid: whether to draw gridlines on each subplot
         x_ticks: tick position for the x-axis
         y_ticks: tick position for the y-axis
         z_ticks: tick position for the z-axis
-        subtitles: subtitles for the subplots
+        subtitles: subtitles for the subplots (shape must match ``state.bdims``)
         figtitle: figure title
         gif: if True, render an animation over one batch axis instead of a
-            tiled grid. Returns a ``matplotlib.animation.FuncAnimation``.
-        gif_params: dict of options for the gif path (same keys as
-            ``plot_qp``: ``save_path``, ``interval_ms``, ``ts``,
-            ``batch_animation_axis``).
+            tiled grid. Returns a ``matplotlib.animation.FuncAnimation``
+            that auto-renders inline in Jupyter.
+        gif_params: dict of options for the gif path. Recognized keys:
+            ``save_path`` (default None) — if set, save the animation here
+            via PillowWriter; ``interval_ms`` (default 200) — milliseconds
+            per frame; ``ts`` (default None) — optional 1D array of
+            timestamps matching the animation-axis length; when set, each
+            frame's suptitle gets a ``t = …`` label;
+            ``batch_animation_axis`` (default 0) — index into
+            ``state.bdims`` selecting which axis becomes the animation/time
+            axis (the remaining batch dims form the per-frame subplot grid).
 
     Returns:
         ``(axs, im)`` in the static case, or a ``FuncAnimation`` when
@@ -832,7 +899,17 @@ def _plot_cf_gif(
     figtitle,
     gif_params,
 ):
-    """Animation path for ``plot_cf(gif=True)``."""
+    """Build the ``FuncAnimation`` for ``plot_cf(gif=True)``.
+
+    Counterpart to :func:`_plot_qp_gif` but each frame is a
+    ``(rows, 2*cols)`` grid of real|imag subplot pairs rendered via
+    :func:`_render_cf_grid`. Same conventions: animation axis chosen by
+    ``gif_params['batch_animation_axis']``, remaining batch dims form the
+    per-frame layout, suptitle inside the figure with
+    ``tight_layout(rect=[0, 0, 1, 0.92])`` so it doesn't clip in the saved
+    gif, and ``anim._repr_html_`` patched + figure closed for inline
+    Jupyter rendering.
+    """
     save_path = gif_params.get("save_path", None)
     interval_ms = gif_params.get("interval_ms", 200)
     ts = gif_params.get("ts", None)
@@ -1001,25 +1078,36 @@ def plot_cf_wigner(
 ):
     """Plot the Wigner characteristic function of the state.
 
+    Thin wrapper around :func:`plot_cf` with ``qp_type='wigner'``. Each batch
+    element is rendered as two subplots side-by-side: real then imaginary
+    part of the characteristic function.
 
     Args:
         state: state with arbitrary number of batch dimensions, result will
-        be flattened to a 2d grid to allow for plotting
-        pts_x: x points to evaluate quasi-probability distribution at
-        pts_y: y points to evaluate quasi-probability distribution at
+            be flattened to a 2d grid to allow for plotting
+        pts_x: x points to evaluate the characteristic function at
+        pts_y: y points to evaluate the characteristic function at
         axs: matplotlib axes to plot on
         contour: make the plot use contouring
         cbar_label: label for the cbar
         axis_scale_factor: scale of the axes labels relative
         plot_cbar: whether to plot cbar
+        plot_grid: whether to draw gridlines on each subplot
         x_ticks: tick position for the x-axis
         y_ticks: tick position for the y-axis
         z_ticks: tick position for the z-axis
         subtitles: subtitles for the subplots
         figtitle: figure title
+        gif: if True, render an animation over one batch axis instead of a
+            tiled subplot grid. See :func:`plot_cf` for details.
+        gif_params: dict of options for the gif path. Recognized keys:
+            ``save_path`` (default None), ``interval_ms`` (default 200),
+            ``ts`` (default None — adds a ``t = …`` label per frame),
+            ``batch_animation_axis`` (default 0).
 
     Returns:
-        axis on which the plot was plotted.
+        ``(axs, im)`` in the static case, or a ``matplotlib.animation.FuncAnimation``
+        when ``gif=True``.
     """
     return plot_cf(
         state=state,
