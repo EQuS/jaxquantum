@@ -21,7 +21,7 @@ pip install jaxquantum # Py 3.11+
 </div>
 
 <div class="hero-buttons" markdown>
-[Get Started :material-arrow-right:](documentation/getting_started/installation.md){ .md-button .md-button--primary }
+[Get Started :material-arrow-right:](documentation/index.md){ .md-button .md-button--primary }
 [Tutorials](documentation/tutorials/index.md){ .md-button }
 [GitHub](https://github.com/EQuS/jaxquantum){ .md-button }
 </div>
