@@ -69,11 +69,12 @@ def wigner(psi, xvec, yvec, method="clenshaw", g=2):
 
     elif method == "clenshaw":
         rho = psi.to_dm()
+        bdims = rho.bdims
         rho = rho.data
 
         vmapped_wigner_clenshaw = [_wigner_clenshaw]
 
-        for _ in rho.shape[:-2]:
+        for _ in bdims:
             vmapped_wigner_clenshaw.append(
                 vmap(
                     vmapped_wigner_clenshaw[-1],
@@ -230,11 +231,14 @@ def qfunc(psi, xvec, yvec, g=2):
 
             return out
 
+    # Use the Qarray batch dims rather than data.shape[:-2]: kets now have a
+    # single trailing space axis, so shape[:-2] would under-count batch dims.
+    bdims = psi.bdims
     psi = psi.data
 
     vmapped_compute_qfunc = [_compute_qfunc]
 
-    for _ in psi.shape[:-2]:
+    for _ in bdims:
         vmapped_compute_qfunc.append(
             vmap(
                 vmapped_compute_qfunc[-1],

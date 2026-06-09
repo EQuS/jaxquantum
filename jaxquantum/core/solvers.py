@@ -18,10 +18,17 @@ import tqdm
 import logging
 
 
+from jax.experimental import sparse as _sparse
+
 from jaxquantum.core.qarray import Qarray, Qtypes, dag_data
 from jaxquantum.core.conversions import jnp2jqt
 from jaxquantum.core.operators import identity_like, multi_mode_basis_set
 from jaxquantum.utils.utils import robust_isscalar
+
+
+def _is_dense_array(x) -> bool:
+    """True for a dense JAX array (not BCOO, not SparseDIA data)."""
+    return not isinstance(x, _sparse.BCOO) and not getattr(x, "_is_sparse_dia", False)
 
 # ----
 
@@ -350,7 +357,15 @@ def _sesolve_data(
     def f(t: float, ψₜ: Array, _):
         H_val = H(t)  # type: ignore
 
-        ψₜ_dot = -1j * (H_val @ ψₜ)
+        # State vectors live on a single trailing axis (..., N). For a dense
+        # Hamiltonian contract that axis directly via einsum (batch-safe, and no
+        # (N,1) is ever materialised — keeps the scan carry 1-D). For a sparse
+        # Hamiltonian use a transient column local to this RHS (sparse is not the
+        # TPU-padding path).
+        if _is_dense_array(H_val):
+            ψₜ_dot = -1j * jnp.einsum("...ij,...j->...i", H_val, ψₜ)
+        else:
+            ψₜ_dot = -1j * (H_val @ ψₜ[..., None])[..., 0]
 
         return ψₜ_dot
 
@@ -409,7 +424,11 @@ def propagator(
 
         basis_states = multi_mode_basis_set(H_first.space_dims)
         results = sesolve(H, basis_states, ts, saveat_tlist=saveat_tlist)
-        propagators_data = results.data.squeeze(-1).mT
+        # results.data is (T, M, M): T times, M evolved basis kets (batch), M
+        # ket components. Transpose the last two axes so each time slice is a
+        # propagator whose columns are the evolved basis states. No squeeze:
+        # kets no longer carry a trailing singleton.
+        propagators_data = results.data.mT
         propagators = Qarray.create(propagators_data, dims=H_first.space_dims)
         
         return propagators

@@ -56,7 +56,7 @@ class TestBosonicQubit:
         required_states = ["+x", "-x", "+y", "-y", "+z", "-z"]
         for state in required_states:
             assert state in qubit.basis
-            assert qubit.basis[state].shape == (2, 1)
+            assert qubit.basis[state].shape == (2,)
     
     def test_bosonic_qubit_pauli_gates(self):
         """Test Pauli gate properties."""
@@ -346,8 +346,8 @@ class TestQubit:
         """Test Qubit basis state construction."""
         qubit = jqtb.Qubit()
         plus_z, minus_z = qubit._get_basis_z()
-        assert plus_z.shape == (2, 1)
-        assert minus_z.shape == (2, 1)
+        assert plus_z.shape == (2,)
+        assert minus_z.shape == (2,)
         # Check that states are normalized - use .dag() method and .data attribute
         assert jnp.allclose(jnp.abs((plus_z.dag() @ plus_z).data), 1.0)
         assert jnp.allclose(jnp.abs((minus_z.dag() @ minus_z).data), 1.0)
@@ -400,8 +400,8 @@ class TestBosonicMode:
         """Test BosonicMode basis state construction."""
         mode = jqtb.BosonicMode({"N": 4})
         plus_z, minus_z = mode._get_basis_z()
-        assert plus_z.shape == (4, 1)
-        assert minus_z.shape == (4, 1)
+        assert plus_z.shape == (4,)
+        assert minus_z.shape == (4,)
         # Check that states are normalized - use .dag() method and .data attribute
         assert jnp.allclose(jnp.abs((plus_z.dag() @ plus_z).data), 1.0)
         assert jnp.allclose(jnp.abs((minus_z.dag() @ minus_z).data), 1.0)
@@ -429,8 +429,8 @@ class TestCatQubit:
         """Test CatQubit basis state construction."""
         cat_qubit = jqtb.CatQubit({"N": 20, "alpha": 2.0})
         plus_z, minus_z = cat_qubit._get_basis_z()
-        assert plus_z.shape == (20, 1)
-        assert minus_z.shape == (20, 1)
+        assert plus_z.shape == (20,)
+        assert minus_z.shape == (20,)
         # Check that states are normalized - use .dag() method and .data attribute
         assert jnp.allclose(jnp.abs((plus_z.dag() @ plus_z).data), 1.0, atol=1e-10)
         assert jnp.allclose(jnp.abs((minus_z.dag() @ minus_z).data), 1.0, atol=1e-10)
@@ -467,8 +467,8 @@ class TestBinomialQubit:
         """Test BinomialQubit basis state construction."""
         bin_qubit = jqtb.BinomialQubit({"N": 20, "L": 1, "G": 0, "D": 0})
         plus_z, minus_z = bin_qubit._get_basis_z()
-        assert plus_z.shape == (20, 1)
-        assert minus_z.shape == (20, 1)
+        assert plus_z.shape == (20,)
+        assert minus_z.shape == (20,)
         # Check that states are normalized - use .dag() method and .data attribute
         assert jnp.allclose(jnp.abs((plus_z.dag() @ plus_z).data), 1.0, atol=1e-10)
         assert jnp.allclose(jnp.abs((minus_z.dag() @ minus_z).data), 1.0, atol=1e-10)
@@ -480,14 +480,14 @@ class TestBinomialQubit:
         # Test with L=2, G=1, D=0
         bin_qubit = jqtb.BinomialQubit({"N": 25, "L": 2, "G": 1, "D": 0})
         plus_z, minus_z = bin_qubit._get_basis_z()
-        assert plus_z.shape == (25, 1)
-        assert minus_z.shape == (25, 1)
+        assert plus_z.shape == (25,)
+        assert minus_z.shape == (25,)
         
         # Test with L=1, G=0, D=1
         bin_qubit = jqtb.BinomialQubit({"N": 25, "L": 1, "G": 0, "D": 1})
         plus_z, minus_z = bin_qubit._get_basis_z()
-        assert plus_z.shape == (25, 1)
-        assert minus_z.shape == (25, 1)
+        assert plus_z.shape == (25,)
+        assert minus_z.shape == (25,)
 
 
 class TestGKPQubit:
@@ -532,8 +532,8 @@ class TestGKPQubit:
         """Test GKPQubit basis state construction."""
         gkp_qubit = jqtb.GKPQubit({"N": 30, "delta": 0.3})
         plus_z, minus_z = gkp_qubit._get_basis_z()
-        assert plus_z.shape == (30, 1)
-        assert minus_z.shape == (30, 1)
+        assert plus_z.shape == (30,)
+        assert minus_z.shape == (30,)
         # Check that states are normalized - use .dag() method and .data attribute
         assert jnp.allclose(jnp.abs((plus_z.dag() @ plus_z).data), 1.0, atol=1e-10)
         assert jnp.allclose(jnp.abs((minus_z.dag() @ minus_z).data), 1.0, atol=1e-10)
@@ -567,8 +567,8 @@ class TestHexagonalGKPQubit:
         """Test HexagonalGKPQubit basis state construction."""
         hex_gkp_qubit = jqtb.HexagonalGKPQubit({"N": 30, "delta": 0.3})
         plus_z, minus_z = hex_gkp_qubit._get_basis_z()
-        assert plus_z.shape == (30, 1)
-        assert minus_z.shape == (30, 1)
+        assert plus_z.shape == (30,)
+        assert minus_z.shape == (30,)
         # Check that states are normalized - use .dag() method and .data attribute
         assert jnp.allclose(jnp.abs((plus_z.dag() @ plus_z).data), 1.0, atol=1e-10)
         assert jnp.allclose(jnp.abs((minus_z.dag() @ minus_z).data), 1.0, atol=1e-10)
@@ -590,8 +590,8 @@ class TestSquareGKPQubit:
         """Test SquareGKPQubit basis state construction."""
         square_gkp_qubit = jqtb.SquareGKPQubit({"N": 30, "delta": 0.3})
         plus_z, minus_z = square_gkp_qubit._get_basis_z()
-        assert plus_z.shape == (30, 1)
-        assert minus_z.shape == (30, 1)
+        assert plus_z.shape == (30,)
+        assert minus_z.shape == (30,)
         # Check that states are normalized - use .dag() method and .data attribute
         assert jnp.allclose(jnp.abs((plus_z.dag() @ plus_z).data), 1.0, atol=1e-10)
         assert jnp.allclose(jnp.abs((minus_z.dag() @ minus_z).data), 1.0, atol=1e-10)
@@ -621,8 +621,8 @@ class TestRectangularGKPQubit:
         """Test RectangularGKPQubit basis state construction."""
         rect_gkp_qubit = jqtb.RectangularGKPQubit({"N": 30, "delta": 0.3, "a": 0.8})
         plus_z, minus_z = rect_gkp_qubit._get_basis_z()
-        assert plus_z.shape == (30, 1)
-        assert minus_z.shape == (30, 1)
+        assert plus_z.shape == (30,)
+        assert minus_z.shape == (30,)
         # Check that states are normalized - use .dag() method and .data attribute
         assert jnp.allclose(jnp.abs((plus_z.dag() @ plus_z).data), 1.0, atol=1e-10)
         assert jnp.allclose(jnp.abs((minus_z.dag() @ minus_z).data), 1.0, atol=1e-10)

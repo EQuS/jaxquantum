@@ -153,18 +153,15 @@ def test_validate_shape_mismatch_raises():
         jqt.identity(5)
 
 
-def test_adaptive_default_replicates_kets():
-    """Kets are (N, 1) — last axis is 1, can't be sharded. Adaptive default
-    must shard the leading (N) axis instead, not error."""
+def test_adaptive_default_shards_ket_space_axis():
+    """Kets are now 1-D (N,): the sole (space) axis is sharded directly."""
     jqt.set_device_mesh(shape=(2,), axis_names=("dp",))
-    # basis(N=4, k=0) builds a column vector of shape (4, 1).
+    # basis(N=4, k=0) builds a 1-D vector of shape (4,).
     psi = jqt.basis(4, 0)
-    assert psi.data.shape == (4, 1)
-    # Should not raise; sharding device set should include both devices
-    # (axis 0 is sharded along 'dp' since it's divisible by 2).
+    assert psi.data.shape == (4,)
+    # Should not raise; the space axis (size 4, divisible by 2) is sharded.
     spec = psi.data.sharding.spec
     assert spec[0] == "dp"
-    assert spec[1] is None
 
 
 # ---------------------------------------------------------------------------
@@ -290,12 +287,12 @@ def test_2d_mesh_ket_replicates_unused_axis():
 
 @needs_8
 def test_2d_mesh_batched_ket():
-    """Batched ket (B, N, 1): 'dp' → batch, 'mp' → matrix-row."""
+    """Batched ket (B, N): 'dp' → batch axis, 'mp' → the space axis N."""
     jqt.set_device_mesh(shape=(2, 4), axis_names=("dp", "mp"))
-    psi_batch_data = jnp.stack([jqt.basis(8, 0).data, jqt.basis(8, 1).data])  # (2, 8, 1)
-    psi = jqt.Qarray.create(psi_batch_data, bdims=(2,))
+    psi_batch_data = jnp.stack([jqt.basis(8, 0).data, jqt.basis(8, 1).data])  # (2, 8)
+    psi = jqt.Qarray.create(psi_batch_data, bdims=(2,), qtype="ket")
     spec = _padded_spec(psi.data)
-    assert spec == ("dp", "mp", None)
+    assert spec == ("dp", "mp")
 
 
 @needs_8
@@ -305,7 +302,7 @@ def test_2d_mesh_matmul_smoke():
     H = jqt.destroy(8) + jqt.create(8)
     psi = jqt.basis(8, 0)
     out = H @ psi
-    assert out.data.shape == (8, 1)
+    assert out.data.shape == (8,)
 
 
 # ---------------------------------------------------------------------------
@@ -355,7 +352,7 @@ def test_mp_e2e_sesolve():
     psi0 = jqt.basis(N, 1)
     ts = jnp.linspace(0.0, 1.0, 6)
     states = jqt.sesolve(H, psi0, ts)
-    assert states.data.shape == (6, N, 1)
+    assert states.data.shape == (6, N)
     assert len(states.data.sharding.device_set) == 2
 
 
@@ -371,8 +368,8 @@ def test_2d_mesh_e2e_batched_sesolve():
 
     H_data = jax.vmap(lambda K: (K * (ad @ ad @ a @ a)).data)(Ks)  # (2, N, N)
     H = jqt.Qarray.create(H_data, bdims=(2,))
-    psi0_data = jnp.broadcast_to(jqt.basis(N, 1).data, (2, N, 1))
-    psi0 = jqt.Qarray.create(psi0_data, bdims=(2,))
+    psi0_data = jnp.broadcast_to(jqt.basis(N, 1).data, (2, N))
+    psi0 = jqt.Qarray.create(psi0_data, bdims=(2,), qtype="ket")
 
     spec_H = H.data.sharding.spec
     spec_psi = psi0.data.sharding.spec
@@ -385,5 +382,5 @@ def test_2d_mesh_e2e_batched_sesolve():
             jqt.Qarray.create(H_), jqt.Qarray.create(psi_), ts
         ).data
     )(H.data, psi0.data)
-    assert states.shape == (2, 4, N, 1)
+    assert states.shape == (2, 4, N)
     assert len(states.sharding.device_set) == 8

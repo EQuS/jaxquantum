@@ -237,7 +237,7 @@ def set_device_mesh(shape, axis_names, partition_spec=None, devices=None):
             used_array_axes: set = set()
             for mesh_axis, priority_fn in mesh_axis_priorities:
                 mesh_size = mesh.shape[mesh_axis]
-                for array_axis in priority_fn(rank):
+                for array_axis in priority_fn(arr.shape):
                     if array_axis in used_array_axes:
                         continue
                     if arr.shape[array_axis] % mesh_size != 0:
@@ -253,22 +253,40 @@ def set_device_mesh(shape, axis_names, partition_spec=None, devices=None):
 
 
 def _array_axis_priority(mesh_axis_name: str):
-    """Return a function ``rank -> list[int]`` giving the array-axis
+    """Return a function ``shape -> list[int]`` giving the array-axis
     priority order for the given mesh-axis name.
 
-    'dp'/'data' → batch dims first (leading axes), then matrix dims.
-    'mp'/'model' (or anything else) → matrix dims first, then batch.
+    'dp'/'data' → batch dims first (leading axes), then space dims.
+    'mp'/'model' (or anything else) → space dims first, then batch.
+
+    The space-vs-batch split is shape-aware so that 1‑D ``(N,)`` and batched
+    ``(B, N)`` state vectors shard their Hilbert-space axis under model-parallel
+    rather than their batch axis:
+
+    * rank ≤ 1 → the sole axis is the space axis.
+    * ``shape[-2] == shape[-1]`` → operator-like; the last two axes are the
+      matrix (space) dims, the rest are batch.
+    * otherwise → batched vector; the last axis is the space axis, the rest are
+      batch.
+
+    The only residual ambiguity is a *square* batched vector (``B == N``), which
+    is indistinguishable from an operator by shape alone and is treated as an
+    operator. This is rare and never incorrect (sharding stays valid).
     """
     name = mesh_axis_name.lower()
     is_dp = name.startswith("dp") or name.startswith("data")
 
-    def priority(rank: int) -> list:
-        if rank >= 2:
-            matrix = [rank - 2, rank - 1]
+    def priority(shape) -> list:
+        rank = len(shape)
+        if rank <= 1:
+            space = list(range(rank))
+            batch = []
+        elif shape[-2] == shape[-1]:
+            space = [rank - 2, rank - 1]
             batch = list(range(rank - 2))
         else:
-            matrix = list(range(rank))
-            batch = []
-        return (batch + matrix) if is_dp else (matrix + batch)
+            space = [rank - 1]
+            batch = list(range(rank - 1))
+        return (batch + space) if is_dp else (space + batch)
 
     return priority

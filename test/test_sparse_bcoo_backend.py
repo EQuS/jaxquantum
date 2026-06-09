@@ -572,7 +572,10 @@ class TestNormFn:
     def test_norm_density_matrix_sparse(self):
         """A normalised density matrix has trace (and hence norm) = 1."""
         ket = jqt.basis(4, 1, implementation=QarrayImplType.SPARSE_BCOO)
-        rho = jqt.ket2dm(ket)
+        # ket2dm of a sparse *vector* densifies the outer product (sparse state
+        # vectors are not natively supported); re-sparsify to exercise the
+        # sparse-operator norm path.
+        rho = jqt.ket2dm(ket).to_sparse_bcoo()
         assert rho.is_sparse_bcoo
         assert jnp.allclose(jqt.norm(rho), 1.0)
 

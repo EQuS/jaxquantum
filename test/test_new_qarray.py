@@ -134,14 +134,14 @@ def test_backward_compatibility_basic():
     
     # Test basic creation
     a = jqt.Qarray.create(jnp.array([1,2,3]))
-    assert a.shape == (3,1)
+    assert a.shape == (3,)
     assert a.qtype == jqt.Qtypes.ket
 
     a = jqt.Qarray.create(jnp.array([[1,2,3],[4,5,6]]))
-    assert a.shape == (2,3,1)
+    assert a.shape == (2,3)
 
     a = jqt.Qarray.create(jnp.array([[1,2,],[4,5]]), bdims=(2,))
-    assert a.shape == (2,2,1)
+    assert a.shape == (2,2)
 
     a = jqt.Qarray.from_list([])
     assert a.dims == ((),()) and a.shape == jnp.array([]).shape
@@ -168,7 +168,7 @@ def test_backward_compatibility_properties():
         print(a[0][0])
 
     a_reshaped = a.reshape_bdims(2,1)
-    assert a_reshaped.shape == (2,1,3,1)
+    assert a_reshaped.shape == (2,1,3)
 
     assert len(a) == 2
     with pytest.raises(ValueError):

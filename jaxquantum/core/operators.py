@@ -269,7 +269,7 @@ def basis(N: int, k: int, implementation: QarrayImplType = QarrayImplType.DENSE)
     Returns:
         Fock State |k>
     """
-    return Qarray.create(one_hot(k, N).reshape(N, 1), implementation=implementation)
+    return Qarray.create(one_hot(k, N), qtype="ket", implementation=implementation)
 
 def multi_mode_basis_set(Ns: List[int]) -> Qarray:
     """Creates a multi-mode basis set.
