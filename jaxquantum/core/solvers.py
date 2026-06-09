@@ -357,12 +357,23 @@ def _sesolve_data(
     def f(t: float, ψₜ: Array, _):
         H_val = H(t)  # type: ignore
 
-        # State vectors live on a single trailing axis (..., N). For a dense
-        # Hamiltonian contract that axis directly via einsum (batch-safe, and no
-        # (N,1) is ever materialised — keeps the scan carry 1-D). For a sparse
-        # Hamiltonian use a transient column local to this RHS (sparse is not the
-        # TPU-padding path).
-        if _is_dense_array(H_val):
+        # State vectors live on a single trailing axis (..., N).
+        #
+        # A SINGLE dense state takes the pure matvec: it keeps the carry 1-D and
+        # never materialises an (N,1) column (the whole point of vector storage).
+        #
+        # Everything else uses the transient-column matmul form. For BATCHED dense
+        # solves this is deliberate: handing the per-step H·ψ a trailing size-1
+        # axis lets the TPU MXU run it as a matrix-MATRIX multiply (the size-1 axis
+        # is lane-padded to the 128-wide tile and the batch rides along nearly for
+        # free) instead of a batched matrix-VECTOR product, whose runtime scales
+        # ~linearly in the batch size. For sparse H it is just the existing path.
+        # n_batch is static at trace time, so only one branch is ever compiled.
+        n_batch = 1
+        for _d in ψₜ.shape[:-1]:
+            n_batch *= _d
+
+        if _is_dense_array(H_val) and n_batch == 1:
             ψₜ_dot = -1j * jnp.einsum("...ij,...j->...i", H_val, ψₜ)
         else:
             ψₜ_dot = -1j * (H_val @ ψₜ[..., None])[..., 0]
