@@ -40,6 +40,7 @@ class SolverOptions:
     max_steps: int = (struct.field(pytree_node=False),)
     rtol: float = (struct.field(pytree_node=False),)
     atol: float = (struct.field(pytree_node=False),)
+    stepsize_controller: str = (struct.field(pytree_node=False),)
 
     @classmethod
     def create(
@@ -49,8 +50,10 @@ class SolverOptions:
         max_steps: int = 100_000,
         rtol: float = 1e-7,
         atol: float = 1e-9,
+        stepsize_controller: Optional[str] = None,
     ):
-        return cls(progress_meter, solver, max_steps, rtol, atol)
+        return cls(progress_meter, solver, max_steps, rtol, atol, stepsize_controller)
+
 
 
 class CustomProgressMeter(TqdmProgressMeter):
@@ -82,7 +85,12 @@ def solve(f, ρ0, tlist, saveat_tlist, args, solver_options: Optional[
     # f and ts
     term = ODETerm(f)
     
-    if saveat_tlist.shape[0] == 1 and saveat_tlist == -1:
+    # A single-element saveat_tlist means "save only the final state". The
+    # documented sentinel is [-1], but under jit saveat_tlist is a traced array
+    # whose value can't be read in a Python `if` (`== -1` would raise
+    # TracerBoolConversionError) — so we key on the *static* length, which is
+    # jit-safe. (Any length-1 saveat_tlist is therefore treated as final-only.)
+    if saveat_tlist.shape[0] == 1:
         saveat = SaveAt(t1=True)
     else:
         saveat = SaveAt(ts=saveat_tlist)
@@ -92,7 +100,11 @@ def solve(f, ρ0, tlist, saveat_tlist, args, solver_options: Optional[
 
     solver_name = solver_options.solver
     solver = getattr(diffrax, solver_name)()
-    stepsize_controller = PIDController(rtol=solver_options.rtol, atol=solver_options.atol)
+
+    if solver_options.stepsize_controller is not None:
+        stepsize_controller = getattr(diffrax, solver_options.stepsize_controller)()
+    else:
+        stepsize_controller = PIDController(rtol=solver_options.rtol, atol=solver_options.atol)
 
     # solve!
     with warnings.catch_warnings():
