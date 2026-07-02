@@ -102,7 +102,10 @@ def solve(f, ρ0, tlist, saveat_tlist, args, solver_options: Optional[
     solver = getattr(diffrax, solver_name)()
 
     if solver_options.stepsize_controller is not None:
-        stepsize_controller = getattr(diffrax, solver_options.stepsize_controller)()
+        if solver_options.stepsize_controller == "PIDController":
+            stepsize_controller = PIDController(rtol=solver_options.rtol, atol=solver_options.atol)
+        else:
+            stepsize_controller = getattr(diffrax, solver_options.stepsize_controller)()
     else:
         stepsize_controller = PIDController(rtol=solver_options.rtol, atol=solver_options.atol)
 
