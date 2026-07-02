@@ -1,9 +1,9 @@
 """Sharding tests.
 
-Spoofs two CPU devices via ``XLA_FLAGS`` so the tests run on a single laptop
-without GPUs/TPUs. The flag must be set *before* JAX is imported anywhere,
-so this file imports `jax` itself and is loaded as its own pytest module.
-"""
+Spoofs 8 CPU devices via ``XLA_FLAGS`` so the tests can run on a single machine
+without GPUs/TPUs. This only works if the flag is set before the *first* JAX
+import in the Python process (e.g. run this module standalone or in a separate
+pytest job/process).
 
 import os
 
