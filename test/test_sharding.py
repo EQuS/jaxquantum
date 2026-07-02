@@ -7,9 +7,10 @@ so this file imports `jax` itself and is loaded as its own pytest module.
 
 import os
 
-# Must be set before any JAX import. Pytest collects modules independently,
-# so this file forks JAX to two-device mode without affecting the rest of
-# the suite (other test files have already imported JAX via jaxquantum).
+# Must be set before the first JAX import in this Python process.
+# If JAX is already imported (e.g. by other tests), changing XLA_FLAGS here has
+# no effect; run this module in isolation or set XLA_FLAGS in the test runner/CI
+# before pytest starts if you want these tests to execute.
 os.environ["XLA_FLAGS"] = (
     os.environ.get("XLA_FLAGS", "") + " --xla_force_host_platform_device_count=8"
 ).strip()
