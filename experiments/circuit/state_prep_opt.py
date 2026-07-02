@@ -230,11 +230,15 @@ def generate_target_cavity_state(settings, large=False):
             target_state_cavity = (jqt.basis(N, 0) + 1.j*jqt.basis(N, 1)).unit()
         elif settings["state"]["logical_state"]=="-y":
             target_state_cavity = (jqt.basis(N, 0) - 1.j*jqt.basis(N, 1)).unit()
-
+    else:
+        raise NotImplementedError(str(settings["state"]["mode"]) + " is not implemented!")
 
     return target_state_cavity
 
-
+def setup_settings(settings):
+    target_state_cavity = generate_target_cavity_state(settings)
+    settings["target_state_cavity"] = target_state_cavity
+    settings["target_state"] = jqt.basis(2,0) ^ target_state_cavity
 
 
 
