@@ -15,4 +15,4 @@
 
 7. Run `pip install --no-deps cuquantum_python_jax_cu13-0.0.6.tar.gz`.
 
-8. Run `module unload cuda` to unload cuda, so that it doesn't conflict with jax's version of CUDA. 
+Make sure to run `module load miniforge cuda` whenever you use the cuquantum backend. 
