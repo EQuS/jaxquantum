@@ -81,6 +81,78 @@ def test_sesolve_edge_cases():
     with pytest.raises(ValueError):
         jqt.sesolve(H0, g_state.to_dm(), ts)
 
+
+def test_sesolve_save_final_only():
+    """An empty saveat_tlist saves only the final state, and is jit-safe."""
+    N = 4
+    omega = 1.0
+    psi0 = jqt.basis(N, 1)
+    ts = jnp.linspace(0, 1.0, 50)
+    opts = jqt.SolverOptions.create(progress_meter=False)
+    H = omega * jqt.identity(N)
+
+    full = jqt.sesolve(H, psi0, ts, solver_options=opts)
+    final_only = jqt.sesolve(
+        H, psi0, ts, saveat_tlist=jnp.array([]), solver_options=opts
+    )
+
+    # only a single (final) time slice is saved, and it matches the full solve
+    assert full.data.shape[0] == len(ts)
+    assert final_only.data.shape[0] == 1
+    assert jnp.allclose(final_only.data[-1], full.data[-1], atol=1e-6)
+
+    # jit-safe: keying on the (static) length of a traced saveat_tlist does not
+    # raise a TracerBoolConversionError.
+    @jit
+    def run(saveat):
+        return jqt.sesolve(H, psi0, ts, saveat_tlist=saveat, solver_options=opts).data
+
+    jitted_final = run(jnp.array([]))
+    assert jitted_final.shape[0] == 1
+    assert jnp.allclose(jitted_final[-1], full.data[-1], atol=1e-6)
+
+
+def test_stepsize_controller_kwargs():
+    """stepsize_controller + kwargs are forwarded generically to diffrax."""
+    N = 4
+    omega = 1.0
+    psi0 = jqt.basis(N, 1)
+    ts = jnp.linspace(0, 1.0, 50)
+    H = omega * jqt.identity(N)
+
+    ref = jqt.sesolve(
+        H, psi0, ts,
+        solver_options=jqt.SolverOptions.create(progress_meter=False),
+    )
+
+    # custom tolerances passed through the generic kwargs dict
+    opts = jqt.SolverOptions.create(
+        progress_meter=False,
+        stepsize_controller="PIDController",
+        stepsize_controller_kwargs={"rtol": 1e-9, "atol": 1e-11},
+    )
+    states = jqt.sesolve(H, psi0, ts, solver_options=opts)
+    assert jnp.allclose(states.data, ref.data, atol=1e-6)
+
+    # the kwargs are genuinely **-unpacked into the controller constructor, so
+    # an unknown key surfaces as a TypeError from diffrax.
+    bad = jqt.SolverOptions.create(
+        progress_meter=False,
+        stepsize_controller_kwargs={"not_a_real_kwarg": 1.0},
+    )
+    with pytest.raises(TypeError):
+        jqt.sesolve(H, psi0, ts, solver_options=bad)
+
+
+def test_stepsize_controller_kwargs_defaults():
+    """Default kwargs are PID tolerances for PIDController, else empty."""
+    pid = jqt.SolverOptions.create()
+    assert pid.stepsize_controller == "PIDController"
+    assert pid.stepsize_controller_kwargs == {"rtol": 1e-7, "atol": 1e-9}
+
+    other = jqt.SolverOptions.create(stepsize_controller="ConstantStepSize")
+    assert other.stepsize_controller_kwargs == {}
+
 # ====
 
 # mesolve ====

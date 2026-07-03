@@ -4,6 +4,7 @@ Spoofs 8 CPU devices via ``XLA_FLAGS`` so the tests can run on a single machine
 without GPUs/TPUs. This only works if the flag is set before the *first* JAX
 import in the Python process (e.g. run this module standalone or in a separate
 pytest job/process).
+"""
 
 import os
 

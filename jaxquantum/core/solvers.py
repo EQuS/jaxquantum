@@ -4,7 +4,6 @@ from diffrax import (
     diffeqsolve,
     ODETerm,
     SaveAt,
-    PIDController,
     TqdmProgressMeter,
     NoProgressMeter,
 )
@@ -35,12 +34,19 @@ def _is_dense_array(x) -> bool:
 
 @struct.dataclass
 class SolverOptions:
-    progress_meter: bool = struct.field(pytree_node=False)
-    solver: str = (struct.field(pytree_node=False),)
-    max_steps: int = (struct.field(pytree_node=False),)
-    rtol: float = (struct.field(pytree_node=False),)
-    atol: float = (struct.field(pytree_node=False),)
-    stepsize_controller: str = (struct.field(pytree_node=False),)
+    progress_meter: bool = struct.field(pytree_node=False, default=True)
+    solver: str = struct.field(pytree_node=False, default="Tsit5")
+    max_steps: int = struct.field(pytree_node=False, default=100_000)
+    # Name of the diffrax stepsize controller and the kwargs fed into it. The
+    # kwargs are controller-specific, so the two must be set together (e.g. the
+    # default rtol/atol below only make sense for PIDController). Any other
+    # diffrax controller works by pairing its name with its own kwargs, e.g.
+    # stepsize_controller="ConstantStepSize", stepsize_controller_kwargs={}.
+    stepsize_controller: str = struct.field(pytree_node=False, default="PIDController")
+    stepsize_controller_kwargs: dict = struct.field(
+        pytree_node=False,
+        default_factory=lambda: {"rtol": 1e-7, "atol": 1e-9},
+    )
 
     @classmethod
     def create(
@@ -48,11 +54,24 @@ class SolverOptions:
         progress_meter: bool = True,
         solver: str = "Tsit5",
         max_steps: int = 100_000,
-        rtol: float = 1e-7,
-        atol: float = 1e-9,
-        stepsize_controller: Optional[str] = None,
+        stepsize_controller: str = "PIDController",
+        stepsize_controller_kwargs: Optional[dict] = None,
     ):
-        return cls(progress_meter, solver, max_steps, rtol, atol, stepsize_controller)
+        if stepsize_controller_kwargs is None:
+            # PIDController needs tolerances; other controllers get no kwargs
+            # by default (pass them explicitly if the controller needs any).
+            stepsize_controller_kwargs = (
+                {"rtol": 1e-7, "atol": 1e-9}
+                if stepsize_controller == "PIDController"
+                else {}
+            )
+        return cls(
+            progress_meter,
+            solver,
+            max_steps,
+            stepsize_controller,
+            stepsize_controller_kwargs,
+        )
 
 
 
@@ -74,7 +93,7 @@ def solve(f, ρ0, tlist, saveat_tlist, args, solver_options: Optional[
         ρ0: initial state
         tlist: time list
         saveat_tlist: list of times at which to save the state
-            pass in [-1] to save only at final time
+            pass in an empty list to save only at final time
         args: additional arguments to f
         solver_options: dictionary with solver options
 
@@ -85,12 +104,14 @@ def solve(f, ρ0, tlist, saveat_tlist, args, solver_options: Optional[
     # f and ts
     term = ODETerm(f)
     
-    # A single-element saveat_tlist means "save only the final state". The
-    # documented sentinel is [-1], but under jit saveat_tlist is a traced array
-    # whose value can't be read in a Python `if` (`== -1` would raise
-    # TracerBoolConversionError) — so we key on the *static* length, which is
-    # jit-safe. (Any length-1 saveat_tlist is therefore treated as final-only.)
-    if saveat_tlist.shape[0] == 1:
+    # An empty saveat_tlist means "save only the final state". We key on the
+    # *static* length, which is jit-safe: under jit saveat_tlist is a traced
+    # array whose element values can't be read in a Python `if` (e.g. `== -1`
+    # would raise TracerBoolConversionError), but its length is part of the
+    # static shape and is always known at trace time. A non-empty saveat_tlist
+    # is passed straight through to SaveAt(ts=...), so a length-1 list is now an
+    # ordinary single-time save rather than a final-only sentinel.
+    if len(saveat_tlist) == 0:
         saveat = SaveAt(t1=True)
     else:
         saveat = SaveAt(ts=saveat_tlist)
@@ -101,13 +122,12 @@ def solve(f, ρ0, tlist, saveat_tlist, args, solver_options: Optional[
     solver_name = solver_options.solver
     solver = getattr(diffrax, solver_name)()
 
-    if solver_options.stepsize_controller is not None:
-        if solver_options.stepsize_controller == "PIDController":
-            stepsize_controller = PIDController(rtol=solver_options.rtol, atol=solver_options.atol)
-        else:
-            stepsize_controller = getattr(diffrax, solver_options.stepsize_controller)()
-    else:
-        stepsize_controller = PIDController(rtol=solver_options.rtol, atol=solver_options.atol)
+    # Build the diffrax stepsize controller generically from its name and the
+    # controller-specific kwargs dict (fall back to PIDController if unset).
+    stepsize_controller_name = solver_options.stepsize_controller or "PIDController"
+    stepsize_controller = getattr(diffrax, stepsize_controller_name)(
+        **solver_options.stepsize_controller_kwargs
+    )
 
     # solve!
     with warnings.catch_warnings():
@@ -148,7 +168,7 @@ def mesolve(
         rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
         tlist: time list
         saveat_tlist: list of times at which to save the state.
-            If -1 or [-1], save only at final time.
+            If empty (e.g. jnp.array([])), save only at final time.
             If None, save at all times in tlist. Default: None.
         c_ops: qarray list of collapse operators
         solver_options: SolverOptions with solver options
@@ -206,7 +226,7 @@ def _mesolve_data(
         rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
         tlist: time list
         saveat_tlist: list of times at which to save the state
-            If -1 or [-1], save only at final time.
+            If empty (e.g. jnp.array([])), save only at final time.
             If None, save at all times in tlist. Default: None.
         c_ops: qarray list of collapse operators
         solver_options: SolverOptions with solver options
@@ -307,7 +327,7 @@ def sesolve(
         rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
         tlist: time list
         saveat_tlist: list of times at which to save the state.
-            If -1 or [-1], save only at final time.
+            If empty (e.g. jnp.array([])), save only at final time.
             If None, save at all times in tlist. Default: None.
         solver_options: SolverOptions with solver options
 
@@ -359,7 +379,7 @@ def _sesolve_data(
         rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
         tlist: time list
         saveat_tlist: list of times at which to save the state.
-            If -1 or [-1], save only at final time.
+            If empty (e.g. jnp.array([])), save only at final time.
             If None, save at all times in tlist. Default: None.
         solver_options: SolverOptions with solver options
 
@@ -411,7 +431,7 @@ def propagator(
             A single time point or
             an Array of time points.
         saveat_tlist: list of times at which to save the state.
-            If -1 or [-1], save only at final time.
+            If empty (e.g. jnp.array([])), save only at final time.
             If None, save at all times in tlist. Default: None.
 
     Returns:
