@@ -218,6 +218,7 @@ def generate_target_cavity_state(settings, large=False):
         settings["state"]["squeezing_level"] = squeezing_level
         target_state_cavity = gkp_qubit.basis[settings["state"]["logical_state"]]
     elif settings["state"]["mode"] == "fock":
+        settings["state"]["logical_state"] = settings["state"]["state"]
         if settings["state"]["logical_state"]=="+z":
             target_state_cavity = jqt.basis(N, 0)
         elif settings["state"]["logical_state"]=="-z":
