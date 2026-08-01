@@ -3,9 +3,41 @@
 from copy import deepcopy
 import itertools
 from tempfile import NamedTemporaryFile
+import jax
 import jax.numpy as jnp
 from tqdm import tqdm
 import os
+
+
+def run_jax_sweep(
+    params,
+    sweep_params,
+    metrics_func,
+    fixed_kwargs=None,
+    is_parallel=False,
+):
+    """Evaluate a pure metric over sweep points with ``jax.vmap``."""
+    if not sweep_params:
+        raise ValueError("sweep_params must not be empty")
+    keys = tuple(sweep_params)
+    values = tuple(jnp.asarray(sweep_params[key]) for key in keys)
+    if is_parallel:
+        length = values[0].shape[0]
+        if not all(value.shape[0] == length for value in values):
+            raise ValueError("parallel sweep parameters must have equal lengths")
+        points = values
+    else:
+        points = tuple(
+            grid.reshape(-1)
+            for grid in jnp.meshgrid(*values, indexing="ij")
+        )
+
+    def evaluate(*point):
+        current = dict(params)
+        current.update(zip(keys, point))
+        return metrics_func(current, **dict(fixed_kwargs or {}))
+
+    return jax.vmap(evaluate)(*points)
 
 
 def run_sweep(
@@ -61,9 +93,9 @@ def run_sweep(
 
     if is_parallel:
         sweep_length = len(next(iter(sweep_params.values())))
-        assert [len(vals) == sweep_length for vals in sweep_params.values()], (
-            "Parallel sweep parameters must have the same length."
-        )
+        assert all(
+            len(vals) == sweep_length for vals in sweep_params.values()
+        ), "Parallel sweep parameters must have the same length."
 
         errors = []
         try:

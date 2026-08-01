@@ -1,0 +1,447 @@
+{
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "jax": "0.11.0",
+  "jaxquantum": "0.3.0",
+  "jaxquantum_source": "/mnt/c/Users/EQuS/Documents/PhD Research/jaxquantum-performance/jaxquantum/__init__.py",
+  "backend": "gpu",
+  "devices": [
+    "cuda:0"
+  ],
+  "parameters": {
+    "dimension": 32,
+    "points": 81,
+    "iterations": 20
+  },
+  "results": {
+    "qfunc_unrolled": {
+      "function": "_qfunc_runner.<locals>.run",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+      "jax": "0.11.0",
+      "backend": "gpu",
+      "devices": [
+        "cuda:0"
+      ],
+      "timings_s": {
+        "lowering": 0.05978933700001221,
+        "compilation": 1.090393272,
+        "first_execution": 0.015865340000004835,
+        "cold_total": 1.166047949000017,
+        "warm_median": 0.002583245499991449,
+        "warm_min": 0.0022926770000140095,
+        "warm_max": 0.003352124000002732,
+        "warm_p10": 0.0023361543999868674,
+        "warm_p90": 0.002913201299995194
+      },
+      "memory_bytes": {
+        "argument_size_in_bytes": 16384,
+        "output_size_in_bytes": 52488,
+        "alias_size_in_bytes": 0,
+        "temp_size_in_bytes": 3400708,
+        "peak_memory_in_bytes": 6909220,
+        "generated_code_size_in_bytes": 3469112,
+        "host_argument_size_in_bytes": 0,
+        "host_output_size_in_bytes": 0,
+        "host_alias_size_in_bytes": 0,
+        "host_temp_size_in_bytes": 0
+      },
+      "device_memory_stats": {
+        "before": {
+          "cuda:0": {
+            "num_allocs": 195,
+            "bytes_in_use": 227328,
+            "peak_bytes_in_use": 71403264,
+            "largest_alloc_size": 33554432,
+            "bytes_limit": 12878610432,
+            "bytes_reserved": 0,
+            "peak_bytes_reserved": 0,
+            "largest_free_block_bytes": 67108864,
+            "pool_bytes": 136314880,
+            "peak_pool_bytes": 136314880
+          }
+        },
+        "after": {
+          "cuda:0": {
+            "num_allocs": 261,
+            "bytes_in_use": 280064,
+            "peak_bytes_in_use": 71403264,
+            "largest_alloc_size": 33554432,
+            "bytes_limit": 12878610432,
+            "bytes_reserved": 0,
+            "peak_bytes_reserved": 0,
+            "largest_free_block_bytes": 67108864,
+            "pool_bytes": 136314880,
+            "peak_pool_bytes": 136314880
+          }
+        }
+      },
+      "cost_analysis": {
+        "bytes accessedout{31}": 105488.0,
+        "bytes accessedout{2}": 105488.0,
+        "bytes accessed16{}": 104976.0,
+        "utilization7{}": 3.0,
+        "utilization25{}": 3.0,
+        "bytes accessed0{}": 6855855.0,
+        "bytes accessed19{}": 104976.0,
+        "bytes accessedout{13}": 105488.0,
+        "utilization28{}": 3.0,
+        "utilization22{}": 3.0,
+        "bytes accessedout{10}": 105488.0,
+        "bytes accessedout{21}": 105488.0,
+        "bytes accessedout{1}": 105488.0,
+        "bytes accessedout{24}": 105488.0,
+        "bytes accessed31{}": 104976.0,
+        "bytes accessed5{}": 104976.0,
+        "bytes accessedout{18}": 105488.0,
+        "bytes accessedout{9}": 105488.0,
+        "bytes accessed29{}": 104976.0,
+        "bytes accessedout{29}": 105488.0,
+        "utilization2{}": 105.0,
+        "bytes accessed11{}": 104976.0,
+        "utilization16{}": 3.0,
+        "utilization29{}": 3.0,
+        "utilization23{}": 3.0,
+        "bytes accessed": 17031744.0,
+        "utilization17{}": 3.0,
+        "utilization20{}": 3.0,
+        "bytes accessed25{}": 104976.0,
+        "bytes accessedout{4}": 105488.0,
+        "bytes accessed27{}": 104976.0,
+        "bytes accessed3{}": 105232.0,
+        "transcendentals": 192.0,
+        "bytes accessedout{28}": 105488.0,
+        "bytes accessed21{}": 104976.0,
+        "bytes accessed28{}": 104976.0,
+        "bytes accessedout{30}": 105488.0,
+        "utilization4{}": 3.0,
+        "utilization34{}": 1.0,
+        "bytes accessed8{}": 104976.0,
+        "bytes accessedout{3}": 105488.0,
+        "bytes accessedout{15}": 105488.0,
+        "bytes accessedout{26}": 105488.0,
+        "utilization21{}": 3.0,
+        "utilization14{}": 3.0,
+        "utilization15{}": 3.0,
+        "bytes accessed33{}": 256.0,
+        "utilization3{}": 35.0,
+        "bytes accessed23{}": 104976.0,
+        "bytes accessed6{}": 104976.0,
+        "bytes accessed17{}": 104976.0,
+        "bytes accessed10{}": 104976.0,
+        "bytes accessedout{25}": 105488.0,
+        "bytes accessedout{14}": 105488.0,
+        "bytes accessed2{}": 114708.0,
+        "utilization8{}": 3.0,
+        "bytes accessed15{}": 104976.0,
+        "bytes accessedout{6}": 105488.0,
+        "utilization12{}": 3.0,
+        "bytes accessed32{}": 104976.0,
+        "utilization32{}": 1.0,
+        "bytes accessedout{19}": 105488.0,
+        "bytes accessed14{}": 104976.0,
+        "bytes accessed12{}": 104976.0,
+        "bytes accessed18{}": 104976.0,
+        "utilization18{}": 3.0,
+        "utilization19{}": 3.0,
+        "bytes accessed22{}": 104976.0,
+        "bytes accessedout{5}": 105488.0,
+        "bytes accessedout{12}": 105488.0,
+        "bytes accessed9{}": 104976.0,
+        "bytes accessedout{23}": 105488.0,
+        "bytes accessed34{}": 4.0,
+        "bytes accessed7{}": 104976.0,
+        "bytes accessedout{20}": 105488.0,
+        "bytes accessedout{17}": 105488.0,
+        "utilization13{}": 3.0,
+        "bytes accessed24{}": 104976.0,
+        "utilization10{}": 3.0,
+        "bytes accessedout{}": 6806311.0,
+        "utilization27{}": 3.0,
+        "utilization30{}": 3.0,
+        "bytes accessedout{0}": 105488.0,
+        "bytes accessedout{22}": 105488.0,
+        "bytes accessedout{11}": 105488.0,
+        "utilization26{}": 3.0,
+        "utilization33{}": 1.0,
+        "bytes accessedout{27}": 105488.0,
+        "bytes accessedout{16}": 105488.0,
+        "utilization9{}": 3.0,
+        "bytes accessed26{}": 104976.0,
+        "utilization6{}": 3.0,
+        "utilization0{}": 578.0,
+        "utilization24{}": 3.0,
+        "utilization31{}": 3.0,
+        "bytes accessed30{}": 104976.0,
+        "flops": 7778305.0,
+        "bytes accessed4{}": 104976.0,
+        "utilization1{}": 215.0,
+        "utilization11{}": 3.0,
+        "bytes accessedout{7}": 105488.0,
+        "bytes accessed20{}": 104976.0,
+        "utilization5{}": 3.0,
+        "bytes accessedout{8}": 105488.0,
+        "bytes accessed13{}": 104976.0,
+        "optimal_seconds": -1.0,
+        "bytes accessed1{}": 3534608.0
+      },
+      "hlo": {
+        "characters": 495929,
+        "lines": 986
+      },
+      "iterations": 20,
+      "warmup": 1
+    },
+    "qfunc_loop": {
+      "function": "_qfunc_runner.<locals>.run",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+      "jax": "0.11.0",
+      "backend": "gpu",
+      "devices": [
+        "cuda:0"
+      ],
+      "timings_s": {
+        "lowering": 0.027587570000008554,
+        "compilation": 0.12335841199998754,
+        "first_execution": 0.005947999999989406,
+        "cold_total": 0.1568939819999855,
+        "warm_median": 0.0028805150000010826,
+        "warm_min": 0.002646147000007204,
+        "warm_max": 0.003979575000016666,
+        "warm_p10": 0.0027414094000050683,
+        "warm_p90": 0.0036864676999925905
+      },
+      "memory_bytes": {
+        "argument_size_in_bytes": 16384,
+        "output_size_in_bytes": 52488,
+        "alias_size_in_bytes": 0,
+        "temp_size_in_bytes": 123649,
+        "peak_memory_in_bytes": 400985,
+        "generated_code_size_in_bytes": 212304,
+        "host_argument_size_in_bytes": 0,
+        "host_output_size_in_bytes": 0,
+        "host_alias_size_in_bytes": 0,
+        "host_temp_size_in_bytes": 0
+      },
+      "device_memory_stats": {
+        "before": {
+          "cuda:0": {
+            "num_allocs": 280,
+            "bytes_in_use": 227328,
+            "peak_bytes_in_use": 71403264,
+            "largest_alloc_size": 33554432,
+            "bytes_limit": 12878610432,
+            "bytes_reserved": 0,
+            "peak_bytes_reserved": 0,
+            "largest_free_block_bytes": 67108864,
+            "pool_bytes": 136314880,
+            "peak_pool_bytes": 136314880
+          }
+        },
+        "after": {
+          "cuda:0": {
+            "num_allocs": 346,
+            "bytes_in_use": 280064,
+            "peak_bytes_in_use": 71403264,
+            "largest_alloc_size": 33554432,
+            "bytes_limit": 12878610432,
+            "bytes_reserved": 0,
+            "peak_bytes_reserved": 0,
+            "largest_free_block_bytes": 67108864,
+            "pool_bytes": 136314880,
+            "peak_pool_bytes": 136314880
+          }
+        }
+      },
+      "cost_analysis": {
+        "bytes accessed0{}": 243559.0,
+        "utilization0{}": 36.0,
+        "utilization1{}": 17.0,
+        "optimal_seconds": -1.0,
+        "bytes accessedout{}": 401097.0,
+        "bytes accessed3{}": 16.0,
+        "utilization3{}": 4.0,
+        "bytes accessed4{}": 8.0,
+        "transcendentals": 192.0,
+        "utilization2{}": 16.0,
+        "bytes accessed2{}": 123416.0,
+        "flops": 258354.0,
+        "bytes accessed1{}": 303448.0,
+        "utilization4{}": 1.0,
+        "bytes accessed": 959857.0
+      },
+      "hlo": {
+        "characters": 436615,
+        "lines": 190
+      },
+      "iterations": 20,
+      "warmup": 1
+    },
+    "qfunc_chunked": {
+      "function": "_qfunc_runner.<locals>.run",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+      "jax": "0.11.0",
+      "backend": "gpu",
+      "devices": [
+        "cuda:0"
+      ],
+      "timings_s": {
+        "lowering": 0.03249213999998801,
+        "compilation": 0.13715661300000193,
+        "first_execution": 0.003356168999999909,
+        "cold_total": 0.17300492199998985,
+        "warm_median": 0.001999705499997617,
+        "warm_min": 0.0014037480000013147,
+        "warm_max": 0.0028251889999921787,
+        "warm_p10": 0.001860054299999092,
+        "warm_p90": 0.0021168450999880404
+      },
+      "memory_bytes": {
+        "argument_size_in_bytes": 16384,
+        "output_size_in_bytes": 52488,
+        "alias_size_in_bytes": 0,
+        "temp_size_in_bytes": 861984,
+        "peak_memory_in_bytes": 1139401,
+        "generated_code_size_in_bytes": 212304,
+        "host_argument_size_in_bytes": 0,
+        "host_output_size_in_bytes": 0,
+        "host_alias_size_in_bytes": 0,
+        "host_temp_size_in_bytes": 0
+      },
+      "device_memory_stats": {
+        "before": {
+          "cuda:0": {
+            "num_allocs": 365,
+            "bytes_in_use": 227328,
+            "peak_bytes_in_use": 71403264,
+            "largest_alloc_size": 33554432,
+            "bytes_limit": 12878610432,
+            "bytes_reserved": 0,
+            "peak_bytes_reserved": 0,
+            "largest_free_block_bytes": 67108864,
+            "pool_bytes": 136314880,
+            "peak_pool_bytes": 136314880
+          }
+        },
+        "after": {
+          "cuda:0": {
+            "num_allocs": 431,
+            "bytes_in_use": 280064,
+            "peak_bytes_in_use": 71403264,
+            "largest_alloc_size": 33554432,
+            "bytes_limit": 12878610432,
+            "bytes_reserved": 0,
+            "peak_bytes_reserved": 0,
+            "largest_free_block_bytes": 67108864,
+            "pool_bytes": 136314880,
+            "peak_pool_bytes": 136314880
+          }
+        }
+      },
+      "cost_analysis": {
+        "utilization1{}": 17.0,
+        "bytes accessed3{}": 72.0,
+        "bytes accessed": 3920489.0,
+        "bytes accessed1{}": 1773112.0,
+        "bytes accessed2{}": 125216.0,
+        "utilization2{}": 16.0,
+        "flops": 1957878.0,
+        "utilization4{}": 1.0,
+        "utilization3{}": 4.0,
+        "bytes accessed0{}": 259431.0,
+        "transcendentals": 192.0,
+        "optimal_seconds": -1.0,
+        "bytes accessedout{}": 1874345.0,
+        "bytes accessed4{}": 8.0,
+        "utilization0{}": 37.0
+      },
+      "hlo": {
+        "characters": 438636,
+        "lines": 206
+      },
+      "iterations": 20,
+      "warmup": 1
+    },
+    "qfunc_vectorized": {
+      "function": "_qfunc_runner.<locals>.run",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+      "jax": "0.11.0",
+      "backend": "gpu",
+      "devices": [
+        "cuda:0"
+      ],
+      "timings_s": {
+        "lowering": 0.02592262699999992,
+        "compilation": 0.11647498699997527,
+        "first_execution": 0.00277975800000263,
+        "cold_total": 0.14517737199997782,
+        "warm_median": 0.0018632109999998647,
+        "warm_min": 0.001774191999999175,
+        "warm_max": 0.002113847999993368,
+        "warm_p10": 0.00179112929998837,
+        "warm_p90": 0.002024070999999594
+      },
+      "memory_bytes": {
+        "argument_size_in_bytes": 16384,
+        "output_size_in_bytes": 52488,
+        "alias_size_in_bytes": 0,
+        "temp_size_in_bytes": 3360536,
+        "peak_memory_in_bytes": 3638333,
+        "generated_code_size_in_bytes": 212296,
+        "host_argument_size_in_bytes": 0,
+        "host_output_size_in_bytes": 0,
+        "host_alias_size_in_bytes": 0,
+        "host_temp_size_in_bytes": 0
+      },
+      "device_memory_stats": {
+        "before": {
+          "cuda:0": {
+            "num_allocs": 450,
+            "bytes_in_use": 227328,
+            "peak_bytes_in_use": 71403264,
+            "largest_alloc_size": 33554432,
+            "bytes_limit": 12878610432,
+            "bytes_reserved": 0,
+            "peak_bytes_reserved": 0,
+            "largest_free_block_bytes": 67108864,
+            "pool_bytes": 136314880,
+            "peak_pool_bytes": 136314880
+          }
+        },
+        "after": {
+          "cuda:0": {
+            "num_allocs": 516,
+            "bytes_in_use": 280064,
+            "peak_bytes_in_use": 71403264,
+            "largest_alloc_size": 33554432,
+            "bytes_limit": 12878610432,
+            "bytes_reserved": 0,
+            "peak_bytes_reserved": 0,
+            "largest_free_block_bytes": 67108864,
+            "pool_bytes": 136314880,
+            "peak_pool_bytes": 136314880
+          }
+        }
+      },
+      "cost_analysis": {
+        "bytes accessed1{}": 3557676.0,
+        "transcendentals": 192.0,
+        "flops": 7778243.0,
+        "utilization2{}": 11.0,
+        "bytes accessed2{}": 26368.0,
+        "bytes accessedout{}": 6872656.0,
+        "utilization3{}": 2.0,
+        "bytes accessed3{}": 12.0,
+        "bytes accessed0{}": 3565887.0,
+        "utilization0{}": 22.0,
+        "utilization1{}": 11.0,
+        "bytes accessed": 13911200.0,
+        "optimal_seconds": -1.0
+      },
+      "hlo": {
+        "characters": 434775,
+        "lines": 154
+      },
+      "iterations": 20,
+      "warmup": 1
+    }
+  }
+}

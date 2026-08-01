@@ -19,6 +19,8 @@ class Gate:
     _Ht: Optional[Array] # Hamiltonian
     _KM: Optional[Qarray] # Kraus map
     _c_ops: Optional[Qarray]
+    _gen_KM: Optional[Callable] = struct.field(pytree_node=False)
+    _channel_apply: Optional[Callable] = struct.field(pytree_node=False)
     _params: Dict[str, Any]
     _ts: Array
     _name: str = struct.field(pytree_node=False)
@@ -35,6 +37,8 @@ class Gate:
         gen_Ht: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
         gen_c_ops: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
         gen_KM: Optional[Callable[[Dict[str, Any]], List[Qarray]]] = None,
+        channel_apply: Optional[Callable[[Array, Dict[str, Any]], Array]] = None,
+        lazy_kraus: bool = False,
         num_modes: int = 1,
     ):
         """Create a gate.
@@ -47,6 +51,8 @@ class Gate:
             gen_U: Function to generate the unitary of the gate.
             gen_Ht: Function to generate a function Ht(t) that takes in a time t and outputs a Hamiltonian Qarray.
             gen_KM: Function to generate the Kraus map of the gate.
+            channel_apply: Optional direct density-matrix channel kernel.
+            lazy_kraus: Generate Kraus operators only when ``KM`` is accessed.
             num_modes: Number of modes of the gate.
         """
 
@@ -64,7 +70,7 @@ class Gate:
         _Ht = gen_Ht(params) if gen_Ht is not None else None 
         _c_ops = gen_c_ops(params) if gen_c_ops is not None else Qarray.from_list([])
 
-        _KM = gen_KM(params) if gen_KM is not None else None
+        _KM = gen_KM(params) if gen_KM is not None and not lazy_kraus else None
 
         return Gate(
             dims = dims,
@@ -72,6 +78,8 @@ class Gate:
             _Ht = _Ht,
             _KM = _KM,
             _c_ops = _c_ops,
+            _gen_KM=gen_KM if lazy_kraus else None,
+            _channel_apply=channel_apply,
             _params = params if params is not None else {},
             _ts=ts if ts is not None else jnp.array([]),
             _name=name,
@@ -100,6 +108,8 @@ class Gate:
     def KM(self):
         if self._KM is not None:
             return self._KM
+        if self._gen_KM is not None:
+            return self._gen_KM(self.params)
         if self._U is None:
             return Qarray.from_list([])
         impl = type(self._U._impl).from_data(self._U.data[None])
@@ -126,8 +136,10 @@ class Gate:
             dims = self.dims,
             _U = self.U,
             _Ht = new_Ht,
-            _KM = self.KM,
+            _KM = self._KM,
             _c_ops = self.c_ops,
+            _gen_KM=self._gen_KM,
+            _channel_apply=self._channel_apply,
             _params = self.params,
             _ts = self.ts,
             _name = self.name,
@@ -140,8 +152,10 @@ class Gate:
             dims = self.dims,
             _U = self.U,
             _Ht = self.Ht,
-            _KM = self.KM,
+            _KM = self._KM,
             _c_ops = concatenate([self.c_ops, c_ops]),
+            _gen_KM=self._gen_KM,
+            _channel_apply=self._channel_apply,
             _params = self.params,
             _ts = self.ts,
             _name = self.name,
@@ -154,8 +168,10 @@ class Gate:
             dims = deepcopy(self.dims),
             _U = self.U,
             _Ht = deepcopy(self.Ht),
-            _KM = self.KM,
+            _KM = self._KM,
             _c_ops = self.c_ops,
+            _gen_KM=self._gen_KM,
+            _channel_apply=self._channel_apply,
             _params = deepcopy(self.params),
             _ts = self.ts,
             _name = self.name,

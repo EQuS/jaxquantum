@@ -1,14 +1,23 @@
 # Performance benchmarks
 
-Both scripts synchronize device work before recording a sample.
+The benchmark scripts synchronize device work before recording a sample.
 
 ```bash
 python benchmarks/performance.py
 python benchmarks/roofline.py
+python benchmarks/channels.py
+python benchmarks/hamiltonian.py
+python benchmarks/construction.py
+python benchmarks/devices.py
+python benchmarks/scan.py
+python benchmarks/cat_sbs.py path/to/cat_sbs.py
 ```
 
 Use `--help` for sizes, iteration counts, and JSON output. For a shared display
 GPU, set `XLA_PYTHON_CLIENT_PREALLOCATE=false` before starting Python.
+
+See the [extended CPU/GPU results](results/performance_summary.md) for the
+additional channel, loop, simulation, device, and cat-sBs measurements.
 
 ## Reference result
 

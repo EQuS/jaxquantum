@@ -136,11 +136,13 @@ class Transmon(FluxDevice):
     def get_H_linear(self):
         """Return linear terms in H."""
         w = self.get_linear_frequency()
-        return w * self.original_ops["a_dag"] @ self.original_ops["a"]
+        ops = self.original_ops
+        return w * ops["a_dag"] @ ops["a"]
 
     def get_H_full(self):
         """Return full H in specified basis."""
-        return self.original_ops["H_charge"] - self.Ej * self.original_ops["cos(φ)"]
+        ops = self.original_ops
+        return ops["H_charge"] - self.Ej * ops["cos(φ)"]
     
     def get_H_truncated(self):
         """Return truncated H in specified basis."""
@@ -182,22 +184,23 @@ class Transmon(FluxDevice):
             return super().calculate_wavefunctions(phi_vals)
         elif self.basis == BasisTypes.singlecharge:
             raise NotImplementedError("Wavefunctions for single charge basis not yet implemented.")
-        elif self.basis in [BasisTypes.charge, BasisTypes.singlecharge_even, BasisTypes.singlecharge_odd]:
+        elif self.basis in [
+            BasisTypes.charge,
+            BasisTypes.singlecharge_even,
+            BasisTypes.singlecharge_odd,
+        ]:
             phi_vals = jnp.array(phi_vals)
-
-            if self.basis in [BasisTypes.singlecharge_even, BasisTypes.singlecharge_odd]:
-                n_labels = 1/2 * jnp.diag(self.original_ops["n"].data)
+            ops = self.original_ops
+            if self.basis in [
+                BasisTypes.singlecharge_even,
+                BasisTypes.singlecharge_odd,
+            ]:
+                n_labels = 1/2 * jnp.diag(ops["n"].data)
             else:
-                n_labels = jnp.diag(self.original_ops["n"].data)
+                n_labels = jnp.diag(ops["n"].data)
 
-            wavefunctions = []
-            for nj in range(self.N_pre_diag):
-                wavefunction = []
-                for phi in phi_vals:
-                    wavefunction.append(
-                        (1j ** nj / jnp.sqrt(2*jnp.pi)) * jnp.sum(
-                            self.eig_systems["vecs"][:,nj] * jnp.exp(1j * phi * n_labels)
-                        )
-                    )
-                wavefunctions.append(jnp.array(wavefunction))
-            return jnp.array(wavefunctions)
+            phases = jnp.exp(1j * n_labels[:, None] * phi_vals)
+            vectors = self.eig_systems["vecs"]
+            wavefunctions = jnp.einsum("...kn,kp->...np", vectors, phases)
+            correction = jnp.power(1j, jnp.arange(self.N_pre_diag))
+            return correction[:, None] * wavefunctions / jnp.sqrt(2 * jnp.pi)

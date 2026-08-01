@@ -6,7 +6,11 @@ import argparse
 import json
 import platform
 import statistics
+import sys
 import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import jax
 import jax.numpy as jnp
@@ -162,6 +166,7 @@ def main():
         "python": platform.python_version(),
         "jax": jax.__version__,
         "jaxquantum": jqt.__version__,
+        "jaxquantum_source": str(Path(jqt.__file__).resolve()),
         "backend": jax.default_backend(),
         "devices": [str(device) for device in jax.devices()],
         "results": results,

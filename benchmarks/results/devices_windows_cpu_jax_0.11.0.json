@@ -1,0 +1,540 @@
+{
+  "platform": "Windows-11-10.0.26200-SP0",
+  "jax": "0.11.0",
+  "jaxquantum": "0.3.0",
+  "jaxquantum_source": "C:\\Users\\EQuS\\Documents\\PhD Research\\jaxquantum-performance\\jaxquantum\\__init__.py",
+  "backend": "cpu",
+  "devices": [
+    "cpu:0"
+  ],
+  "results": {
+    "transmon_reference": {
+      "function": "main.<locals>.<lambda>",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "jax": "0.11.0",
+      "backend": "cpu",
+      "devices": [
+        "cpu:0"
+      ],
+      "timings_s": {
+        "lowering": 0.024107400327920914,
+        "compilation": 0.027335401624441147,
+        "first_execution": 0.00032719969749450684,
+        "cold_total": 0.05177000164985657,
+        "warm_median": 6.901100277900696e-06,
+        "warm_min": 6.400048732757568e-06,
+        "warm_max": 1.3299286365509033e-05,
+        "warm_p10": 6.539002060890198e-06,
+        "warm_p90": 8.740276098251342e-06
+      },
+      "memory_bytes": {
+        "argument_size_in_bytes": 8,
+        "output_size_in_bytes": 7056,
+        "alias_size_in_bytes": 0,
+        "temp_size_in_bytes": 0,
+        "peak_memory_in_bytes": 7064,
+        "generated_code_size_in_bytes": 0,
+        "host_argument_size_in_bytes": 0,
+        "host_output_size_in_bytes": 0,
+        "host_alias_size_in_bytes": 0,
+        "host_temp_size_in_bytes": 0
+      },
+      "device_memory_stats": {
+        "before": {
+          "cpu:0": null
+        },
+        "after": {
+          "cpu:0": null
+        }
+      },
+      "cost_analysis": {
+        "flops": 7644.0,
+        "bytes accessedout{}": 7056.0,
+        "utilization2{}": 3.0,
+        "bytes accessed0{}": 8.0,
+        "bytes accessed": 7064.0,
+        "utilization0{}": 1.0,
+        "bytes accessed1{}": 46872.0,
+        "utilization1{}": 17.0,
+        "bytes accessed2{}": 10584.0
+      },
+      "hlo": {
+        "characters": 7463,
+        "lines": 104
+      },
+      "iterations": 15,
+      "warmup": 1
+    },
+    "transmon_hoisted": {
+      "function": "main.<locals>.<lambda>",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "jax": "0.11.0",
+      "backend": "cpu",
+      "devices": [
+        "cpu:0"
+      ],
+      "timings_s": {
+        "lowering": 0.019591599702835083,
+        "compilation": 0.02069159969687462,
+        "first_execution": 0.0002097003161907196,
+        "cold_total": 0.04049289971590042,
+        "warm_median": 6.9998204708099365e-06,
+        "warm_min": 6.498768925666809e-06,
+        "warm_max": 9.698793292045593e-06,
+        "warm_p10": 6.639584898948669e-06,
+        "warm_p90": 7.800385355949402e-06
+      },
+      "memory_bytes": {
+        "argument_size_in_bytes": 8,
+        "output_size_in_bytes": 7056,
+        "alias_size_in_bytes": 0,
+        "temp_size_in_bytes": 0,
+        "peak_memory_in_bytes": 7064,
+        "generated_code_size_in_bytes": 0,
+        "host_argument_size_in_bytes": 0,
+        "host_output_size_in_bytes": 0,
+        "host_alias_size_in_bytes": 0,
+        "host_temp_size_in_bytes": 0
+      },
+      "device_memory_stats": {
+        "before": {
+          "cpu:0": null
+        },
+        "after": {
+          "cpu:0": null
+        }
+      },
+      "cost_analysis": {
+        "bytes accessedout{}": 7056.0,
+        "bytes accessed1{}": 46872.0,
+        "utilization0{}": 1.0,
+        "flops": 7644.0,
+        "utilization1{}": 17.0,
+        "utilization2{}": 3.0,
+        "bytes accessed2{}": 10584.0,
+        "bytes accessed": 7064.0,
+        "bytes accessed0{}": 8.0
+      },
+      "hlo": {
+        "characters": 7464,
+        "lines": 104
+      },
+      "iterations": 15,
+      "warmup": 1
+    },
+    "kno_reference": {
+      "function": "main.<locals>.<lambda>",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "jax": "0.11.0",
+      "backend": "cpu",
+      "devices": [
+        "cpu:0"
+      ],
+      "timings_s": {
+        "lowering": 0.025823799893260002,
+        "compilation": 0.031906601041555405,
+        "first_execution": 0.0003146994858980179,
+        "cold_total": 0.058045100420713425,
+        "warm_median": 8.359923958778381e-05,
+        "warm_min": 5.700066685676575e-05,
+        "warm_max": 0.0004029013216495514,
+        "warm_p10": 5.9159845113754274e-05,
+        "warm_p90": 0.00034382045269012453
+      },
+      "memory_bytes": {
+        "argument_size_in_bytes": 8,
+        "output_size_in_bytes": 16384,
+        "alias_size_in_bytes": 0,
+        "temp_size_in_bytes": 65536,
+        "peak_memory_in_bytes": 16400,
+        "generated_code_size_in_bytes": 0,
+        "host_argument_size_in_bytes": 0,
+        "host_output_size_in_bytes": 0,
+        "host_alias_size_in_bytes": 0,
+        "host_temp_size_in_bytes": 0
+      },
+      "device_memory_stats": {
+        "before": {
+          "cpu:0": null
+        },
+        "after": {
+          "cpu:0": null
+        }
+      },
+      "cost_analysis": {
+        "bytes accessedout{}": 147960.0,
+        "flops": 289984.0,
+        "bytes accessed2{}": 65536.0,
+        "transcendentals": 31.0,
+        "bytes accessed0{}": 83688.0,
+        "utilization2{}": 8.0,
+        "bytes accessed1{}": 197896.0,
+        "utilization0{}": 14.0,
+        "bytes accessed": 313080.0,
+        "utilization1{}": 25.0
+      },
+      "hlo": {
+        "characters": 16445,
+        "lines": 218
+      },
+      "iterations": 15,
+      "warmup": 1
+    },
+    "kno_hoisted": {
+      "function": "main.<locals>.<lambda>",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "jax": "0.11.0",
+      "backend": "cpu",
+      "devices": [
+        "cpu:0"
+      ],
+      "timings_s": {
+        "lowering": 0.015191100537776947,
+        "compilation": 0.02872990071773529,
+        "first_execution": 0.00038040056824684143,
+        "cold_total": 0.04430140182375908,
+        "warm_median": 4.879944026470184e-05,
+        "warm_min": 4.849955439567566e-05,
+        "warm_max": 6.300024688243866e-05,
+        "warm_p10": 4.849955439567566e-05,
+        "warm_p90": 5.125999450683594e-05
+      },
+      "memory_bytes": {
+        "argument_size_in_bytes": 8,
+        "output_size_in_bytes": 16384,
+        "alias_size_in_bytes": 0,
+        "temp_size_in_bytes": 49152,
+        "peak_memory_in_bytes": 16400,
+        "generated_code_size_in_bytes": 0,
+        "host_argument_size_in_bytes": 0,
+        "host_output_size_in_bytes": 0,
+        "host_alias_size_in_bytes": 0,
+        "host_temp_size_in_bytes": 0
+      },
+      "device_memory_stats": {
+        "before": {
+          "cpu:0": null
+        },
+        "after": {
+          "cpu:0": null
+        }
+      },
+      "cost_analysis": {
+        "bytes accessed2{}": 49160.0,
+        "utilization0{}": 13.0,
+        "bytes accessedout{}": 131576.0,
+        "utilization1{}": 24.0,
+        "utilization2{}": 7.0,
+        "transcendentals": 31.0,
+        "flops": 283808.0,
+        "bytes accessed0{}": 83680.0,
+        "bytes accessed": 296440.0,
+        "bytes accessed1{}": 197640.0
+      },
+      "hlo": {
+        "characters": 8271,
+        "lines": 110
+      },
+      "iterations": 15,
+      "warmup": 1
+    },
+    "wavefunctions_reference": {
+      "function": "main.<locals>.<lambda>",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "jax": "0.11.0",
+      "backend": "cpu",
+      "devices": [
+        "cpu:0"
+      ],
+      "timings_s": {
+        "lowering": 1.893834799528122,
+        "compilation": 1.6395730003714561,
+        "first_execution": 0.000498700886964798,
+        "cold_total": 3.533906500786543,
+        "warm_median": 0.00014740042388439178,
+        "warm_min": 0.0001214984804391861,
+        "warm_max": 0.00027140043675899506,
+        "warm_p10": 0.00012915991246700286,
+        "warm_p90": 0.00025982148945331575
+      },
+      "memory_bytes": {
+        "argument_size_in_bytes": 168,
+        "output_size_in_bytes": 4368,
+        "alias_size_in_bytes": 0,
+        "temp_size_in_bytes": 22488,
+        "peak_memory_in_bytes": 4536,
+        "generated_code_size_in_bytes": 0,
+        "host_argument_size_in_bytes": 0,
+        "host_output_size_in_bytes": 0,
+        "host_alias_size_in_bytes": 0,
+        "host_temp_size_in_bytes": 0
+      },
+      "device_memory_stats": {
+        "before": {
+          "cpu:0": null
+        },
+        "after": {
+          "cpu:0": null
+        }
+      },
+      "cost_analysis": {
+        "bytes accessed16{}": 208.0,
+        "utilization0{}": 407.076904296875,
+        "bytes accessed7{}": 544.0,
+        "utilization11{}": 14.0,
+        "utilization14{}": 13.0,
+        "bytes accessed18{}": 208.0,
+        "transcendentals": 7644.0,
+        "bytes accessed5{}": 1636.0,
+        "utilization2{}": 292.0,
+        "bytes accessed8{}": 544.0,
+        "bytes accessed3{}": 2728.0,
+        "utilization8{}": 14.0,
+        "bytes accessed": 893227.0,
+        "utilization7{}": 14.0,
+        "bytes accessed4{}": 738736.0,
+        "utilization10{}": 14.0,
+        "bytes accessed13{}": 208.0,
+        "utilization17{}": 13.0,
+        "bytes accessed15{}": 208.0,
+        "utilization20{}": 13.0,
+        "bytes accessed10{}": 544.0,
+        "bytes accessed20{}": 208.0,
+        "bytes accessed1{}": 59900.0,
+        "bytes accessed11{}": 544.0,
+        "utilization1{}": 356.0,
+        "bytes accessed0{}": 86715.0,
+        "bytes accessedout{}": 20383.0,
+        "utilization19{}": 13.0,
+        "utilization13{}": 13.0,
+        "utilization5{}": 287.0,
+        "utilization16{}": 13.0,
+        "utilization3{}": 287.0,
+        "flops": 110375.0,
+        "bytes accessed9{}": 544.0,
+        "bytes accessed6{}": 544.0,
+        "utilization6{}": 14.0,
+        "utilization15{}": 13.0,
+        "optimal_seconds": -1.0,
+        "utilization9{}": 14.0,
+        "bytes accessed14{}": 208.0,
+        "utilization4{}": 287.0,
+        "bytes accessed19{}": 208.0,
+        "bytes accessed12{}": 544.0,
+        "utilization18{}": 13.0,
+        "bytes accessed2{}": 64088.0,
+        "utilization12{}": 14.0,
+        "bytes accessed17{}": 208.0
+      },
+      "hlo": {
+        "characters": 2247855,
+        "lines": 27500
+      },
+      "iterations": 15,
+      "warmup": 1
+    },
+    "wavefunctions_vectorized": {
+      "function": "main.<locals>.<lambda>",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "jax": "0.11.0",
+      "backend": "cpu",
+      "devices": [
+        "cpu:0"
+      ],
+      "timings_s": {
+        "lowering": 0.036408599466085434,
+        "compilation": 0.04749030061066151,
+        "first_execution": 0.00038979947566986084,
+        "cold_total": 0.0842886995524168,
+        "warm_median": 6.399862468242645e-05,
+        "warm_min": 3.690086305141449e-05,
+        "warm_max": 0.00016539916396141052,
+        "warm_p10": 5.2220001816749575e-05,
+        "warm_p90": 0.00014185979962348937
+      },
+      "memory_bytes": {
+        "argument_size_in_bytes": 168,
+        "output_size_in_bytes": 4368,
+        "alias_size_in_bytes": 0,
+        "temp_size_in_bytes": 7440,
+        "peak_memory_in_bytes": 4536,
+        "generated_code_size_in_bytes": 0,
+        "host_argument_size_in_bytes": 0,
+        "host_output_size_in_bytes": 0,
+        "host_alias_size_in_bytes": 0,
+        "host_temp_size_in_bytes": 0
+      },
+      "device_memory_stats": {
+        "before": {
+          "cpu:0": null
+        },
+        "after": {
+          "cpu:0": null
+        }
+      },
+      "cost_analysis": {
+        "bytes accessed1{}": 35624.0,
+        "utilization1{}": 32.0,
+        "utilization0{}": 72.07691955566406,
+        "optimal_seconds": -1.0,
+        "bytes accessed2{}": 16016.0,
+        "bytes accessedout{}": 18927.0,
+        "flops": 17415.0,
+        "utilization2{}": 9.0,
+        "transcendentals": 1105.0,
+        "bytes accessed0{}": 59315.0,
+        "bytes accessed": 33659.0
+      },
+      "hlo": {
+        "characters": 19076,
+        "lines": 250
+      },
+      "iterations": 15,
+      "warmup": 1
+    },
+    "sweep_unrolled": {
+      "function": "main.<locals>.<lambda>",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "jax": "0.11.0",
+      "backend": "cpu",
+      "devices": [
+        "cpu:0"
+      ],
+      "timings_s": {
+        "lowering": 0.1065909992903471,
+        "compilation": 0.10360689833760262,
+        "first_execution": 0.0004712007939815521,
+        "cold_total": 0.21066909842193127,
+        "warm_median": 0.00032399967312812805,
+        "warm_min": 0.00022669881582260132,
+        "warm_max": 0.0004497002810239792,
+        "warm_p10": 0.00024993941187858584,
+        "warm_p90": 0.00043952055275440214
+      },
+      "memory_bytes": {
+        "argument_size_in_bytes": 136,
+        "output_size_in_bytes": 4896,
+        "alias_size_in_bytes": 0,
+        "temp_size_in_bytes": 45316,
+        "peak_memory_in_bytes": 5032,
+        "generated_code_size_in_bytes": 0,
+        "host_argument_size_in_bytes": 0,
+        "host_output_size_in_bytes": 0,
+        "host_alias_size_in_bytes": 0,
+        "host_temp_size_in_bytes": 0
+      },
+      "device_memory_stats": {
+        "before": {
+          "cpu:0": null
+        },
+        "after": {
+          "cpu:0": null
+        }
+      },
+      "cost_analysis": {
+        "bytes accessed7{}": 288.0,
+        "bytes accessedout{}": 55743.0,
+        "utilization10{}": 1.0,
+        "utilization4{}": 1.0,
+        "bytes accessed5{}": 288.0,
+        "bytes accessed11{}": 288.0,
+        "utilization6{}": 1.0,
+        "utilization9{}": 1.0,
+        "bytes accessed8{}": 288.0,
+        "bytes accessed16{}": 288.0,
+        "utilization14{}": 1.0,
+        "utilization11{}": 1.0,
+        "bytes accessed": 62611.0,
+        "bytes accessed9{}": 288.0,
+        "optimal_seconds": -17.0,
+        "bytes accessed10{}": 288.0,
+        "bytes accessed13{}": 288.0,
+        "bytes accessed15{}": 288.0,
+        "bytes accessed6{}": 288.0,
+        "bytes accessed12{}": 288.0,
+        "bytes accessed14{}": 288.0,
+        "utilization15{}": 1.0,
+        "bytes accessed2{}": 75904.0,
+        "utilization1{}": 358.0,
+        "bytes accessed0{}": 2175.0,
+        "utilization3{}": 1.0,
+        "flops": 69071.0,
+        "utilization12{}": 1.0,
+        "utilization5{}": 1.0,
+        "utilization8{}": 1.0,
+        "utilization7{}": 1.0,
+        "utilization0{}": 86.0,
+        "utilization13{}": 1.0,
+        "bytes accessed3{}": 288.0,
+        "bytes accessed4{}": 288.0,
+        "utilization2{}": 86.0,
+        "utilization16{}": 1.0,
+        "bytes accessed1{}": 424676.0
+      },
+      "hlo": {
+        "characters": 125880,
+        "lines": 1619
+      },
+      "iterations": 15,
+      "warmup": 1
+    },
+    "sweep_vmapped": {
+      "function": "main.<locals>.<lambda>",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "jax": "0.11.0",
+      "backend": "cpu",
+      "devices": [
+        "cpu:0"
+      ],
+      "timings_s": {
+        "lowering": 0.033810000866651535,
+        "compilation": 0.03782209940254688,
+        "first_execution": 0.0004827994853258133,
+        "cold_total": 0.07211489975452423,
+        "warm_median": 0.00012730062007904053,
+        "warm_min": 0.00011140108108520508,
+        "warm_max": 0.0003784988075494766,
+        "warm_p10": 0.00011881962418556214,
+        "warm_p90": 0.00024053975939750672
+      },
+      "memory_bytes": {
+        "argument_size_in_bytes": 136,
+        "output_size_in_bytes": 4896,
+        "alias_size_in_bytes": 0,
+        "temp_size_in_bytes": 47940,
+        "peak_memory_in_bytes": 5032,
+        "generated_code_size_in_bytes": 0,
+        "host_argument_size_in_bytes": 0,
+        "host_output_size_in_bytes": 0,
+        "host_alias_size_in_bytes": 0,
+        "host_temp_size_in_bytes": 0
+      },
+      "device_memory_stats": {
+        "before": {
+          "cpu:0": null
+        },
+        "after": {
+          "cpu:0": null
+        }
+      },
+      "cost_analysis": {
+        "flops": 37971.0,
+        "bytes accessed0{}": 1903.0,
+        "bytes accessed": 52835.0,
+        "utilization2{}": 4.0,
+        "bytes accessedout{}": 50863.0,
+        "utilization0{}": 5.0,
+        "bytes accessed1{}": 246340.0,
+        "optimal_seconds": -1.0,
+        "utilization1{}": 21.0,
+        "bytes accessed2{}": 49088.0
+      },
+      "hlo": {
+        "characters": 12550,
+        "lines": 154
+      },
+      "iterations": 15,
+      "warmup": 1
+    }
+  }
+}

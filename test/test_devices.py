@@ -1,7 +1,15 @@
 import jax
 import jax.numpy as jnp
 
-from jaxquantum.devices import Transmon
+from jaxquantum.devices import (
+    ATS,
+    Fluxonium,
+    IdealQubit,
+    KNO,
+    Resonator,
+    SNAIL,
+    Transmon,
+)
 
 
 def make_transmon(ng=0.13):
@@ -42,6 +50,59 @@ def test_full_ops_diagonalizes_once(monkeypatch):
     assert {"id", "n", "cos(\u03c6)", "sin(\u03c6)"}.issubset(operators)
 
 
+def test_transmon_hamiltonian_builds_operators_once(monkeypatch):
+    calls = 0
+    original = Transmon.common_ops
+
+    def counted(self):
+        nonlocal calls
+        calls += 1
+        return original(self)
+
+    monkeypatch.setattr(Transmon, "common_ops", counted)
+    make_transmon().get_H_full()
+    assert calls == 1
+
+
+def test_device_hamiltonians_build_operator_dictionary_once(monkeypatch):
+    devices = [
+        Resonator.create(4, {"Ec": 0.2, "El": 1.0}),
+        Fluxonium.create(4, {"Ec": 0.2, "El": 1.0, "Ej": 3.0, "phi_ext": 0.1}),
+        ATS.create(
+            4,
+            {
+                "Ec": 0.2,
+                "El": 1.0,
+                "Ej": 3.0,
+                "dEj": 0.1,
+                "Ej2": 0.05,
+                "phi_sum_ext": 0.1,
+                "phi_delta_ext": 0.03,
+            },
+        ),
+        KNO.create(4, {"f": 5.0, "α": -0.2}),
+        IdealQubit.create(2, {"f": 5.0, "Δ": 0.1}),
+        SNAIL.create(
+            3,
+            {"Ec": 0.2, "Ej": 3.0, "alpha": 0.25, "m": 2, "phi_ext": 0.1},
+            N_pre_diag=5,
+        ),
+    ]
+
+    for device in devices:
+        cls = type(device)
+        original = cls.common_ops
+        calls = []
+
+        def counted(self, fn=original):
+            calls.append(None)
+            return fn(self)
+
+        monkeypatch.setattr(cls, "common_ops", counted)
+        device.get_H_full()
+        assert len(calls) == 1
+
+
 def test_full_ops_match_direct_basis_transform():
     device = make_transmon()
     original_ops = device.linear_ops
@@ -62,4 +123,35 @@ def test_device_hamiltonian_is_jittable_and_batchable():
     expected = jnp.stack([hamiltonian(offset) for offset in offsets])
 
     assert actual.shape == (5, 6, 6)
+    assert jnp.allclose(actual, expected, atol=1e-12)
+
+
+def test_transmon_wavefunctions_match_loop_and_diagonalize_once(monkeypatch):
+    device = make_transmon()
+    phases = jnp.linspace(-0.4, 0.4, 9)
+    n_labels = jnp.diag(device.original_ops["n"].data)
+    vectors = device.eig_systems["vecs"]
+    expected = jnp.stack(
+        [
+            jnp.stack(
+                [
+                    (1j**level / jnp.sqrt(2 * jnp.pi))
+                    * jnp.sum(vectors[:, level] * jnp.exp(1j * phi * n_labels))
+                    for phi in phases
+                ]
+            )
+            for level in range(device.N_pre_diag)
+        ]
+    )
+    calls = 0
+    original = Transmon._calculate_eig_systems
+
+    def counted(self):
+        nonlocal calls
+        calls += 1
+        return original(self)
+
+    monkeypatch.setattr(Transmon, "_calculate_eig_systems", counted)
+    actual = device.calculate_wavefunctions(phases)
+    assert calls == 1
     assert jnp.allclose(actual, expected, atol=1e-12)

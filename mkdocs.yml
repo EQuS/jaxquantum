@@ -46,6 +46,9 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/EQuS/jaxquantum
+watch:
+  - docs
+  - jaxquantum
 plugins:
   - search
   - mkdocs-jupyter:
@@ -57,10 +60,7 @@ plugins:
   - literate-nav:
       nav_file: summary.md
   - section-index
-  - mkdocstrings:
-      watch:
-      - docs
-      - jaxquantum
+  - mkdocstrings
 markdown_extensions:
   - toc
   - admonition
@@ -103,6 +103,8 @@ nav:
     - Getting Started:
       - Installation: documentation/getting_started/installation.md
       - NVIDIA GPU on Windows: documentation/getting_started/gpu_windows.md
+      - Profiling JAX code: documentation/getting_started/profiling.md
+      - Custom direct channels: documentation/getting_started/channels.md
       - Qarray: documentation/getting_started/qarray.ipynb
       - The Sharp Bits 🔪: documentation/getting_started/sharp_bits.md
     - Tutorials:
