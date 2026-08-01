@@ -2,7 +2,7 @@
 Cat Code Qubit
 """
 
-from typing import Tuple
+from typing import ClassVar, Tuple
 
 from jaxquantum.codes.base import BosonicQubit
 import jaxquantum as jqt
@@ -18,7 +18,7 @@ class CatQubit(BosonicQubit):
     Cat Qubit Class.
     """
 
-    PARAMETERS = ["alpha", "delta"]
+    PARAMETERS: ClassVar[list[str]] = ["alpha", "delta"]
 
     name = "cat"
 

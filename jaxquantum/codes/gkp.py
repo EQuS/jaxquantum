@@ -2,7 +2,7 @@
 Cat Code Qubit
 """
 
-from typing import Tuple
+from typing import ClassVar, Tuple
 import warnings
 
 from jaxquantum.codes.base import BosonicQubit
@@ -18,7 +18,7 @@ class GKPQubit(BosonicQubit):
     GKP Qubit Class.
     """
 
-    PARAMETERS = ["delta"]
+    PARAMETERS: ClassVar[list[str]] = ["delta"]
 
     name = "gkp"
 
@@ -207,7 +207,7 @@ class GKPQubit(BosonicQubit):
 
 class RectangularGKPQubit(GKPQubit):
 
-    PARAMETERS = ["delta", "a"]
+    PARAMETERS: ClassVar[list[str]] = ["delta", "a"]
 
     def _params_validation(self):
         super()._params_validation()

@@ -86,9 +86,11 @@ class Layer:
         all_indices = [ind for op in operations for ind in op.indices]
         unique_indices = list(set(all_indices))
 
-        if default_simulate_mode != SimulateMode.HAMILTONIAN:
-            if len(all_indices) != len(unique_indices):
-                raise ValueError("Operations must not have overlapping indices.")
+        if (
+            default_simulate_mode != SimulateMode.HAMILTONIAN
+            and len(all_indices) != len(unique_indices)
+        ):
+            raise ValueError("Operations must not have overlapping indices.")
 
         return Layer(
             operations=operations,
@@ -97,9 +99,10 @@ class Layer:
         )
 
     def add(self, operation: Operation):
-        if self._default_simulate_mode != SimulateMode.HAMILTONIAN:
-            if any(ind in self._unique_indices for ind in operation.indices):
-                raise ValueError("Operations must not have overlapping indices.")
+        if self._default_simulate_mode != SimulateMode.HAMILTONIAN and any(
+            ind in self._unique_indices for ind in operation.indices
+        ):
+            raise ValueError("Operations must not have overlapping indices.")
         self.operations.append(operation)
         self._unique_indices.extend(operation.indices)
 
