@@ -87,3 +87,15 @@ ignore = ["E731", "E741"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
+
+[tool.pytest.ini_options]
+# Tests marked ``cuquantum`` need the ``cuquantum.densitymat.jax`` extension
+# (and a CUDA GPU).  Default CI excludes them; run them locally via
+#   pytest test/test_cuquantum_backend.py
+# or
+#   pytest -m cuquantum
+# To skip them everywhere, use `pytest -m "not cuquantum"`.
+markers = [
+    "cuquantum: tests that require the cuquantum.densitymat.jax extension (GPU)",
+]
+addopts = "-m 'not cuquantum'"

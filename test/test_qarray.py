@@ -517,9 +517,200 @@ def test_qtype():
     with pytest.raises(ValueError):
         jqt.Qtypes.from_dims([[1,2],[3,4]])
 
- 
+
 
 
 # def test_qtypes():
+
+# =========================================
+
+
+# Qarray.from_impl / Qarray.to_backend
+# =========================================
+from jaxquantum.core.qarray import (  # noqa: E402
+    DenseImpl,
+    QarrayImplType,
+)
+from jaxquantum.core.sparse_bcoo import SparseBCOOImpl  # noqa: E402
+from jaxquantum.core.sparse_dia import SparseDiaImpl  # noqa: E402
+from jaxquantum.core.settings import SETTINGS  # noqa: E402
+
+
+class TestFromImpl:
+    """Tests for ``Qarray.from_impl`` — wrap a pre-built impl without the
+    raw-data normalisation that ``create`` does."""
+
+    def test_dense_impl(self):
+        impl = DenseImpl.from_data(jnp.eye(3))
+        q = jqt.Qarray.from_impl(impl)
+        assert q.impl_type == QarrayImplType.DENSE
+        assert q.dims == ((3,), (3,))
+        assert q.bdims == ()
+        assert jnp.allclose(q.data, jnp.eye(3))
+
+    def test_sparse_dia_smart_constructor(self):
+        impl = SparseDiaImpl.from_diags(offsets=(0,), diags=jnp.ones((1, 4)))
+        q = jqt.Qarray.from_impl(impl)
+        assert q.impl_type == QarrayImplType.SPARSE_DIA
+        assert q.dims == ((4,), (4,))
+        assert jnp.allclose(q.to_dense().data, jnp.eye(4))
+
+    def test_explicit_dims(self):
+        impl = DenseImpl.from_data(jnp.eye(4))
+        q = jqt.Qarray.from_impl(impl, dims=((2, 2), (2, 2)))
+        assert q.dims == ((2, 2), (2, 2))
+
+    def test_dims_inference_matches_create(self):
+        data = jnp.diag(jnp.arange(1, 4, dtype=jnp.float64))
+        impl = DenseImpl.from_data(data)
+        q_from_impl = jqt.Qarray.from_impl(impl)
+        q_create = jqt.Qarray.create(data)
+        assert q_from_impl.dims == q_create.dims
+        assert q_from_impl.bdims == q_create.bdims
+        assert jnp.allclose(q_from_impl.data, q_create.data)
+
+
+class TestToBackend:
+    """Tests for ``Qarray.to_backend`` — generic conversion across registered
+    backends.  No-op when already on the target."""
+
+    @pytest.mark.parametrize("src", ["dense", "sparse_bcoo", "sparse_dia"])
+    @pytest.mark.parametrize("dst", ["dense", "sparse_bcoo", "sparse_dia"])
+    def test_roundtrip_preserves_data(self, src, dst):
+        ref = jqt.destroy(4)
+        q_src = ref.to_backend(src)
+        q_dst = q_src.to_backend(dst)
+        assert q_dst.impl_type == QarrayImplType(dst)
+        assert jnp.allclose(q_dst.to_dense().data, ref.data)
+
+    def test_noop_when_same(self):
+        q = jqt.destroy(4)
+        assert q.to_backend("dense") is q
+
+    def test_noop_sparse_dia(self):
+        q = jqt.destroy(4, implementation="sparse_dia")
+        assert q.to_backend("sparse_dia") is q
+
+    def test_dense_to_sparse_dia_via_direct_method(self):
+        q = jqt.destroy(4)
+        q_sd = q.to_backend("sparse_dia")
+        assert q_sd.impl_type == QarrayImplType.SPARSE_DIA
+        assert jnp.allclose(q_sd.to_dense().data, q.data)
+
+
+class TestOperatorImplementationFlag:
+    """All operators expose ``implementation``; primitives and (square) composites
+    return Qarrays of the requested backend.  Kets fall back to dense."""
+
+    @pytest.mark.parametrize(
+        "op_factory",
+        [
+            lambda: jqt.sigmax(implementation="sparse_dia"),
+            lambda: jqt.sigmay(implementation="sparse_dia"),
+            lambda: jqt.sigmaz(implementation="sparse_dia"),
+            lambda: jqt.hadamard(implementation="sparse_dia"),
+            lambda: jqt.sigmam(implementation="sparse_dia"),
+            lambda: jqt.sigmap(implementation="sparse_dia"),
+            lambda: jqt.destroy(5, implementation="sparse_dia"),
+            lambda: jqt.create(5, implementation="sparse_dia"),
+            lambda: jqt.num(5, implementation="sparse_dia"),
+            lambda: jqt.identity(5, implementation="sparse_dia"),
+        ],
+    )
+    def test_primitive_returns_sparse_dia(self, op_factory):
+        op = op_factory()
+        assert op.impl_type == QarrayImplType.SPARSE_DIA
+
+    @pytest.mark.parametrize(
+        "op_factory, ref_factory",
+        [
+            (lambda: jqt.destroy(5, implementation="sparse_dia"), lambda: jqt.destroy(5)),
+            (lambda: jqt.create(5, implementation="sparse_dia"), lambda: jqt.create(5)),
+            (lambda: jqt.num(5, implementation="sparse_dia"), lambda: jqt.num(5)),
+            (lambda: jqt.identity(5, implementation="sparse_dia"), lambda: jqt.identity(5)),
+            (lambda: jqt.hadamard(implementation="sparse_dia"), lambda: jqt.hadamard()),
+        ],
+    )
+    def test_primitive_dense_equivalence(self, op_factory, ref_factory):
+        assert jnp.allclose(op_factory().to_dense().data, ref_factory().to_dense().data)
+
+    def test_displace_round_trips_to_sparse_dia(self):
+        ref = jqt.displace(5, 0.4)
+        op = jqt.displace(5, 0.4, implementation="sparse_dia")
+        assert op.impl_type == QarrayImplType.SPARSE_DIA
+        assert jnp.allclose(op.to_dense().data, ref.data)
+
+    def test_squeeze_round_trips_to_sparse_dia(self):
+        ref = jqt.squeeze(5, 0.3)
+        op = jqt.squeeze(5, 0.3, implementation="sparse_dia")
+        assert op.impl_type == QarrayImplType.SPARSE_DIA
+        assert jnp.allclose(op.to_dense().data, ref.data)
+
+    def test_qubit_rotation_sparse_dia(self):
+        ref = jqt.qubit_rotation(0.7, 1, 0, 0)
+        op = jqt.qubit_rotation(0.7, 1, 0, 0, implementation="sparse_dia")
+        assert op.impl_type == QarrayImplType.SPARSE_DIA
+        assert jnp.allclose(op.to_dense().data, ref.to_dense().data)
+
+    def test_thermal_dm_sparse_dia(self):
+        ref = jqt.thermal_dm(5, 0.5)
+        op = jqt.thermal_dm(5, 0.5, implementation="sparse_dia")
+        assert op.impl_type == QarrayImplType.SPARSE_DIA
+        assert jnp.allclose(op.to_dense().data, ref.to_dense().data)
+
+    def test_basis_falls_back_to_dense_for_ket_incompatible(self):
+        # SparseDIA can't store kets — basis must gracefully fall back.
+        ket = jqt.basis(5, 2, implementation="sparse_dia")
+        assert ket.impl_type == QarrayImplType.DENSE
+
+    def test_coherent_falls_back_to_dense(self):
+        # coherent yields a ket; sparse_dia requested but result is dense.
+        ket = jqt.coherent(5, 0.3, implementation="sparse_dia")
+        assert ket.impl_type == QarrayImplType.DENSE
+        assert jnp.allclose(ket.to_dense().data, jqt.coherent(5, 0.3).to_dense().data)
+
+
+class TestSettingsDefaultBackend:
+    """Operators default to ``implementation=None`` and inherit
+    ``SETTINGS['default_backend']``."""
+
+    def test_default_backend_propagates_to_operators(self):
+        original = SETTINGS.get("default_backend")
+        try:
+            SETTINGS["default_backend"] = "sparse_dia"
+            assert jqt.sigmax().impl_type == QarrayImplType.SPARSE_DIA
+            assert jqt.destroy(4).impl_type == QarrayImplType.SPARSE_DIA
+        finally:
+            if original is None:
+                SETTINGS.pop("default_backend", None)
+            else:
+                SETTINGS["default_backend"] = original
+
+    def test_explicit_dense_overrides_settings(self):
+        original = SETTINGS.get("default_backend")
+        try:
+            SETTINGS["default_backend"] = "sparse_dia"
+            assert jqt.sigmax(implementation="dense").impl_type == QarrayImplType.DENSE
+        finally:
+            if original is None:
+                SETTINGS.pop("default_backend", None)
+            else:
+                SETTINGS["default_backend"] = original
+
+
+def test_no_in_function_imports_in_operators():
+    """``operators.py`` should have no indented import statements."""
+    import re
+    import jaxquantum.core.operators as ops_mod
+
+    with open(ops_mod.__file__) as f:
+        source = f.read()
+
+    # Match a line that is indented (one or more spaces or tab) and starts with
+    # ``import `` or ``from ``.
+    pattern = re.compile(r"^[ \t]+(import |from )", re.MULTILINE)
+    matches = pattern.findall(source)
+    assert not matches, f"operators.py has indented imports: {matches!r}"
+
 
 # =========================================
