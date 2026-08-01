@@ -84,7 +84,7 @@ def _validate_shape(arr: Any, sharding: Any) -> None:
     """
     try:
         from jax.sharding import NamedSharding
-    except Exception:  # pragma: no cover — jax always has this
+    except Exception:  # noqa: BLE001  # pragma: no cover
         return
 
     if not isinstance(sharding, NamedSharding):

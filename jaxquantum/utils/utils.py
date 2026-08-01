@@ -17,11 +17,11 @@ config.update("jax_enable_x64", True)
 
 def device_put_params(params: Dict, non_device_params=None):
     non_device_params = [] if non_device_params is None else non_device_params
-    for param in params:
+    for param, value in params.items():
         if param in non_device_params:
             continue
-        if isinstance(params[param], Number) or isinstance(params[param], np.ndarray):
-            params[param] = device_put(params[param])
+        if isinstance(value, (Number, np.ndarray)):
+            params[param] = device_put(value)
     return params
 
 
@@ -274,7 +274,7 @@ def _array_axis_priority(mesh_axis_name: str):
     operator. This is rare and never incorrect (sharding stays valid).
     """
     name = mesh_axis_name.lower()
-    is_dp = name.startswith("dp") or name.startswith("data")
+    is_dp = name.startswith(("dp", "data"))
 
     def priority(shape) -> list:
         rank = len(shape)

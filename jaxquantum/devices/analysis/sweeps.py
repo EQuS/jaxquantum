@@ -54,13 +54,13 @@ def run_sweep(
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
         else:
-            save_file = save_file or NamedTemporaryFile()
+            save_file = save_file or NamedTemporaryFile()  # noqa: SIM115
             print("Saving data to a temporary file: ", save_file.name)
 
     fixed_kwargs = fixed_kwargs or {}
 
     if is_parallel:
-        sweep_length = len(list(sweep_params.values())[0])
+        sweep_length = len(next(iter(sweep_params.values())))
         assert [len(vals) == sweep_length for vals in sweep_params.values()], (
             "Parallel sweep parameters must have the same length."
         )
@@ -87,7 +87,7 @@ def run_sweep(
                     jnp.savez(
                         save_file, data=data, sweep_params=sweep_params, params=params
                     )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             errors.append(str(e))
             print("Error during run: ", errors[-1])
 
@@ -100,7 +100,7 @@ def run_sweep(
                     params=params,
                     error=None,
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             errors.append(str(e))
             print("Error during saving: ", errors[-1])
 
@@ -148,7 +148,7 @@ def run_sweep(
                             sweep_params=sweep_params,
                             params=params,
                         )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             errors.append(str(e))
             print("Error during run: ", errors[-1])
 
@@ -157,7 +157,7 @@ def run_sweep(
                 jnp.savez(
                     save_file, data=data, sweep_params=sweep_params, params=params
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             errors.append(str(e))
             print("Error during saving: ", errors[-1])
 

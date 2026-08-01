@@ -225,9 +225,8 @@ def test_dp_falls_through_to_matrix_when_no_batch():
     """A bare (N, N) matrix with axis_names=('dp',) still gets sharded (matrix-row)."""
     jqt.set_device_mesh(shape=(2,), axis_names=("dp",))
     a = jqt.identity(8)
-    spec = a.data.sharding.spec
-    assert spec[0] == "dp"
-    assert spec[1] is None
+    spec = _padded_spec(a.data)
+    assert spec == ("dp", None)
 
 
 # ---------------------------------------------------------------------------
@@ -238,9 +237,8 @@ def test_mp_shards_matrix_dim():
     """Bare (N, N) with axis_names=('mp',) shards the matrix-row dim."""
     jqt.set_device_mesh(shape=(2,), axis_names=("mp",))
     a = jqt.identity(8)
-    spec = a.data.sharding.spec
-    assert spec[0] == "mp"
-    assert spec[1] is None
+    spec = _padded_spec(a.data)
+    assert spec == ("mp", None)
 
 
 def test_mp_skips_batch_dim_when_present():

@@ -90,7 +90,7 @@ class QarrayImplType(Enum):
         try:
             cls.from_impl_class(x)
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
 
     @classmethod
@@ -822,15 +822,15 @@ class Qarray(Generic[ImplT]):
         if len(data.shape) == 1 and data.shape[0] > 0:
             data = data.reshape(data.shape[0], 1)
 
-        if len(data.shape) >= 2:
-            if data.shape[-2] != data.shape[-1] and not (
-                data.shape[-2] == 1 or data.shape[-1] == 1
-            ):
-                data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
+        if (
+            len(data.shape) >= 2
+            and data.shape[-2] != data.shape[-1]
+            and not (data.shape[-2] == 1 or data.shape[-1] == 1)
+        ):
+            data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
 
-        if bdims is not None:
-            if len(data.shape) - len(bdims) == 1:
-                data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
+        if bdims is not None and len(data.shape) - len(bdims) == 1:
+            data = data.reshape(*data.shape[:-1], data.shape[-1], 1)
 
         if bdims is None:
             bdims = tuple(data.shape[:-2])
@@ -1323,7 +1323,9 @@ class Qarray(Generic[ImplT]):
 
     def __eq__(self, other):
         if not isinstance(other, Qarray):
-            raise ValueError("Cannot calculate equality of a Qarray with a non-Qarray.")
+            raise ValueError(  # noqa: TRY004
+                "Cannot calculate equality of a Qarray with a non-Qarray."
+            )
 
         if self.dims != other.dims:
             return False
@@ -1442,7 +1444,7 @@ class Qarray(Generic[ImplT]):
             ValueError: If *other* is a ``Qarray``.
         """
         if isinstance(other, Qarray):
-            raise ValueError("Cannot divide a Qarray by another Qarray.")
+            raise ValueError("Cannot divide a Qarray by another Qarray.")  # noqa: TRY004
 
         return self.__mul__(1 / other)
 

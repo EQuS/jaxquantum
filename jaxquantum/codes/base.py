@@ -2,7 +2,7 @@
 Base Bosonic Qubit Class
 """
 
-from typing import Dict, Optional, Tuple
+from typing import ClassVar, Dict, Optional, Tuple
 from abc import abstractmethod, ABCMeta
 
 from jaxquantum.utils.utils import device_put_params
@@ -21,8 +21,8 @@ class BosonicQubit(metaclass=ABCMeta):
     Base class for Bosonic Qubits.
     """
 
-    BASE_PARAMETERS = ["N"]
-    PARAMETERS = []
+    BASE_PARAMETERS: ClassVar[list[str]] = ["N"]
+    PARAMETERS: ClassVar[list[str]] = []
 
     name = "bqubit"
 
@@ -33,7 +33,9 @@ class BosonicQubit(metaclass=ABCMeta):
         """
         return ["N"]
 
-    def __init__(self, params: Optional[Dict[str, float]] = None, name: str = None):
+    def __init__(
+        self, params: Optional[Dict[str, float]] = None, name: Optional[str] = None
+    ):
         if name is not None:
             self.name = name
 
@@ -283,7 +285,7 @@ class BosonicQubit(metaclass=ABCMeta):
             state = self._prepare_state_plot(self.basis[label])
             pos = (i // 3, i % 3)
             ax = axs[pos]
-            _, w_plt = self._plot_single(state, ax=ax, qp_type=qp_type, **kwargs)
+            self._plot_single(state, ax=ax, qp_type=qp_type, **kwargs)
             ax.set_title(f"|{label}" + r"$\rangle$")
             ax.set_xlabel(r"Re[$\alpha$]")
             ax.set_ylabel(r"Im[$\alpha$]")

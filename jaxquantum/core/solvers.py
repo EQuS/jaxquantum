@@ -186,7 +186,7 @@ def mesolve(
     # if isinstance(H, Qarray):
 
     if len(c_ops) == 0 and rho0.qtype != Qtypes.oper:
-        logging.warning(
+        logging.warning(  # noqa: LOG015
             "Consider using `jqt.sesolve()` instead, as `c_ops` is an empty list and the initial state is not a density matrix."
         )
 

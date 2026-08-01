@@ -192,12 +192,11 @@ def plot_qp(
     bdims = state.bdims
     added_baxes = 0
 
-    if subtitles is not None:
-        if subtitles.shape != bdims:
-            raise ValueError(
-                f"labels must have same shape as bdims, "
-                f"got shapes {subtitles.shape} and {bdims}"
-            )
+    if subtitles is not None and subtitles.shape != bdims:
+        raise ValueError(
+            f"labels must have same shape as bdims, "
+            f"got shapes {subtitles.shape} and {bdims}"
+        )
 
     if len(bdims) == 0:
         bdims = (1,)
@@ -795,12 +794,11 @@ def plot_cf(
     bdims = state.bdims
     added_baxes = 0
 
-    if subtitles is not None:
-        if subtitles.shape != bdims:
-            raise ValueError(
-                f"labels must have same shape as bdims, "
-                f"got shapes {subtitles.shape} and {bdims}"
-            )
+    if subtitles is not None and subtitles.shape != bdims:
+        raise ValueError(
+            f"labels must have same shape as bdims, "
+            f"got shapes {subtitles.shape} and {bdims}"
+        )
 
     if len(bdims) == 0:
         bdims = (1,)
@@ -834,9 +832,10 @@ def plot_cf(
         vmax = 1
         scale = 1
         cmap = "seismic"
-        cbar_label = [r"$\mathcal{Re}(\chi_W(\alpha))$", r"$\mathcal{"
-                                                         r"Im}(\chi_W("
-                                                         r"\alpha))$"]
+        cbar_label = [
+            r"$\mathcal{Re}(\chi_W(\alpha))$",
+            r"$\mathcal{Im}(\chi_W(\alpha))$",
+        ]
         QP = scale * cf_wigner(state, pts_x, pts_y)
 
     for _ in range(added_baxes):

@@ -361,7 +361,7 @@ class QuantumStateTomography:
                 "No results to plot. Run quantum_state_tomography_mle first."
             )
 
-        fig, ax = plt.subplots(1, figsize=(5, 4))
+        _, ax = plt.subplots(1, figsize=(5, 4))
         if self._result.infidelity_history is not None:
             ax2 = ax.twinx()
 
@@ -394,7 +394,7 @@ def tensor_basis(single_basis: Qarray, n: int) -> Qarray:
     dims = single_basis.dims
 
     single_basis = single_basis.data
-    b, d, _ = single_basis.shape
+    b, _, _ = single_basis.shape
     indices = jnp.stack(jnp.meshgrid(*[jnp.arange(b)] * n, indexing="ij"),
                         axis=-1).reshape(-1, n)  # shape (b^n, n)
 
