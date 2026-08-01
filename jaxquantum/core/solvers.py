@@ -19,8 +19,7 @@ import logging
 
 from jax.experimental import sparse as _sparse
 
-from jaxquantum.core.qarray import Qarray, Qtypes, dag_data
-from jaxquantum.core.conversions import jnp2jqt
+from jaxquantum.core.qarray import DenseImpl, Qarray, Qtypes, dag_data
 from jaxquantum.core.operators import identity_like, multi_mode_basis_set
 from jaxquantum.utils.utils import robust_isscalar
 
@@ -195,7 +194,7 @@ def mesolve(
     if robust_isscalar(H):
         H = H * identity_like(ρ0)  # treat scalar H as a multiple of the identity
 
-    dims = ρ0.dims
+    qdims = ρ0.qdims
     ρ0 = ρ0.data
 
     c_ops = c_ops.data
@@ -208,7 +207,7 @@ def mesolve(
     ys = _mesolve_data(Ht_data, ρ0, tlist, saveat_tlist, c_ops,
                        solver_options=solver_options)
 
-    return jnp2jqt(ys, dims=dims)
+    return Qarray._from_impl(DenseImpl._make(ys), qdims)
 
 
 def _mesolve_data(
@@ -263,7 +262,7 @@ def _mesolve_data(
         batch_shape = jnp.broadcast_shapes(
             c_ops.shape[1:-2], H0_shape[:-2], ρ0.shape[:-2]
         )
-    ρ0 = jnp.resize(ρ0, batch_shape + ρ0.shape[-2:])  # ensure correct shape
+    ρ0 = jnp.broadcast_to(ρ0, batch_shape + ρ0.shape[-2:])
 
     if len(c_ops) != 0:
         c_ops_bdims = c_ops.shape[:-2]
@@ -351,7 +350,7 @@ def sesolve(
     if robust_isscalar(H):
         H = H * identity_like(ψ)  # treat scalar H as a multiple of the identity
 
-    dims = ψ.dims
+    qdims = ψ.qdims
     ψ = ψ.data
 
     if isinstance(H, Qarray):
@@ -362,7 +361,7 @@ def sesolve(
     ys = _sesolve_data(Ht_data, ψ, tlist, saveat_tlist,
                        solver_options=solver_options)
 
-    return jnp2jqt(ys, dims=dims)
+    return Qarray._from_impl(DenseImpl._make(ys), qdims)
 
 
 def _sesolve_data(
@@ -404,8 +403,8 @@ def _sesolve_data(
 
         return ψₜ_dot
 
-    ψ_test = f(0, ψ, None)
-    ψ = jnp.resize(ψ, ψ_test.shape)  # ensure correct shape
+    batch_shape = jnp.broadcast_shapes(H(0.0).shape[:-2], ψ.shape[:-1])
+    ψ = jnp.broadcast_to(ψ, batch_shape + ψ.shape[-1:])
 
     sol = solve(f, ψ, tlist, saveat_tlist, None, solver_options=solver_options)
     return sol.ys

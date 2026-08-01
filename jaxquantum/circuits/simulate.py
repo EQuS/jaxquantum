@@ -2,9 +2,11 @@
 
 from flax import struct
 from jax import config
+import jax.numpy as jnp
+from math import prod
 from typing import List
 
-from jaxquantum.core.qarray import Qarray, ket2dm
+from jaxquantum.core.qarray import DenseImpl, Qarray, Qtypes, ket2dm
 from jaxquantum.circuits.circuits import Circuit, Layer
 from jaxquantum.circuits.constants import SimulateMode
 from jaxquantum.core.solvers import mesolve, sesolve, SolverOptions
@@ -37,6 +39,69 @@ class Results:
         return len(self.results)
 
 
+def _apply_matrix_to_axes(data, matrix, target_axes, system_shape):
+    """Apply a matrix to selected tensor axes without forming a full operator."""
+    n_system_axes = len(system_shape)
+    batch_shape = data.shape[:-n_system_axes]
+    target_axes = tuple(target_axes)
+
+    if target_axes == tuple(range(target_axes[0], target_axes[-1] + 1)):
+        start, stop = target_axes[0], target_axes[-1] + 1
+        left = prod(system_shape[:start])
+        target = prod(system_shape[start:stop])
+        right = prod(system_shape[stop:])
+        data = data.reshape(batch_shape + (left, target, right))
+        data = jnp.einsum("...ij,...ljr->...lir", matrix, data)
+        return data.reshape(data.shape[:-3] + tuple(system_shape))
+
+    other_axes = tuple(i for i in range(n_system_axes) if i not in target_axes)
+    order = other_axes + target_axes
+    n_batch_axes = len(batch_shape)
+
+    data = jnp.transpose(
+        data,
+        tuple(range(n_batch_axes))
+        + tuple(n_batch_axes + axis for axis in order),
+    )
+    other_shape = tuple(system_shape[axis] for axis in other_axes)
+    target_shape = tuple(system_shape[axis] for axis in target_axes)
+    data = data.reshape(batch_shape + (prod(other_shape), prod(target_shape)))
+    data = jnp.einsum("...ij,...kj->...ki", matrix, data)
+
+    out_batch_shape = data.shape[:-2]
+    data = data.reshape(out_batch_shape + other_shape + target_shape)
+    return jnp.transpose(
+        data,
+        tuple(range(len(out_batch_shape)))
+        + tuple(len(out_batch_shape) + order.index(axis) for axis in range(n_system_axes)),
+    )
+
+
+def _apply_local_unitary(state: Qarray, operation) -> Qarray:
+    dims = tuple(operation.register.dims)
+    unitary = operation.gate.U.to_dense().data
+    n_modes = len(dims)
+
+    if state.qtype == Qtypes.ket:
+        data = state.data.reshape(state.data.shape[:-1] + dims)
+        data = _apply_matrix_to_axes(data, unitary, operation.indices, dims)
+        data = data.reshape(data.shape[:-n_modes] + (prod(dims),))
+    else:
+        system_shape = dims + dims
+        data = state.to_dense().data.reshape(state.data.shape[:-2] + system_shape)
+        data = _apply_matrix_to_axes(data, unitary, operation.indices, system_shape)
+        bra_axes = tuple(n_modes + index for index in operation.indices)
+        data = _apply_matrix_to_axes(data, jnp.conj(unitary), bra_axes, system_shape)
+        data = data.reshape(data.shape[:-2 * n_modes] + (prod(dims), prod(dims)))
+
+    return Qarray._from_impl(DenseImpl._make(data), state._qdims)
+
+
+def _single_state_batch(state: Qarray) -> Qarray:
+    impl = type(state._impl).from_data(jnp.expand_dims(state.data, axis=0))
+    return Qarray._from_impl(impl, state._qdims)
+
+
 def simulate(
     circuit: Circuit, initial_state: Qarray, mode: SimulateMode = SimulateMode.DEFAULT, **kwargs
 ) -> Results:
@@ -59,7 +124,7 @@ def simulate(
 
     results = Results.create([])
     state = initial_state
-    results.append(Qarray.from_list([state]))
+    results.append(_single_state_batch(state))
 
     start_time = 0
 
@@ -100,13 +165,9 @@ def _simulate_layer(
         mode = layer._default_simulate_mode
 
     if mode == SimulateMode.UNITARY:
-        U = layer.gen_U()
-        if state.is_dm():
-            state = U @ state @ U.dag()
-        else:
-            state = U @ state
-
-        result = Qarray.from_list([state])
+        for operation in layer.operations:
+            state = _apply_local_unitary(state, operation)
+        result = _single_state_batch(state)
 
     elif mode == SimulateMode.HAMILTONIAN:
 

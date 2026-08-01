@@ -1,0 +1,81 @@
+{
+  "system": {
+    "os": "Windows 11 with WSL2 Ubuntu 24.04",
+    "wsl_kernel": "6.6.87.2-microsoft-standard-WSL2",
+    "gpu": "NVIDIA GeForce RTX 4080 SUPER",
+    "driver": "595.95",
+    "gpu_memory_mib": 16376,
+    "jax": "0.11.0",
+    "python": "3.12.3",
+    "x64": true,
+    "preallocate": false
+  },
+  "telemetry": {
+    "sample_interval_ms": 200,
+    "gpu_utilization_max_percent": 100,
+    "memory_utilization_max_percent": 100,
+    "gpu_memory_used_max_mib": 6964,
+    "power_max_w": 321.14,
+    "temperature_max_c": 50
+  },
+  "roofs": [
+    {
+      "name": "stream_float64",
+      "iterations": 20,
+      "arithmetic_intensity_flop_per_byte": 0.08333333333333333,
+      "median_s": 0.0023663510000000443,
+      "min_s": 0.002294058999999571,
+      "median_gb_s": 340.31568774031615,
+      "peak_gb_s": 351.0399549445549
+    },
+    {
+      "name": "gemm_float32",
+      "size": 8192,
+      "iterations": 20,
+      "median_tflop_s": 51.37022027060658,
+      "peak_tflop_s": 52.60480135264095
+    },
+    {
+      "name": "gemm_float64",
+      "size": 4096,
+      "iterations": 20,
+      "median_tflop_s": 0.8658067577298926,
+      "peak_tflop_s": 0.8711437198993492
+    },
+    {
+      "name": "gemm_complex64",
+      "size": 8192,
+      "iterations": 20,
+      "median_tflop_s": 53.496614648924535,
+      "peak_tflop_s": 54.01951564074561
+    },
+    {
+      "name": "gemm_complex128",
+      "size": 4096,
+      "iterations": 20,
+      "median_tflop_s": 0.9554127295861173,
+      "peak_tflop_s": 1.0429631898956329
+    }
+  ],
+  "jaxquantum_kernels": [
+    {
+      "name": "qarray_matvec_complex128",
+      "size": 6144,
+      "iterations": 20,
+      "arithmetic_intensity_flop_per_byte": 0.4998372925479987,
+      "median_s": 0.0013126119999995467,
+      "median_gflop_s": 230.06790125345822,
+      "median_gb_s": 460.285586296795
+    },
+    {
+      "name": "local_circuit_complex128",
+      "qubits": 20,
+      "depth": 64,
+      "iterations": 20,
+      "arithmetic_intensity_flop_per_byte": 0.5,
+      "median_s": 0.08785387599999694,
+      "median_gflop_s": 12.221906111462143,
+      "median_gb_s": 24.443812222924286
+    }
+  ]
+}

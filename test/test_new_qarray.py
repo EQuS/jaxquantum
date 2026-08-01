@@ -67,6 +67,14 @@ def test_conversion_between_implementations():
     assert a_dense.to_dense() == a_dense
     assert a_sparse.to_sparse_bcoo() == a_sparse
 
+
+def test_internal_results_do_not_repeat_public_tidy():
+    source = jqt.Qarray.create(jnp.array([1e-13]), qtype="ket")
+
+    assert jqt.Qarray.create(jnp.array([1e-15]), qtype="ket").data[0] == 0
+    assert (source * 1e-2).data[0] == 1e-15
+
+
 def test_implementation_preservation():
     """Test that operations preserve implementation type when possible."""
     

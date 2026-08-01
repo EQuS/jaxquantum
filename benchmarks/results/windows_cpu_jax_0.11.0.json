@@ -1,0 +1,72 @@
+{
+  "system": {
+    "os": "Windows 11",
+    "backend": "cpu",
+    "jax": "0.11.0",
+    "python": "3.12.9"
+  },
+  "before": [
+    {
+      "name": "qarray_dense_chain",
+      "compile_s": 0.036882100626826286,
+      "warm_median_s": 0.0004023490473628044,
+      "hlo_chars": 48952
+    },
+    {
+      "name": "qarray_matvec_chain",
+      "compile_s": 0.0353085994720459,
+      "warm_median_s": 0.004161549732089043,
+      "hlo_chars": 28435
+    },
+    {
+      "name": "transmon_hamiltonian",
+      "compile_s": 0.05754789896309376,
+      "warm_median_s": 0.00006140116602182388,
+      "hlo_chars": 37596
+    },
+    {
+      "name": "transmon_operators",
+      "compile_s": 0.10738690011203289,
+      "warm_median_s": 0.00011354964226484299,
+      "hlo_chars": 135470
+    },
+    {
+      "name": "unitary_circuit",
+      "compile_s": 0.5762120001018047,
+      "warm_median_s": 0.009374999441206455,
+      "hlo_chars": 1165204
+    }
+  ],
+  "after": [
+    {
+      "name": "qarray_dense_chain",
+      "compile_s": 0.019513998180627823,
+      "warm_median_s": 0.00038330070674419403,
+      "hlo_chars": 8243
+    },
+    {
+      "name": "qarray_matvec_chain",
+      "compile_s": 0.014378700405359268,
+      "warm_median_s": 0.003785199485719204,
+      "hlo_chars": 3370
+    },
+    {
+      "name": "transmon_hamiltonian",
+      "compile_s": 0.0287587009370327,
+      "warm_median_s": 0.000047099776566028595,
+      "hlo_chars": 10925
+    },
+    {
+      "name": "transmon_operators",
+      "compile_s": 0.06316009908914566,
+      "warm_median_s": 0.00014834944158792496,
+      "hlo_chars": 36078
+    },
+    {
+      "name": "unitary_circuit",
+      "compile_s": 0.09760849922895432,
+      "warm_median_s": 0.00003834906965494156,
+      "hlo_chars": 215649
+    }
+  ]
+}

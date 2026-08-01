@@ -272,10 +272,8 @@ def _qfunc_iterative_single(
 
 def _qfunc_coherent_grid(xvec, yvec, g):
     x, y = jnp.meshgrid(0.5 * g * xvec, 0.5 * g * yvec)
-    grid = jnp.empty(x.shape, dtype=jnp.complex128)
-    grid += x
     # We produce the adjoint of the coherent states to save an operation
     # later when computing dot products, hence the negative imaginary part.
-    grid += -y * 1.0j
+    grid = x - 1.0j * y
     prefactor = jnp.exp(-0.5 * (x * x + y * y)).astype(jnp.complex128)
     return grid, prefactor

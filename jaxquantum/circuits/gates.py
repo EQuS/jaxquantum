@@ -64,10 +64,7 @@ class Gate:
         _Ht = gen_Ht(params) if gen_Ht is not None else None 
         _c_ops = gen_c_ops(params) if gen_c_ops is not None else Qarray.from_list([])
 
-        if gen_KM is not None:
-            _KM = gen_KM(params)
-        elif _U is not None:
-            _KM = Qarray.from_list([_U])
+        _KM = gen_KM(params) if gen_KM is not None else None
 
         return Gate(
             dims = dims,
@@ -101,7 +98,12 @@ class Gate:
 
     @property
     def KM(self):
-        return self._KM
+        if self._KM is not None:
+            return self._KM
+        if self._U is None:
+            return Qarray.from_list([])
+        impl = type(self._U._impl).from_data(self._U.data[None])
+        return Qarray._from_impl(impl, self._U._qdims)
 
     @property
     def c_ops(self):

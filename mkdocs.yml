@@ -102,6 +102,7 @@ nav:
     - documentation/index.md
     - Getting Started:
       - Installation: documentation/getting_started/installation.md
+      - NVIDIA GPU on Windows: documentation/getting_started/gpu_windows.md
       - Qarray: documentation/getting_started/qarray.ipynb
       - The Sharp Bits 🔪: documentation/getting_started/sharp_bits.md
     - Tutorials:

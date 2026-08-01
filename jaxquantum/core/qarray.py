@@ -24,9 +24,6 @@ from jaxquantum.core.dims import (
     Qdims,
     check_dims,
     ket_from_op_dims,
-    isket_dims,
-    isbra_dims,
-    isop_dims,
 )
 
 config.update("jax_enable_x64", True)
@@ -683,6 +680,14 @@ class Qarray(Generic[ImplT]):
 
     # Initialization ----
     @classmethod
+    def _from_impl(cls, impl, qdims, bdims=None):
+        """Wrap a canonical internal result without repeating public validation."""
+        if bdims is None:
+            shape = impl.shape()
+            bdims = shape[:-2] if qdims.qtype == Qtypes.oper else shape[:-1]
+        return cls(impl, qdims, tuple(bdims))
+
+    @classmethod
     @overload
     def create(cls, data, dims=None, bdims=None, qtype=None, implementation: Literal[QarrayImplType.DENSE] = QarrayImplType.DENSE) -> "Qarray[DenseImpl]":
         ...
@@ -1203,11 +1208,8 @@ class Qarray(Generic[ImplT]):
 
     def __getitem__(self, index):
         if len(self.bdims) > 0:
-            return Qarray.create(
-                self.data[index],
-                dims=self.dims,
-                implementation=self.impl_type,
-            )
+            impl = type(self._impl).from_data(self.data[index])
+            return Qarray._from_impl(impl, self._qdims)
         else:
             raise ValueError("Cannot index a non-batched Qarray.")
 
@@ -1362,11 +1364,7 @@ class Qarray(Generic[ImplT]):
         # so create() infers bdims/qtype from the result shape unambiguously.
         if st == Qtypes.oper and ot == Qtypes.oper:
             new_impl = self._impl.matmul(other._impl)
-            return Qarray.create(
-                new_impl.data,
-                dims=_qdims_new.dims,
-                implementation=new_impl.impl_type,
-            )
+            return Qarray._from_impl(new_impl, _qdims_new)
 
         # bra @ oper  ==  dag( oper^dag @ bra^dag ).  Reusing the oper @ ket path
         # keeps a sparse operator sparse (no densification of the operator).
@@ -1385,8 +1383,7 @@ class Qarray(Generic[ImplT]):
                 # Transient column only inside the sparse kernel; never stored.
                 rhs = vec[..., None]  # (..., N, 1)
                 out = self._impl.matmul(DenseImpl._make(rhs)).data[..., 0]
-            return Qarray.create(out, dims=_qdims_new.dims, bdims=out.shape[:-1],
-                                 qtype=Qtypes.ket)
+            return Qarray._from_impl(DenseImpl._make(out), _qdims_new)
 
         # Vector ⊗/· vector — both operands are dense.
         a = self.to_dense().data
@@ -1394,14 +1391,12 @@ class Qarray(Generic[ImplT]):
         if st == Qtypes.ket and ot == Qtypes.bra:
             # Outer product |a><b| → operator.
             out = jnp.einsum("...i,...j->...ij", a, b)
-            return Qarray.create(out, dims=_qdims_new.dims, bdims=out.shape[:-2],
-                                 qtype=Qtypes.oper)
+            return Qarray._from_impl(DenseImpl._make(out), _qdims_new)
         if st == Qtypes.bra and ot == Qtypes.ket:
             # Inner product <a|b> → 1x1 "ket" (qdims ((1,),(1,))).
             out = jnp.einsum("...i,...i->...", a, b)
             out = out.reshape(out.shape + (1,))
-            return Qarray.create(out, dims=_qdims_new.dims, bdims=out.shape[:-1],
-                                 qtype=_qdims_new.qtype)
+            return Qarray._from_impl(DenseImpl._make(out), _qdims_new)
 
         return NotImplemented
 
@@ -1417,13 +1412,7 @@ class Qarray(Generic[ImplT]):
             other = other.reshape(other.shape + extra)
 
         new_impl = self._impl.mul(other)
-        # Pass the full dims tuple (not qtype/bdims): a scalar *array* can add
-        # leading batch dims, so let create() infer bdims from the result shape.
-        return Qarray.create(
-            new_impl.data,
-            dims=self._qdims.dims,
-            implementation=new_impl.impl_type,
-        )
+        return Qarray._from_impl(new_impl, self._qdims)
 
     def __rmul__(self, other):
         return self.__mul__(other)
@@ -1459,11 +1448,7 @@ class Qarray(Generic[ImplT]):
                 )
                 raise ValueError(msg)
             new_impl = self._impl.add(other._impl)
-            return Qarray.create(
-                new_impl.data,
-                dims=self.dims,
-                implementation=new_impl.impl_type,
-            )
+            return Qarray._from_impl(new_impl, self._qdims)
 
         if robust_isscalar(other) and other == 0:
             return self.copy()
@@ -1496,11 +1481,7 @@ class Qarray(Generic[ImplT]):
                 )
                 raise ValueError(msg)
             new_impl = self._impl.sub(other._impl)
-            return Qarray.create(
-                new_impl.data,
-                dims=self.dims,
-                implementation=new_impl.impl_type,
-            )
+            return Qarray._from_impl(new_impl, self._qdims)
 
         if robust_isscalar(other) and other == 0:
             return self.copy()
@@ -1673,11 +1654,7 @@ class Qarray(Generic[ImplT]):
             A new ``Qarray`` containing the real parts of each element.
         """
         new_impl = self._impl.real()
-        return Qarray.create(
-            new_impl.data,
-            dims=self.dims,
-            implementation=new_impl.impl_type,
-        )
+        return Qarray._from_impl(new_impl, self._qdims)
 
     def imag(self):
         """Element-wise imaginary part.
@@ -1686,12 +1663,7 @@ class Qarray(Generic[ImplT]):
             A new ``Qarray`` containing the imaginary parts of each element.
         """
         new_impl = self._impl.imag()
-
-        return Qarray.create(
-            new_impl.data,
-            dims=self.dims,
-            implementation=new_impl.impl_type,
-        )
+        return Qarray._from_impl(new_impl, self._qdims)
 
     def conj(self):
         """Element-wise complex conjugate.
@@ -1700,11 +1672,7 @@ class Qarray(Generic[ImplT]):
             A new ``Qarray`` containing the complex-conjugated elements.
         """
         new_impl = self._impl.conj()
-        return Qarray.create(
-            new_impl.data,
-            dims=self.dims,
-            implementation=new_impl.impl_type,
-        )
+        return Qarray._from_impl(new_impl, self._qdims)
 
     def expm(self):
         """Matrix exponential."""
@@ -1983,7 +1951,8 @@ def tensor(*args, **kwargs) -> Qarray:
                 )
             dims_0 = dims_0 + arg.dims[0]
             dims_1 = dims_1 + arg.dims[1]
-        return Qarray.create(data, dims=(dims_0, dims_1), implementation=target_impl_type)
+        impl = target_impl_type.get_impl_class().from_data(data)
+        return Qarray._from_impl(impl, Qdims((dims_0, dims_1)))
 
     # Non-parallel: delegate to each impl's kron method.
     # All-sparse inputs stay sparse; mixed inputs promote to dense via _coerce.
@@ -1994,8 +1963,7 @@ def tensor(*args, **kwargs) -> Qarray:
         current_impl = current_impl.kron(arg._impl)
         dims_0 = dims_0 + arg.dims[0]
         dims_1 = dims_1 + arg.dims[1]
-    return Qarray.create(current_impl.data, dims=(dims_0, dims_1),
-                         implementation=current_impl.impl_type)
+    return Qarray._from_impl(current_impl, Qdims((dims_0, dims_1)))
 
 
 def tr(qarr: Qarray, **kwargs) -> Array:
@@ -2239,21 +2207,14 @@ def eigenstates(qarr: Qarray) -> Qarray:
     dense_qarr = qarr.to_dense()
 
     evals, evecs = jnp.linalg.eigh(dense_qarr.data)
-    idxs_sorted = jnp.argsort(evals, axis=-1)
-
     dims = ket_from_op_dims(qarr.dims)
-
-    evals = jnp.take_along_axis(evals, idxs_sorted, axis=-1)
-    evecs = jnp.take_along_axis(evecs, idxs_sorted[..., None, :], axis=-1)
 
     # numpy returns [batch, :, i] as the i-th eigenvector
     # we want [batch, i, :] as the i-th eigenvector
     evecs = jnp.swapaxes(evecs, -2, -1)
-
-    evecs = Qarray.create(
-        evecs,
-        dims=dims,
-        bdims=evecs.shape[:-1],
+    evecs = Qarray._from_impl(
+        DenseImpl._make(evecs),
+        Qdims(dims),
     )
 
     return evals, evecs
@@ -2332,11 +2293,7 @@ def dag(qarr: Qarray) -> Qarray:
     # Pass only the (reversed) dims tuple — not bdims/qtype. ``_bdims`` is a
     # static pytree field and is stale under ``vmap``; let create() infer the
     # batch dims from the actual data shape (which vmap does update).
-    return Qarray.create(
-        new_impl.data,
-        dims=dims,
-        implementation=new_impl.impl_type,
-    )
+    return Qarray._from_impl(new_impl, Qdims(dims))
 
 
 def dag_data(arr) -> Array:
