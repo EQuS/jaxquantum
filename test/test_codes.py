@@ -418,12 +418,37 @@ class TestCatQubit:
         assert cat_qubit.name == "cat"
         assert cat_qubit.params["N"] == 50  # default
         assert cat_qubit.params["alpha"] == 2  # default
+        assert cat_qubit.params["delta"] == 1.0
     
     def test_cat_qubit_custom_params(self):
         """Test CatQubit with custom parameters."""
-        cat_qubit = jqtb.CatQubit({"N": 20, "alpha": 3.0})
+        cat_qubit = jqtb.CatQubit({"N": 20, "alpha": 3.0, "delta": 0.7})
         assert cat_qubit.params["N"] == 20
         assert cat_qubit.params["alpha"] == 3.0
+        assert cat_qubit.params["delta"] == 0.7
+
+    def test_cat_qubit_squeezed_states_match_paper_definition(self):
+        """Test displaced squeezed states and their even cat."""
+        N, alpha, delta = 30, 1.3, 0.75
+        cat_qubit = jqtb.CatQubit({"N": N, "alpha": alpha, "delta": delta})
+        squeezed_vacuum = jqt.squeeze(N, -jnp.log(delta)) @ jqt.basis(N, 0)
+        plus_z = jqt.displace(N, alpha) @ squeezed_vacuum
+        minus_z = jqt.displace(N, -alpha) @ squeezed_vacuum
+        assert jnp.allclose(
+            jqtb.CatQubit.displaced_squeezed_state(N, alpha, delta).data,
+            plus_z.data,
+        )
+        assert jnp.allclose(cat_qubit.basis["+z"].data, plus_z.data)
+        assert jnp.allclose(cat_qubit.basis["-z"].data, minus_z.data)
+        assert jnp.allclose(
+            jqtb.CatQubit.cat_state(N, alpha, delta).data,
+            jqt.unit(plus_z + minus_z).data,
+        )
+
+    def test_cat_qubit_rejects_invalid_delta(self):
+        """Test the paper range 0 < delta <= 1."""
+        with pytest.raises(ValueError, match="delta"):
+            jqtb.CatQubit({"delta": 0.0})
     
     def test_cat_qubit_basis_states(self):
         """Test CatQubit basis state construction."""
@@ -436,11 +461,12 @@ class TestCatQubit:
         assert jnp.allclose(jnp.abs((minus_z.dag() @ minus_z).data), 1.0, atol=1e-10)
         # Check that states are orthogonal - use more relaxed tolerance for finite truncation
         assert jnp.allclose((plus_z.dag() @ minus_z).data, 0.0, atol=1e-1)
-    
+
     def test_cat_qubit_non_device_params(self):
-        """Test that alpha is in non_device_params."""
+        """Test that cat parameters remain host-side."""
         cat_qubit = jqtb.CatQubit()
         assert "alpha" in cat_qubit._non_device_params
+        assert "delta" in cat_qubit._non_device_params
 
 
 class TestBinomialQubit:
