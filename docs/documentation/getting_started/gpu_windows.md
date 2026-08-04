@@ -50,7 +50,11 @@ The output should include `gpu` and `CudaDevice(id=0)`. Then run:
 ```bash
 python benchmarks/performance.py
 python benchmarks/roofline.py
+bash test.sh
 ```
+
+`test.sh` runs ordinary tests on the selected backend, then isolates the
+eight-virtual-CPU sharding tests with `JAX_PLATFORMS=cpu`.
 
 Monitor utilization in another WSL terminal:
 

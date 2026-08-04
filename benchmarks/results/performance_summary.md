@@ -29,6 +29,15 @@ regressions; the ancilla reset is 1.06x faster and compiles 1.54x faster.
 Data: [CPU](channels_final3_windows_cpu_jax_0.11.0.json),
 [GPU](channels_final3_rtx4080_jax_0.11.0.json).
 
+Shifted bosonic channels now reduce Kraus branches sequentially on CPU and
+with `vmap` on accelerators. At dimension 60 with four density matrices, the
+RTX 4080 path was 1.11x faster warm for 9 branches (2.64x at the 10th
+percentile) and 1.69x for 81 branches. Cold time improved 1.02x and 1.07x,
+respectively, while HLO fell from 170 to 110 lines. Peak memory rose by 1.8%
+for 9 branches and 14.4% for 81 branches; the largest numerical difference
+was `3.6e-15`. The sequential path remains selected on CPU because
+vectorization slowed its 9-branch warm time by 1.69x.
+
 ## Compiled loops
 
 For 16 channel rounds, `simulate_repeated` reduces CPU compile time by
@@ -107,10 +116,67 @@ Data: CPU [raw](cat_sbs_current_windows_cpu_jax_0.11.0.json) /
 [ancilla](cat_sbs_direct_qubit_rtx4080_jax_0.11.0.json) /
 [all direct](cat_sbs_direct_channels_rtx4080_jax_0.11.0.json).
 
+## Shared cat/GKP sBs simulation
+
+The shared functional kernel represents noisy conditional displacements
+blockwise, applies local channels directly, and uses `lax.scan` over rounds.
+Cat and GKP protocols differ only in pulse geometry, rotations, timing, and
+device parameters.
+
+For the current GKP device at dimension 60, the shared model agrees with the
+jump-operator-corrected colleague model to 0.0278% in fitted lifetime
+(2245.95 us versus 2245.33 us); the full contrast differs by `3.43e-6` in
+relative L2 norm. Under the legacy parameters it gives 70.276 us versus
+69.926 us (0.501%), while the ideal traces agree to `3.74e-9` relative L2.
+Compared with the colleague implementation, the shared model is 1.64x faster
+including build and cold execution and 28.24x faster warm for the current
+case; the legacy ratios are 1.29x and 11.45x.
+
+Replacing dense noisy-CD tensors with the blockwise form at dimension 60 cuts
+GPU argument memory 3.85x, compiler peak memory 2.59x, and temporary memory
+1.24x while improving warm execution 1.23x. Using the exact zero-temperature
+oscillator path improves the same dense reference by 4.40x warm, 1.42x cold,
+4.14x in arguments, and 2.69x in peak memory with no measurable lifetime
+change.
+
+| GKP profile | Windows CPU | RTX 4080 | Ratio |
+| --- | ---: | ---: | ---: |
+| Cold kernel | 1.584 s | 2.757 s | CPU 1.74x faster |
+| Warm kernel | 0.473 s | 0.0954 s | GPU 4.96x faster |
+| Compiler temporary | 10.68 MiB | 6.63 MiB | GPU 1.61x lower |
+| Compiler peak | 7.76 MiB | 15.22 MiB | CPU 1.96x lower |
+
+CPU and GPU lifetimes agree to below `1e-12` relative. The current all-on GKP
+lifetime is 2.255 ms at one microstep and 2.263 ms at two; one microstep is
+0.405% below a four-microstep reference. Its all-on-context error ranking is
+storage Tphi (171.41/s), CD-qubit T1 (169.19/s), storage T1 (139.76/s), qubit
+Tphi (9.38/s), idle qubit T1 (1.85/s), then reset (1.24/s).
+
+For nominal cat parameters at `Delta=0.60`, `ratio=3.125`, the fitted bit
+lifetime rises from 0.668 ms at nbar 1 to 45.112 ms at nbar 4; the ranking is
+stable: storage Tphi, storage T1, qubit Tphi, CD-qubit T1, idle qubit T1,
+reset. At nbar 4, one microstep differs from four by 0.0097% and dimension 32
+differs from dimension 72 by 0.0021%.
+
+The exact measured-device configuration supplied for the independent
+`cat_sbs.py` model gives 33.108 ms at `Delta=0.60`, `ratio=3.125`, dimension
+52, and 480 alternating rounds; the shared result differs by 0.00097%. At
+`ratio=2`, its local sweep instead peaks at
+41.622 ms near `Delta=0.75`; the shared result is 41.613 ms (0.023% lower).
+Thus the remembered approximately 30 ms optimum requires a different model
+revision or an additional error channel not present in that configuration.
+
+Reproduce these measurements with `sbs_device.py`, `sbs_budget_sweep.py`,
+`gkp_sbs_compare.py`, and `cat_control_sweep.py`. Raw research outputs are not
+versioned with the library.
+
 ## Rejected experiments
 
 - A composite `ptrace` lowered HLO from 96 to 55 lines, but cold time was
   unchanged, warm time improved only 1.04x, and temporary memory rose from
   zero to 333 KB. It was removed.
+- Chunking shifted-channel branches improved large CPU thermal maps but
+  regressed cold time and small-map runtime, so CPU retains the simpler
+  sequential reduction.
 - Direct storage channels improve the cat-sBs CPU path but slow its GPU kernel;
   the benchmark keeps storage and ancilla selection explicit.

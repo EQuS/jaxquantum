@@ -109,7 +109,7 @@ def _apply_local_kraus(state: Qarray, operation) -> Qarray:
     n_modes = len(dims)
     system_shape = dims + dims
     data = state.to_dense().data.reshape(state.data.shape[:-2] + system_shape)
-    direct_apply = operation.gate._channel_apply
+    direct_apply = operation.gate.channel_apply
     if direct_apply is not None:
         target_axes = tuple(operation.indices) + tuple(
             n_modes + index for index in operation.indices
@@ -565,5 +565,8 @@ def _simulate_layer(
         for operation in layer.operations:
             state = _apply_local_kraus(state, operation)
         result = _single_state_batch(state)
+
+    else:
+        raise ValueError(f"Unsupported simulation mode: {mode}")
 
     return {"result": result, "start_time": start_time}

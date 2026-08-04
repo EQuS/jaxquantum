@@ -5,8 +5,6 @@ from __future__ import annotations
 import argparse
 import gc
 import json
-import statistics
-import time
 
 import jax
 import jax.numpy as jnp
@@ -17,21 +15,13 @@ from jaxquantum.circuits import Circuit, Register, Rx, simulate
 jax.config.update("jax_enable_x64", True)
 
 
-def _ready(value):
-    for leaf in jax.tree.leaves(value):
-        if hasattr(leaf, "block_until_ready"):
-            leaf.block_until_ready()
-
-
 def _measure(function, *args, iterations):
-    compiled = jax.jit(function).lower(*args).compile()
-    _ready(compiled(*args))
-    samples = []
-    for _ in range(iterations):
-        start = time.perf_counter()
-        _ready(compiled(*args))
-        samples.append(time.perf_counter() - start)
-    return statistics.median(samples), min(samples)
+    timings = jqt.benchmark_jax_function(
+        function,
+        *args,
+        iterations=iterations,
+    )["timings_s"]
+    return timings["warm_median"], timings["warm_min"]
 
 
 def _stream(size, iterations):

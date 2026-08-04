@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import jaxquantum as jqt
 
 from jaxquantum.devices import (
     ATS,
@@ -9,6 +10,10 @@ from jaxquantum.devices import (
     Resonator,
     SNAIL,
     Transmon,
+)
+from jaxquantum.devices.base.base import (
+    get_vec_data_in_new_basis,
+    get_vec_in_new_basis,
 )
 
 
@@ -26,6 +31,7 @@ def test_device_hamiltonian_uses_truncated_eigenvalues():
     hamiltonian = device.get_H()
 
     assert hamiltonian.dims == ((device.N,), (device.N,))
+    assert hamiltonian.dtype == device._get_H_in_original_basis().dtype
     assert jnp.allclose(jnp.diag(hamiltonian.data), values[: device.N], atol=1e-12)
     assert jnp.allclose(
         hamiltonian.data - jnp.diag(jnp.diag(hamiltonian.data)),
@@ -112,6 +118,19 @@ def test_full_ops_match_direct_basis_transform():
     for name, operator in original_ops.items():
         expected = vectors.conj().T @ operator.data @ vectors
         assert jnp.allclose(transformed_ops[name].data, expected, atol=1e-12)
+
+
+def test_basis_transform_supports_vectors_and_column_stacks():
+    vectors = jnp.stack((jnp.eye(4), jnp.flip(jnp.eye(4))))
+    states = jqt.Qarray.from_list([jqt.basis(4, 0), jqt.basis(4, 1)])
+    transformed = get_vec_in_new_basis(states, vectors, ((4,), (1,)))
+    columns = jnp.arange(28.0).reshape(4, 7)
+
+    assert transformed.shape == (2, 4)
+    assert jnp.allclose(
+        get_vec_data_in_new_basis(columns, vectors),
+        jnp.swapaxes(vectors.conj(), -1, -2) @ columns,
+    )
 
 
 def test_device_hamiltonian_is_jittable_and_batchable():

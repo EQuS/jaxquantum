@@ -5,9 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import platform
-import statistics
 import sys
-import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -38,43 +36,14 @@ from jaxquantum.circuits import (
 from jaxquantum.core.qarray import ket2dm
 
 
-def _ready(value) -> None:
-    for leaf in jax.tree.leaves(value):
-        if hasattr(leaf, "block_until_ready"):
-            leaf.block_until_ready()
-
-
 def _measure(name, function, *args, iterations):
-    jax.clear_caches()
-    lowered = jax.jit(function).lower(*args)
-
-    start = time.perf_counter()
-    compiled = lowered.compile()
-    compile_s = time.perf_counter() - start
-
-    _ready(compiled(*args))
-    samples = []
-    for _ in range(iterations):
-        start = time.perf_counter()
-        _ready(compiled(*args))
-        samples.append(time.perf_counter() - start)
-
-    memory = compiled.memory_analysis()
-    memory_fields = (
-        "argument_size_in_bytes",
-        "output_size_in_bytes",
-        "alias_size_in_bytes",
-        "temp_size_in_bytes",
-        "peak_memory_in_bytes",
-        "generated_code_size_in_bytes",
-    )
     return {
         "name": name,
-        "compile_s": compile_s,
-        "warm_median_s": statistics.median(samples),
-        "warm_min_s": min(samples),
-        "hlo_chars": len(lowered.as_text()),
-        "memory": {field: getattr(memory, field) for field in memory_fields},
+        **jqt.benchmark_jax_function(
+            function,
+            *args,
+            iterations=iterations,
+        ),
     }
 
 

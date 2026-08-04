@@ -167,8 +167,10 @@ class Device(ABC):
         """
         Return the Hamiltonian truncated in its eigenbasis.
         """
-        values = self.eig_systems["vals"][..., : self.N]
-        data = values[..., :, None] * jnp.eye(self.N, dtype=values.dtype)
+        eig_systems = self.eig_systems
+        values = eig_systems["vals"][..., : self.N]
+        dtype = eig_systems["vecs"].dtype
+        data = values.astype(dtype)[..., :, None] * jnp.eye(self.N, dtype=dtype)
         qdims = Qdims(((self.N,), (self.N,)))
         return Qarray._from_impl(DenseImpl._make(data), qdims)
 
@@ -230,9 +232,9 @@ def get_op_data_in_new_basis(op_data: Array, evecs: Array) -> Array:
 
 
 def get_vec_in_new_basis(vec: Qarray, evecs: Array, dims: List[List[int]]) -> Qarray:
-    data = get_vec_data_in_new_basis(vec.data, evecs)
+    data = jnp.einsum("...ji,...j->...i", jnp.conj(evecs), vec.data)
     return Qarray._from_impl(DenseImpl._make(data), Qdims(dims))
 
 
 def get_vec_data_in_new_basis(vec_data: Array, evecs: Array) -> Array:
-    return jnp.einsum("...ji,...j->...i", jnp.conj(evecs), vec_data)
+    return jnp.swapaxes(jnp.conj(evecs), -1, -2) @ vec_data

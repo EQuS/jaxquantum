@@ -240,6 +240,9 @@ def test_final_only_simulation_preserves_result():
     assert jnp.allclose(actual.data, expected.data, atol=1e-12)
     assert jnp.allclose(compact[-1][-1].data, expected.data, atol=1e-12)
 
+    with pytest.raises(ValueError, match="Unsupported simulation mode"):
+        jqtc.simulate_final(circuit, state, mode="invalid")
+
 
 def test_repeated_simulation_matches_unrolled_kraus_circuit():
     reg = jqtc.Register([2, 5])
@@ -347,6 +350,10 @@ def test_public_direct_channel_helpers_match_kraus_fallbacks():
     assert jnp.allclose(actual.data, expected.data, atol=1e-12)
     with pytest.raises(ValueError, match="coefficients"):
         jqtc.ShiftedChannel(3, jnp.ones((2, 2)), shifts)
+    with pytest.raises(ValueError, match="non-empty"):
+        jqtc.ShiftedChannel(3, jnp.ones((0, 3)), ())
+    with pytest.raises(ValueError, match="one-dimensional"):
+        jqtc.ShiftedChannel(3, jnp.ones((2, 3)), jnp.ones((2, 1)))
 
 
 def test_apply_channel_uses_direct_and_kraus_paths():
@@ -370,6 +377,7 @@ def test_apply_channel_uses_direct_and_kraus_paths():
         lambda value, params: value,
         kraus=lambda params: [jqt.identity(2)],
     )
+    assert custom.channel_apply is not None
     assert isinstance(custom.KM, jqt.Qarray)
     assert jnp.allclose(jqtc.apply_kraus_map(custom.KM, qubit_rho), qubit_rho)
 

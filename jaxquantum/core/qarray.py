@@ -2290,9 +2290,8 @@ def dag(qarr: Qarray) -> Qarray:
         new_impl = qarr._impl.conj()
     else:
         new_impl = qarr._impl.dag()
-    # Pass only the (reversed) dims tuple — not bdims/qtype. ``_bdims`` is a
-    # static pytree field and is stale under ``vmap``; let create() infer the
-    # batch dims from the actual data shape (which vmap does update).
+    # Infer batch dimensions from the transformed data because ``_bdims`` is
+    # static PyTree metadata and can be stale under ``vmap``.
     return Qarray._from_impl(new_impl, Qdims(dims))
 
 

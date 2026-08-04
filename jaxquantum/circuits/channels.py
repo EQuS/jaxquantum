@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
+import jax
 from jax import lax
 import jax.numpy as jnp
 
@@ -33,6 +34,9 @@ def apply_shifted_channel(rho, params):
             0,
         )
         return coefficient[..., :, None] * shifted * jnp.conj(coefficient[..., None, :])
+
+    if jax.default_backend() != "cpu":
+        return jax.vmap(branch)(jnp.arange(coefficients.shape[-2])).sum(axis=0)
 
     return lax.fori_loop(
         1,
@@ -64,8 +68,8 @@ def apply_channel(channel, rho, axes=(-2, -1)):
     """Apply a channel to density-matrix axes, with Kraus fallback."""
     input_ndim = rho.ndim
     rho = jnp.moveaxis(rho, axes, (-2, -1))
-    if channel._channel_apply is not None:
-        result = channel._channel_apply(rho[..., None, :, :], channel.params)
+    if channel.channel_apply is not None:
+        result = channel.channel_apply(rho[..., None, :, :], channel.params)
         result = jnp.squeeze(result, axis=-3)
     else:
         result = apply_kraus_map(channel.KM, rho)
@@ -141,6 +145,8 @@ def ShiftedChannel(
     """Create a channel from output coefficients and input-index shifts."""
     coefficients = jnp.asarray(coefficients)
     shifts = jnp.asarray(shifts)
+    if shifts.ndim != 1 or shifts.shape[0] == 0:
+        raise ValueError("shifts must be a non-empty one-dimensional sequence")
     if coefficients.shape[-2:] != (shifts.shape[0], dimension):
         raise ValueError("coefficients must end in (num_shifts, dimension)")
     params = dict(params or {})

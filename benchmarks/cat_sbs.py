@@ -243,6 +243,7 @@ def main():
     parser.add_argument("--direct-qubit", action="store_true")
     parser.add_argument("--direct-channels", action="store_true")
     parser.add_argument("--cache-channels", action="store_true")
+    parser.add_argument("--balanced-contrast", action="store_true")
     parser.add_argument("--output")
     args = parser.parse_args()
     model = _load_model(args.source.resolve())
@@ -262,6 +263,7 @@ def main():
         "params": params,
         "delta": args.delta,
         "ratio": args.ratio,
+        "balanced_contrast": args.balanced_contrast,
     }
 
     def simulate():

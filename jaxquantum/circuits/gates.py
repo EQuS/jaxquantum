@@ -120,6 +120,11 @@ class Gate:
         return self._c_ops
 
     @property
+    def channel_apply(self):
+        """Direct density-matrix kernel, if defined."""
+        return self._channel_apply
+
+    @property
     def params(self):
         return self._params
 
