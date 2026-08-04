@@ -102,7 +102,8 @@ that gain, so the ancilla-only variant is preferred. Maximum trace differences
 from the raw Kraus reference are `1.11e-13` (CPU) and `3.63e-14` (GPU);
 lifetime relative differences remain below `2e-12`.
 
-Reproduce with `cat_sbs.py`; its channel-selection flags retain each comparison.
+The external-model benchmark and raw outputs are archived with the cat project
+in `bosonic-sims`.
 
 ## Shared cat/GKP sBs simulation
 
@@ -154,9 +155,9 @@ The exact measured-device configuration supplied for the independent
 Thus the remembered approximately 30 ms optimum requires a different model
 revision or an additional error channel not present in that configuration.
 
-Reproduce these measurements with `sbs_device.py`, `sbs_budget_sweep.py`,
-`gkp_sbs_compare.py`, and `cat_control_sweep.py`. Raw research outputs are not
-versioned with the library.
+Reproduce the kernel profile with `sbs_device.py`. The experiment-specific
+error-budget, comparison, and control-sweep runners are archived with their cat
+and GKP projects in `bosonic-sims`.
 
 ## Rejected experiments
 

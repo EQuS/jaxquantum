@@ -21,7 +21,7 @@ import numpy as np
 
 import jaxquantum as jqt
 import jaxquantum.circuits as jqtc
-from experiments.circuit import sbs_device as model
+from jaxquantum.circuits.library import sbs as model
 
 
 def _jsonable(value):

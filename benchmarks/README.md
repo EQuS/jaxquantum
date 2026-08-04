@@ -10,22 +10,17 @@ python benchmarks/hamiltonian.py
 python benchmarks/construction.py
 python benchmarks/devices.py
 python benchmarks/scan.py
-python benchmarks/cat_sbs.py path/to/cat_sbs.py
 python benchmarks/sbs_device.py --code gkp
-python benchmarks/sbs_budget_sweep.py
-python benchmarks/gkp_sbs_compare.py path/to/sbs_accelerated_blocked.py
-python benchmarks/cat_control_sweep.py --parameters measured
-python benchmarks/gkp_error_budget.py --output-dir path/to/archive
 ```
 
 Use `--help` for sizes, iteration counts, and JSON output. For a shared display
 GPU, set `XLA_PYTHON_CLIENT_PREALLOCATE=false` before starting Python.
 
 `sbs_device.py` profiles cold/warm execution, compiler memory, HLO, accuracy,
-and optionally an error budget. The sweep scripts record the cat-size budget
-and cross-check control points against either colleague implementation.
-`gkp_error_budget.py` saves exact inputs, full curves, fits, and an analysis
-figure; named experimental inputs live in `experiments/circuit/sbs_parameters.py`.
+and optionally an error budget. Experiment-specific cat and GKP runners and
+their saved outputs live in the corresponding `bosonic-sims` project folders.
+The reusable implementation and named inputs live in
+`jaxquantum.circuits.library.sbs`.
 
 See the [extended CPU/GPU results](results/performance_summary.md) for the
 additional channel, loop, simulation, device, and cat-sBs measurements.

@@ -2,6 +2,8 @@
 
 from math import pi
 
+__all__ = ("GKP_JULY30", "PARAMETER_SETS")
+
 
 GKP_JULY30 = {
     "device": {

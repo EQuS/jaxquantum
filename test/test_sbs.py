@@ -1,7 +1,4 @@
 from dataclasses import replace
-import importlib.util
-from pathlib import Path
-import sys
 
 import jax.numpy as jnp
 import numpy as np
@@ -9,16 +6,14 @@ import pytest
 
 import jaxquantum as jqt
 import jaxquantum.circuits as jqtc
-import jaxquantum.circuits.sbs as sbs
+import jaxquantum.circuits.sbs as legacy_sbs
+import jaxquantum.circuits.library.sbs as model
+import jaxquantum.circuits.library.sbs.core as sbs
 
 
-def _experiment_module():
-    path = Path(__file__).parents[1] / "experiments" / "circuit" / "sbs_device.py"
-    spec = importlib.util.spec_from_file_location("sbs_device_test", path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+def test_legacy_sbs_import_reexports_public_api():
+    assert legacy_sbs.SBSNoise is model.SBSNoise
+    assert legacy_sbs.simulate_sbs is model.simulate_sbs
 
 
 def _joint_state(dimension):
@@ -218,7 +213,6 @@ def test_segment_dephasing_uses_coherence_time(microsteps):
 
 
 def test_shared_cat_protocol_matches_native_ideal_round():
-    model = _experiment_module()
     dimension = 10
     nbar = 2.0
     protocol = model.cat_protocol(dimension, nbar, enabled=())
@@ -239,7 +233,6 @@ def test_shared_cat_protocol_matches_native_ideal_round():
 
 
 def test_cat_protocol_alternates_displacement_direction():
-    model = _experiment_module()
     initial, observables = model.cat_problem(8, 1.0)
     protocol = model.cat_protocol(
         8,
@@ -259,7 +252,6 @@ def test_cat_protocol_alternates_displacement_direction():
 
 
 def test_measured_cat_device_round_time():
-    model = _experiment_module()
     device = model.CAT_MEASURED_DEVICE
     t2_echo = 1 / (1 / device.qubit_tphi + 1 / (2 * device.qubit_t1))
     assert np.isclose(model.round_time(device), 6.348e-6)
@@ -267,11 +259,10 @@ def test_measured_cat_device_round_time():
 
 
 def test_july30_gkp_parameters_match_experiment():
-    model = _experiment_module()
     parameters = model.GKP_JULY30
     device = model.GKP_JULY30_DEVICE
     control = parameters["control"]
-    z_displacements, _ = model._gkp_displacements(
+    z_displacements, _ = model.gkp_displacements(
         control["delta"],
         control["small_ratio"],
         control["small_displacement_scales"],
@@ -289,7 +280,6 @@ def test_july30_gkp_parameters_match_experiment():
 
 
 def test_gkp_protocol_supports_experimental_four_way_control():
-    model = _experiment_module()
     control = model.GKP_JULY30["control"]
     protocol = model.gkp_protocol(
         7,
@@ -348,7 +338,6 @@ def test_gkp_protocol_supports_experimental_four_way_control():
 
 
 def test_gkp_protocol_accepts_per_cd_thermalization():
-    model = _experiment_module()
     device = replace(
         model.GKP_JULY30_DEVICE,
         qubit_t1_cd=(100e-6, 50e-6, 25e-6),
@@ -376,7 +365,6 @@ def test_gkp_protocol_accepts_per_cd_thermalization():
 
 
 def test_gkp_problem_supports_both_logical_axes():
-    model = _experiment_module()
     for kind in ("x", "z"):
         states, observables = model.gkp_problem(8, 0.438, kind)
         assert states.shape == observables.shape == (2, 8, 8)
@@ -385,7 +373,6 @@ def test_gkp_problem_supports_both_logical_axes():
 
 
 def test_prepared_protocol_reuses_cd_geometry():
-    model = _experiment_module()
     build = model.prepare_gkp_protocol(8, jump_samples=2, max_loss=2)
     baseline = build(())
     noisy = build(model.ERROR_CHANNELS)
@@ -395,7 +382,6 @@ def test_prepared_protocol_reuses_cd_geometry():
 
 
 def test_error_budget_subtracts_baseline_and_reports_context():
-    model = _experiment_module()
     initial, observables = model.cat_problem(7, 1.0)
     channels = ("storage_t1", "storage_tphi")
     budget = model.compute_error_budget(
@@ -426,7 +412,6 @@ def test_error_budget_subtracts_baseline_and_reports_context():
 
 
 def test_batched_error_budget_matches_sequential():
-    model = _experiment_module()
     initial, observables = model.gkp_problem(7)
     channels = ("storage_t1", "qubit_t1")
     build = model.prepare_gkp_protocol(
@@ -461,7 +446,6 @@ def test_batched_error_budget_matches_sequential():
 
 
 def test_single_decay_variant_matches_direct_simulation():
-    model = _experiment_module()
     initial, observables = model.cat_problem(7, 1.0)
     protocol = model.cat_protocol(
         7,
@@ -491,7 +475,6 @@ def test_single_decay_variant_matches_direct_simulation():
 
 
 def test_batched_alternating_protocol_matches_sequential():
-    model = _experiment_module()
     initial, observables = model.cat_problem(7, 1.0)
     protocols = [
         model.cat_protocol(
@@ -531,7 +514,6 @@ def test_batched_alternating_protocol_matches_sequential():
 
 
 def test_decay_fit_floor_excludes_low_signal_tail():
-    model = _experiment_module()
     times = np.arange(6, dtype=float)
     contrast = np.exp(-times / 2)
     contrast[-2:] = (0.08, 0.09)

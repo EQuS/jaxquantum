@@ -10,9 +10,44 @@ import jax.numpy as jnp
 import numpy as np
 
 import jaxquantum as jqt
-import jaxquantum.circuits as jqtc
 import jaxquantum.codes as jqcodes
-from experiments.circuit.sbs_parameters import GKP_JULY30
+from jaxquantum.circuits.library.qubit import Rx, Ry
+
+from .core import (
+    SBSCDGeometry,
+    SBSNoise,
+    SBSProtocol,
+    build_sbs_cd_geometry,
+    build_sbs_half_round,
+    simulate_sbs,
+)
+from .parameters import GKP_JULY30
+
+__all__ = (
+    "ERROR_CHANNELS",
+    "DeviceParameters",
+    "CAT_DEVICE",
+    "CAT_MEASURED_DEVICE",
+    "GKP_DEVICE",
+    "GKP_JULY30_DEVICE",
+    "GKP_LEGACY_DEVICE",
+    "DecayResult",
+    "ErrorBudget",
+    "round_time",
+    "cat_protocol",
+    "gkp_protocol",
+    "gkp_displacements",
+    "prepare_gkp_protocol",
+    "prepare_cat_protocol",
+    "cat_problem",
+    "gkp_problem",
+    "fit_decay",
+    "simulate_decay",
+    "simulate_decay_variants",
+    "compute_error_budget",
+    "gkp_error_budget",
+    "cat_error_budget",
+)
 
 
 ERROR_CHANNELS = (
@@ -160,7 +195,7 @@ def _enabled(value, name, enabled):
 
 
 def _noise(device, enabled):
-    return jqtc.SBSNoise(
+    return SBSNoise(
         oscillator_t1=_enabled(
             device.storage_t1,
             "storage_t1",
@@ -209,14 +244,14 @@ def cat_protocol(
     small = jnp.pi * delta**2 / (4 * alpha)
     displacements = (small, -1j * jnp.pi / (2 * alpha), ratio * small)
     rotations = (
-        jqtc.Ry(jnp.pi / 2).U.data,
-        jqtc.Rx(-jnp.pi / 2).U.data,
-        jqtc.Rx(-jnp.pi / 2).U.data,
-        jqtc.Ry(jnp.pi / 2).U.data,
+        Ry(jnp.pi / 2).U.data,
+        Rx(-jnp.pi / 2).U.data,
+        Rx(-jnp.pi / 2).U.data,
+        Ry(jnp.pi / 2).U.data,
     )
 
     def build(values, geometry):
-        return jqtc.build_sbs_half_round(
+        return build_sbs_half_round(
             dimension,
             values,
             rotations,
@@ -236,12 +271,12 @@ def cat_protocol(
     forward = build(displacements, cd_geometry)
     if not alternate_cd_direction:
         return (forward,)
-    reverse_geometry = jqtc.SBSCDGeometry(
+    reverse_geometry = SBSCDGeometry(
         jnp.swapaxes(forward.cd.displacements.conj(), -1, -2),
         jnp.swapaxes(forward.cd.jump_displacements.conj(), -1, -2),
     )
     reverse = build(tuple(-value for value in displacements), reverse_geometry)
-    return jqtc.SBSProtocol((forward,), (reverse,))
+    return SBSProtocol((forward,), (reverse,))
 
 
 def gkp_protocol(
@@ -264,7 +299,7 @@ def gkp_protocol(
     cd_geometries=None,
 ):
     """Build the two complementary GKP sBs half-rounds."""
-    z_displacements, x_displacements = _gkp_displacements(
+    z_displacements, x_displacements = gkp_displacements(
         delta,
         small_ratio,
         small_displacement_scales,
@@ -273,17 +308,17 @@ def gkp_protocol(
         length_scale,
     )
     rotations = (
-        jqtc.Ry(jnp.pi / 2).U.data,
-        jqtc.Rx(-jnp.pi / 2).U.data,
-        jqtc.Rx(jnp.pi / 2).U.data,
-        jqtc.Ry(-jnp.pi / 2).U.data,
+        Ry(jnp.pi / 2).U.data,
+        Rx(-jnp.pi / 2).U.data,
+        Rx(jnp.pi / 2).U.data,
+        Ry(-jnp.pi / 2).U.data,
     )
     noise = _noise(device, set(enabled))
     if cd_geometries is None:
         cd_geometries = (None, None)
 
     def build(displacements, geometry):
-        half_round = jqtc.build_sbs_half_round(
+        half_round = build_sbs_half_round(
             dimension,
             displacements,
             rotations,
@@ -320,7 +355,7 @@ def gkp_protocol(
     if not alternate_cd_direction:
         return forward
     reverse_geometries = tuple(
-        jqtc.SBSCDGeometry(
+        SBSCDGeometry(
             jnp.swapaxes(half_round.cd.displacements.conj(), -1, -2),
             jnp.swapaxes(half_round.cd.jump_displacements.conj(), -1, -2),
         )
@@ -336,10 +371,10 @@ def gkp_protocol(
             reverse_geometries,
         )
     )
-    return jqtc.SBSProtocol(forward, reverse)
+    return SBSProtocol(forward, reverse)
 
 
-def _gkp_displacements(
+def gkp_displacements(
     delta,
     small_ratio,
     small_displacement_scales,
@@ -347,6 +382,7 @@ def _gkp_displacements(
     epsilon_model,
     length_scale,
 ):
+    """Return complementary Z- and X-stabilizer displacements."""
     length = jnp.sqrt(2 * jnp.pi) * length_scale
     if epsilon_model == "sinh":
         epsilon = jnp.sinh(delta**2) * length
@@ -381,7 +417,7 @@ def prepare_gkp_protocol(
     max_reset=12,
 ):
     """Return an error-channel builder with shared pulse geometry."""
-    displacements = _gkp_displacements(
+    displacements = gkp_displacements(
         delta,
         small_ratio,
         small_displacement_scales,
@@ -390,7 +426,7 @@ def prepare_gkp_protocol(
         length_scale,
     )
     geometries = tuple(
-        jqtc.build_sbs_cd_geometry(
+        build_sbs_cd_geometry(
             dimension,
             values,
             microsteps=microsteps,
@@ -438,7 +474,7 @@ def prepare_cat_protocol(
     alpha = jnp.sqrt(nbar)
     small = jnp.pi * delta**2 / (4 * alpha)
     displacements = (small, -1j * jnp.pi / (2 * alpha), ratio * small)
-    geometry = jqtc.build_sbs_cd_geometry(
+    geometry = build_sbs_cd_geometry(
         dimension,
         displacements,
         microsteps=microsteps,
@@ -521,7 +557,7 @@ def simulate_decay(
     fit_start=4,
     fit_floor=1e-10,
 ):
-    final, values, _ = jqtc.simulate_sbs(
+    final, values, _ = simulate_sbs(
         initial_states,
         observables,
         half_rounds,
@@ -606,7 +642,7 @@ def simulate_decay_variants(
         ]
     protocols, axes = _stack_protocols(protocols)
     final, values, _ = jax.vmap(
-        lambda rounds: jqtc.simulate_sbs(
+        lambda rounds: simulate_sbs(
             initial_states,
             observables,
             rounds,
