@@ -33,10 +33,8 @@ additional channel, loop, simulation, device, and cat-sBs measurements.
 ## Reference result
 
 Measured on Windows 11 / WSL2 Ubuntu 24.04, RTX 4080 Super, driver 595.95,
-JAX 0.11.0, and Python 3.12. Exact data is in
-[`results/rtx4080_super_wsl_jax_0.11.0.json`](results/rtx4080_super_wsl_jax_0.11.0.json).
-The CPU before/after data is in
-[`results/windows_cpu_jax_0.11.0.json`](results/windows_cpu_jax_0.11.0.json).
+JAX 0.11.0, and Python 3.12. The scripts accept `--output` for saving raw JSON;
+the checked-in summary keeps generated data out of the library diff.
 
 The complex128 empirical roof is about 0.96 TFLOP/s median, while the float64
 stream kernel sustains about 340 GB/s. A 6144-dimensional dense complex128

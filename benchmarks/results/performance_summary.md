@@ -26,8 +26,7 @@ qubit kernels reduce 4.59–4.98 MB to zero or near-zero. Tiny-kernel warmed
 times are dominated by WSL/display-GPU dispatch and range from modest wins to
 regressions; the ancilla reset is 1.06x faster and compiles 1.54x faster.
 
-Data: [CPU](channels_final3_windows_cpu_jax_0.11.0.json),
-[GPU](channels_final3_rtx4080_jax_0.11.0.json).
+Reproduce with `python benchmarks/channels.py --include-reference`.
 
 Shifted bosonic channels now reduce Kraus branches sequentially on CPU and
 with `vmap` on accelerators. At dimension 60 with four density matrices, the
@@ -59,9 +58,7 @@ compile-size/scaling improvement; it is not forced on short circuits.
 Lazy amplitude-damping gate construction is 1.41x faster on CPU and 2.89x on
 GPU when the fallback Kraus map is not requested.
 
-Data: construction [CPU](construction_windows_cpu_jax_0.11.0.json) /
-[GPU](construction_rtx4080_jax_0.11.0.json), Hamiltonian [CPU](hamiltonian_auto_windows_cpu_jax_0.11.0.json) /
-[GPU](hamiltonian_auto_rtx4080_jax_0.11.0.json).
+Reproduce with `construction.py` and `hamiltonian.py --include-reference`.
 
 ## Distributions, devices, and sweeps
 
@@ -77,9 +74,7 @@ The vectorized GPU wavefunction path trades compiler memory for its very large
 compile reduction: temporary memory rises from 0.025 MB to 4.01 MB. The GPU
 sweep also raises peak memory by about 9%.
 
-Data: Q function [CPU](scan_windows_cpu_jax_0.11.0.json) /
-[GPU](scan_rtx4080_jax_0.11.0.json), devices and sweeps [CPU](devices_windows_cpu_jax_0.11.0.json) /
-[GPU](devices_rtx4080_jax_0.11.0.json).
+Reproduce with `scan.py` and `devices.py`.
 
 ## Cat-sBs end to end
 
@@ -107,14 +102,7 @@ that gain, so the ancilla-only variant is preferred. Maximum trace differences
 from the raw Kraus reference are `1.11e-13` (CPU) and `3.63e-14` (GPU);
 lifetime relative differences remain below `2e-12`.
 
-Data: CPU [raw](cat_sbs_current_windows_cpu_jax_0.11.0.json) /
-[cached](cat_sbs_cached_channels_windows_cpu_jax_0.11.0.json) /
-[ancilla](cat_sbs_direct_qubit_windows_cpu_jax_0.11.0.json) /
-[all direct](cat_sbs_direct_channels_windows_cpu_jax_0.11.0.json), GPU
-[raw](cat_sbs_current_rtx4080_jax_0.11.0.json) /
-[cached](cat_sbs_cached_channels_rtx4080_jax_0.11.0.json) /
-[ancilla](cat_sbs_direct_qubit_rtx4080_jax_0.11.0.json) /
-[all direct](cat_sbs_direct_channels_rtx4080_jax_0.11.0.json).
+Reproduce with `cat_sbs.py`; its channel-selection flags retain each comparison.
 
 ## Shared cat/GKP sBs simulation
 
