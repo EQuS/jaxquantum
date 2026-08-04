@@ -459,11 +459,11 @@ def apply_sbs_half_round(joint, ops: SBSHalfRound):
         joint = _apply_qubit_unitary(joint, ops.rotations[index])
         joint = _apply_noise(joint, ops.rotation_noise, index)
 
-        def positive(_, state):
+        def positive(_, state, index=index):
             state = _apply_noisy_cd(state, ops.cd, index)
             return _apply_noise(state, ops.cd_noise, index)
 
-        def negative(_, state):
+        def negative(_, state, index=index):
             state = _apply_noisy_cd(state, ops.cd, index, inverse=True)
             return _apply_noise(state, ops.cd_noise, index)
 

@@ -231,7 +231,11 @@ def _solve_local_hamiltonian(
             collapse_ops = operation.gate.c_ops.to_dense().data
             bra_indices = tuple(n_modes + index for index in indices)
 
-            def dissipator(matrix):
+            def dissipator(
+                matrix,
+                indices=indices,
+                bra_indices=bra_indices,
+            ):
                 left = _apply_matrix_to_axes(
                     tensor,
                     matrix,
@@ -259,7 +263,7 @@ def _solve_local_hamiltonian(
                 )
                 return sandwich - 0.5 * (anti_left + anti_right)
 
-            def add_dissipator(index, total):
+            def add_dissipator(index, total, collapse_ops=collapse_ops):
                 return total + dissipator(collapse_ops[index])
 
             derivative += lax.fori_loop(
