@@ -1,28 +1,28 @@
 """Circuit simulation methods."""
 
-from flax import struct
-import jax
-from jax import config, lax
-import jax.numpy as jnp
 from math import prod
-from typing import List
 
-from jaxquantum.core.qarray import DenseImpl, Qarray, Qtypes, ket2dm
+import jax
+import jax.numpy as jnp
+from flax import struct
+from jax import config, lax
+
+from jaxquantum.circuits.channels import apply_kraus_map
 from jaxquantum.circuits.circuits import Circuit, Layer
 from jaxquantum.circuits.constants import SimulateMode
 from jaxquantum.core.measurements import overlap
-from jaxquantum.core.solvers import mesolve, sesolve, solve, SolverOptions
-
+from jaxquantum.core.qarray import DenseImpl, Qarray, Qtypes, ket2dm
+from jaxquantum.core.solvers import SolverOptions, mesolve, sesolve, solve
 
 config.update("jax_enable_x64", True)
 
 
 @struct.dataclass
 class Results:
-    results: List[Qarray] = struct.field(pytree_node=False)
+    results: list[Qarray] = struct.field(pytree_node=False)
 
     @classmethod
-    def create(cls, results: List[Qarray]):
+    def create(cls, results: list[Qarray]):
         return Results(results=results)
 
     def __getitem__(self, j: int):
@@ -86,14 +86,15 @@ def _apply_local_unitary(state: Qarray, operation) -> Qarray:
     dims = tuple(operation.register.dims)
     unitary = operation.gate.U.to_dense().data
     n_modes = len(dims)
+    state_data = state.to_dense().data
 
     if state.qtype == Qtypes.ket:
-        data = state.data.reshape(state.data.shape[:-1] + dims)
+        data = state_data.reshape(state_data.shape[:-1] + dims)
         data = _apply_matrix_to_axes(data, unitary, operation.indices, dims)
         data = data.reshape(data.shape[:-n_modes] + (prod(dims),))
     else:
         system_shape = dims + dims
-        data = state.to_dense().data.reshape(state.data.shape[:-2] + system_shape)
+        data = state_data.reshape(state_data.shape[:-2] + system_shape)
         data = _apply_matrix_to_axes(data, unitary, operation.indices, system_shape)
         bra_axes = tuple(n_modes + index for index in operation.indices)
         data = _apply_matrix_to_axes(data, jnp.conj(unitary), bra_axes, system_shape)
@@ -110,65 +111,45 @@ def _apply_local_kraus(state: Qarray, operation) -> Qarray:
     system_shape = dims + dims
     data = state.to_dense().data.reshape(state.data.shape[:-2] + system_shape)
     direct_apply = operation.gate.channel_apply
-    if direct_apply is not None:
-        target_axes = tuple(operation.indices) + tuple(
-            n_modes + index for index in operation.indices
-        )
-        other_axes = tuple(
-            index for index in range(2 * n_modes) if index not in target_axes
-        )
-        order = other_axes + target_axes
-        n_batch_axes = data.ndim - 2 * n_modes
-        data = jnp.transpose(
-            data,
-            tuple(range(n_batch_axes))
-            + tuple(n_batch_axes + index for index in order),
-        )
-        other_shape = tuple(system_shape[index] for index in other_axes)
-        target_shape = tuple(dims[index] for index in operation.indices)
-        target_size = prod(target_shape)
-        data = data.reshape(
-            data.shape[:n_batch_axes]
-            + (prod(other_shape), target_size, target_size)
-        )
-        data = direct_apply(data, operation.gate.params)
-        out_batch_shape = data.shape[:-3]
-        data = data.reshape(
-            out_batch_shape + other_shape + target_shape + target_shape
-        )
-        data = jnp.transpose(
-            data,
-            tuple(range(len(out_batch_shape)))
-            + tuple(
-                len(out_batch_shape) + order.index(index)
-                for index in range(2 * n_modes)
-            ),
-        )
-        data = data.reshape(
-            out_batch_shape + (prod(dims), prod(dims))
-        )
-        return Qarray._from_impl(DenseImpl._make(data), state._qdims)
-
-    kraus = operation.gate.KM.to_dense().data
-    ket_axes = tuple(operation.indices)
-    bra_axes = tuple(n_modes + index for index in operation.indices)
-
-    def apply_branch(matrix):
-        branch = _apply_matrix_to_axes(data, matrix, ket_axes, system_shape)
-        return _apply_matrix_to_axes(
-            branch,
-            jnp.conj(matrix),
-            bra_axes,
-            system_shape,
-        )
-
-    def add_branch(index, total):
-        return total + apply_branch(lax.dynamic_index_in_dim(kraus, index, 0, False))
-
-    if kraus.shape[0] == 0:
+    kraus = None if direct_apply is not None else operation.gate.KM.to_dense().data
+    if kraus is not None and kraus.shape[0] == 0:
         return state
-    data = lax.fori_loop(1, kraus.shape[0], add_branch, apply_branch(kraus[0]))
-    data = data.reshape(data.shape[:-2 * n_modes] + (prod(dims), prod(dims)))
+
+    target_axes = tuple(operation.indices) + tuple(
+        n_modes + index for index in operation.indices
+    )
+    other_axes = tuple(
+        index for index in range(2 * n_modes) if index not in target_axes
+    )
+    order = other_axes + target_axes
+    n_batch_axes = data.ndim - 2 * n_modes
+    data = jnp.transpose(
+        data,
+        tuple(range(n_batch_axes))
+        + tuple(n_batch_axes + index for index in order),
+    )
+    other_shape = tuple(system_shape[index] for index in other_axes)
+    target_shape = tuple(dims[index] for index in operation.indices)
+    target_size = prod(target_shape)
+    data = data.reshape(
+        data.shape[:n_batch_axes]
+        + (prod(other_shape), target_size, target_size)
+    )
+    if direct_apply is not None:
+        data = direct_apply(data, operation.gate.params)
+    else:
+        data = apply_kraus_map(kraus[..., None, :, :], data)
+    out_batch_shape = data.shape[:-3]
+    data = data.reshape(out_batch_shape + other_shape + target_shape + target_shape)
+    data = jnp.transpose(
+        data,
+        tuple(range(len(out_batch_shape)))
+        + tuple(
+            len(out_batch_shape) + order.index(index)
+            for index in range(2 * n_modes)
+        ),
+    )
+    data = data.reshape(out_batch_shape + (prod(dims), prod(dims)))
     return Qarray._from_impl(DenseImpl._make(data), state._qdims)
 
 
@@ -287,7 +268,7 @@ def _solve_local_hamiltonian(
 
 
 def _single_state_batch(state: Qarray) -> Qarray:
-    impl = type(state._impl).from_data(jnp.expand_dims(state.data, axis=0))
+    impl = type(state._impl).from_data(state.data.reshape(1, *state.data.shape))
     return Qarray._from_impl(impl, state._qdims)
 
 
@@ -406,7 +387,7 @@ def _expectations(state, observables):
 def simulate_expectations(
     circuit: Circuit,
     initial_state: Qarray,
-    observables: List[Qarray],
+    observables: list[Qarray],
     mode: SimulateMode = SimulateMode.DEFAULT,
     include_initial: bool = True,
     **kwargs,
@@ -433,7 +414,7 @@ def simulate_repeated_expectations(
     circuit: Circuit,
     initial_state: Qarray,
     repetitions: int,
-    observables: List[Qarray],
+    observables: list[Qarray],
     mode: SimulateMode = SimulateMode.DEFAULT,
     include_initial: bool = True,
     **kwargs,

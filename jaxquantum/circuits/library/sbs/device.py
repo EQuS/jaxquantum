@@ -335,15 +335,13 @@ def gkp_protocol(
             cd_geometry=geometry,
         )
         if final_storage_rotation:
-            phase = jnp.diag(
-                jnp.exp(-1j * final_storage_rotation * jnp.arange(dimension))
+            phase = jnp.exp(
+                -1j * final_storage_rotation * jnp.arange(dimension)
             )
-            rotation = jnp.kron(jnp.eye(2), phase)
+            phase_factor = phase[:, None] * phase.conj()[None, :]
             half_round = half_round._replace(
-                reset_kraus=jnp.einsum(
-                    "ij,kjl->kil",
-                    rotation,
-                    half_round.reset_kraus,
+                reset=half_round.reset._replace(
+                    phase_factor=phase_factor * half_round.reset.phase_factor,
                 )
             )
         return half_round

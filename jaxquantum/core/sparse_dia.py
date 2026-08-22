@@ -118,6 +118,8 @@ class SparseDiaData:
         ``new_shape`` must end with ``(N, N)`` (the matrix dims are unchanged).
         Only the leading batch dims are reshaped.
         """
+        if len(new_shape) == 1 and isinstance(new_shape[0], (tuple, list)):
+            new_shape = new_shape[0]
         new_batch = new_shape[:-2]
         n = self.diags.shape[-1]
         new_diags = self.diags.reshape(*new_batch, len(self.offsets), n)
@@ -410,12 +412,18 @@ class SparseDiaImpl(QarrayImpl):
 
     @classmethod
     def _eye_data(cls, n: int, dtype=None):
-        """Return an n×n identity as a dense JAX array.
-
-        ``from_data`` will automatically convert it to SparseDIA format
-        when the implementation type is ``SPARSE_DIA``.
-        """
+        """Return an n×n identity as a dense JAX array."""
         return jnp.eye(n, dtype=dtype)
+
+    @classmethod
+    def _scaled_identity(cls, n: int, scalar, dtype=None) -> "SparseDiaImpl":
+        """Create a batched scaled identity without dense storage."""
+        scalar = jnp.ones((), dtype=dtype) * (jnp.asarray(scalar) + 0.0j)
+        diags = jnp.broadcast_to(
+            scalar[..., None, None],
+            (*scalar.shape, 1, n),
+        )
+        return cls._make((0,), diags)
 
     @classmethod
     def can_handle_data(cls, arr) -> bool:

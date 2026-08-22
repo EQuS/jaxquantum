@@ -145,6 +145,31 @@ def test_device_hamiltonian_is_jittable_and_batchable():
     assert jnp.allclose(actual, expected, atol=1e-12)
 
 
+def test_batched_device_basis_transform_helpers(monkeypatch):
+    device = make_transmon()
+    vectors = jnp.stack(
+        (jnp.eye(device.N_pre_diag), jnp.flip(jnp.eye(device.N_pre_diag)))
+    )
+    values = jnp.zeros((2, device.N_pre_diag))
+    monkeypatch.setattr(
+        Transmon,
+        "_calculate_eig_systems",
+        lambda self: (values, vectors),
+    )
+    operator = device.linear_ops["n"]
+    vector = jqt.basis(device.N_pre_diag, 0)
+    eigvecs = vectors[..., :, : device.N]
+
+    assert jnp.allclose(
+        device.get_op_in_H_eigenbasis(operator).data,
+        jnp.swapaxes(eigvecs.conj(), -1, -2) @ operator.data @ eigvecs,
+    )
+    assert jnp.allclose(
+        device.get_vec_in_H_eigenbasis(vector).data,
+        jnp.swapaxes(eigvecs.conj(), -1, -2) @ vector.data,
+    )
+
+
 def test_transmon_wavefunctions_match_loop_and_diagonalize_once(monkeypatch):
     device = make_transmon()
     phases = jnp.linspace(-0.4, 0.4, 9)

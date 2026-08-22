@@ -3,28 +3,30 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from flax import struct
-from jax import Array, config, vmap
-from typing import TYPE_CHECKING, List, Union, TypeVar, Generic, overload, Literal
+from copy import deepcopy
+from enum import Enum
+from math import prod
+from numbers import Number
+from typing import TYPE_CHECKING, Generic, List, Literal, TypeVar, Union, overload
 
-if TYPE_CHECKING:
-    from jaxquantum.core.sparse_bcoo import SparseBCOOImpl
 import jax.numpy as jnp
 import jax.scipy as jsp
+from flax import struct
+from jax import Array, config, default_backend
 from jax.experimental import sparse
 from numpy import ndarray
-from copy import deepcopy
-from math import prod
-from enum import Enum
 
-from jaxquantum.core.settings import SETTINGS, _maybe_shard
-from jaxquantum.utils.utils import robust_isscalar
 from jaxquantum.core.dims import (
-    Qtypes,
     Qdims,
+    Qtypes,
     check_dims,
     ket_from_op_dims,
 )
+from jaxquantum.core.settings import SETTINGS, _maybe_shard
+from jaxquantum.utils.utils import robust_isscalar
+
+if TYPE_CHECKING:
+    from jaxquantum.core.sparse_bcoo import SparseBCOOImpl
 
 config.update("jax_enable_x64", True)
 
@@ -333,6 +335,14 @@ class QarrayImpl(ABC):
             Raw identity matrix data in the format appropriate for this impl.
         """
         pass
+
+    @classmethod
+    def _scaled_identity(cls, n: int, scalar, dtype=None) -> QarrayImpl:
+        """Create an identity scaled over any leading scalar batch axes."""
+        scalar = jnp.asarray(scalar) + 0.0j
+        if scalar.ndim:
+            scalar = scalar.reshape(scalar.shape + (1, 1))
+        return cls.from_data(cls._eye_data(n, dtype=dtype) * scalar)
 
     @classmethod
     @abstractmethod
@@ -1232,13 +1242,11 @@ class Qarray(Generic[ImplT]):
             # Vectors keep a single trailing space axis (no (N,1)).
             new_shape = new_bdims + (prod(self.dims[0]) * prod(self.dims[1]),)
 
-        # Preserve implementation type
-        implementation = self.impl_type
-        return Qarray.create(
-            self.data.reshape(new_shape),
-            dims=self.dims,
-            bdims=new_bdims,
-            implementation=implementation,
+        impl = type(self._impl).from_data(self.data.reshape(new_shape))
+        return Qarray._from_impl(
+            impl,
+            self._qdims,
+            new_bdims,
         )
 
     def space_to_qdims(self, space_dims: List[int]):
@@ -1257,7 +1265,9 @@ class Qarray(Generic[ImplT]):
         if isinstance(space_dims[0], (list, tuple)):
             return space_dims
 
-        if self.qtype in [Qtypes.oper, Qtypes.ket]:
+        if self.qtype == Qtypes.oper:
+            return (tuple(space_dims), tuple(space_dims))
+        elif self.qtype == Qtypes.ket:
             return (tuple(space_dims), tuple([1 for _ in range(len(space_dims))]))
         elif self.qtype == Qtypes.bra:
             return (tuple([1 for _ in range(len(space_dims))]), tuple(space_dims))
@@ -1282,11 +1292,7 @@ class Qarray(Generic[ImplT]):
         assert prod(new_space_dims) == prod(current_space_dims)
 
         new_qdims = self.space_to_qdims(new_space_dims)
-        new_bdims = self.bdims
-
-        # Preserve implementation type
-        implementation = self.impl_type
-        return Qarray.create(self.data, dims=new_qdims, bdims=new_bdims, implementation=implementation)
+        return Qarray._from_impl(self._impl, Qdims(new_qdims), self._bdims)
 
     def resize(self, new_shape):
         """Resize the Qarray to a new shape.
@@ -1437,6 +1443,13 @@ class Qarray(Generic[ImplT]):
 
         return self.__mul__(1 / other)
 
+    def _scaled_identity(self, scalar):
+        return type(self._impl)._scaled_identity(
+            self.data.shape[-2],
+            scalar,
+            dtype=self.data.dtype,
+        )
+
     def __add__(self, other):
         if isinstance(other, Qarray):
             if self.dims != other.dims:
@@ -1450,20 +1463,14 @@ class Qarray(Generic[ImplT]):
             new_impl = self._impl.add(other._impl)
             return Qarray._from_impl(new_impl, self._qdims)
 
-        if robust_isscalar(other) and other == 0:
+        if isinstance(other, Number) and other == 0:
             return self.copy()
 
         if self.qtype == Qtypes.oper:
-            other = other + 0.0j
-            if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
-                other = other.reshape(other.shape + (1, 1))
-            eye_data = self._impl._eye_data(self.data.shape[-2], dtype=self.data.dtype)
-            other = Qarray.create(
-                other * eye_data,
-                dims=self.dims,
-                implementation=self.impl_type
+            return Qarray._from_impl(
+                self._impl.add(self._scaled_identity(other)),
+                self._qdims,
             )
-            return self.__add__(other)
 
         return NotImplemented
 
@@ -1483,21 +1490,14 @@ class Qarray(Generic[ImplT]):
             new_impl = self._impl.sub(other._impl)
             return Qarray._from_impl(new_impl, self._qdims)
 
-        if robust_isscalar(other) and other == 0:
+        if isinstance(other, Number) and other == 0:
             return self.copy()
 
         if self.qtype == Qtypes.oper:
-            other = other + 0.0j
-
-            if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
-                other = other.reshape(other.shape + (1, 1))
-            eye_data = self._impl._eye_data(self.data.shape[-2], dtype=self.data.dtype)
-            other = Qarray.create(
-                other * eye_data,
-                dims=self.dims,
-                implementation=self.impl_type
+            return Qarray._from_impl(
+                self._impl.sub(self._scaled_identity(other)),
+                self._qdims,
             )
-            return self.__sub__(other)
 
         return NotImplemented
 
@@ -1867,23 +1867,13 @@ def norm(qarr: Qarray) -> float:
     qarr = qarr.to_dense()
 
     qdata = qarr.data
-    bdims = qarr.bdims
 
     if qarr.qtype == Qtypes.oper:
-        qdata_dag = qarr.dag().data
-
-        if len(bdims) > 0:
-            qdata = qdata.reshape(-1, qdata.shape[-2], qdata.shape[-1])
-            qdata_dag = qdata_dag.reshape(-1, qdata_dag.shape[-2], qdata_dag.shape[-1])
-
-            evals, _ = vmap(jnp.linalg.eigh)(qdata @ qdata_dag)
-            rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)), axis=-1)
-            rho_norm = rho_norm.reshape(*bdims)
-            return rho_norm
-        else:
-            evals, _ = jnp.linalg.eigh(qdata @ qdata_dag)
-            rho_norm = jnp.sum(jnp.sqrt(jnp.abs(evals)))
-            return rho_norm
+        if default_backend() == "cpu":
+            return jnp.sum(jnp.linalg.svd(qdata, compute_uv=False), axis=-1)
+        gram = qdata @ jnp.swapaxes(jnp.conj(qdata), -1, -2)
+        values = jnp.linalg.eigvalsh(gram)
+        return jnp.sum(jnp.sqrt(jnp.abs(values)), axis=-1)
 
     elif qarr.qtype in [Qtypes.ket, Qtypes.bra]:
         # Vectors store the Hilbert space on the single trailing axis.

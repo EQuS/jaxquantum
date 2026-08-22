@@ -12,8 +12,9 @@ import jax.numpy as jnp
 from jaxquantum.circuits.channels import apply_kraus_map, apply_shifted_channel
 from jaxquantum.circuits.library.oscillator import (
     CD,
-    Dephasing_Reset,
     _amp_damp_coefficients,
+    _apply_dephasing_reset_factors,
+    _dephasing_reset_factors,
     _thermal_coefficients,
 )
 from jaxquantum.circuits.library.qubit import Rx
@@ -24,6 +25,7 @@ __all__ = (
     "SBSNoiseOps",
     "SBSCDGeometry",
     "SBSCDOps",
+    "SBSResetOps",
     "SBSHalfRound",
     "SBSProtocol",
     "noisy_cd_kraus",
@@ -72,13 +74,19 @@ class SBSCDOps(NamedTuple):
     excitation_probability: jax.Array
 
 
+class SBSResetOps(NamedTuple):
+    transfer_factor: jax.Array
+    excited_factor: jax.Array
+    phase_factor: jax.Array
+
+
 class SBSHalfRound(NamedTuple):
     rotations: jax.Array
     cd: SBSCDOps
     echoes: jax.Array
     rotation_noise: SBSNoiseOps
     cd_noise: SBSNoiseOps
-    reset_kraus: jax.Array
+    reset: SBSResetOps
     reset_noise: SBSNoiseOps
     microsteps: int
 
@@ -256,8 +264,12 @@ def build_sbs_half_round(
         raise ValueError("sBs requires three displacements and CD durations")
     if len(rotations) != 4 or len(rotation_durations) != 4:
         raise ValueError("sBs requires four rotations and rotation durations")
-    if microsteps < 1:
-        raise ValueError("microsteps must be positive")
+    if microsteps < 1 or jump_samples < 1:
+        raise ValueError("microsteps and jump_samples must be positive")
+    if max_loss < 0:
+        raise ValueError("max_loss must be non-negative")
+    if max_reset < 2:
+        raise ValueError("max_reset must be at least two")
     if storage_placement not in {"segment", "lumped"}:
         raise ValueError("storage_placement must be 'segment' or 'lumped'")
 
@@ -328,13 +340,13 @@ def build_sbs_half_round(
         qubit_tphi=noise.qubit_tphi,
         qubit_excited_population=noise.qubit_excited_population,
     )
-    reset_kraus = Dephasing_Reset(
+    transfer_factor, excited_factor = _dephasing_reset_factors(
         dimension,
         noise.reset_error,
         reset_duration,
         noise.reset_chi,
         max_reset,
-    ).KM.data
+    )
     return SBSHalfRound(
         rotations=jnp.stack(
             [getattr(rotation, "data", rotation) for rotation in rotations]
@@ -355,7 +367,11 @@ def build_sbs_half_round(
             cd_noise,
             max_loss,
         ),
-        reset_kraus=reset_kraus,
+        reset=SBSResetOps(
+            transfer_factor,
+            excited_factor,
+            jnp.asarray(1, dtype=transfer_factor.dtype),
+        ),
         reset_noise=_noise_ops(
             dimension,
             reset_storage,
@@ -371,6 +387,19 @@ def _apply_joint_kraus(joint, kraus):
     dimension = joint.shape[-1]
     flat = joint.reshape(joint.shape[:-4] + (2 * dimension,) * 2)
     flat = apply_kraus_map(kraus, flat)
+    return flat.reshape(flat.shape[:-2] + (2, dimension, 2, dimension))
+
+
+def _apply_reset(joint, reset):
+    dimension = joint.shape[-1]
+    flat = joint.reshape(joint.shape[:-4] + (2 * dimension,) * 2)
+    flat = _apply_dephasing_reset_factors(
+        flat,
+        reset.transfer_factor,
+        reset.excited_factor,
+        dimension,
+        reset.phase_factor,
+    )
     return flat.reshape(flat.shape[:-2] + (2, dimension, 2, dimension))
 
 
@@ -455,25 +484,31 @@ def _apply_noise(joint, noise, index):
 
 def apply_sbs_half_round(joint, ops: SBSHalfRound):
     """Apply one prepared sBs half-round to a joint density matrix."""
-    for index in range(3):
-        joint = _apply_qubit_unitary(joint, ops.rotations[index])
-        joint = _apply_noise(joint, ops.rotation_noise, index)
 
-        def positive(_, state, index=index):
-            state = _apply_noisy_cd(state, ops.cd, index)
-            return _apply_noise(state, ops.cd_noise, index)
+    def segment(index, state):
+        state = _apply_qubit_unitary(state, ops.rotations[index])
+        state = _apply_noise(state, ops.rotation_noise, index)
 
-        def negative(_, state, index=index):
-            state = _apply_noisy_cd(state, ops.cd, index, inverse=True)
-            return _apply_noise(state, ops.cd_noise, index)
+        def apply_cd(inverse):
+            def step(_, value):
+                value = _apply_noisy_cd(value, ops.cd, index, inverse=inverse)
+                return _apply_noise(value, ops.cd_noise, index)
 
-        joint = jax.lax.fori_loop(0, ops.microsteps, positive, joint)
-        joint = _apply_qubit_unitary(joint, ops.echoes[index])
-        joint = jax.lax.fori_loop(0, ops.microsteps, negative, joint)
+            return step
+
+        state = jax.lax.fori_loop(0, ops.microsteps, apply_cd(False), state)
+        state = _apply_qubit_unitary(state, ops.echoes[index])
+        return jax.lax.fori_loop(0, ops.microsteps, apply_cd(True), state)
+
+    if jax.default_backend() == "cpu":
+        for index in range(3):
+            joint = segment(index, joint)
+    else:
+        joint = jax.lax.fori_loop(0, 3, segment, joint)
 
     joint = _apply_qubit_unitary(joint, ops.rotations[3])
     joint = _apply_noise(joint, ops.rotation_noise, 3)
-    joint = _apply_joint_kraus(joint, ops.reset_kraus)
+    joint = _apply_reset(joint, ops.reset)
     return _apply_noise(joint, ops.reset_noise, 0)
 
 

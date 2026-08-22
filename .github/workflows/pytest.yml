@@ -1,5 +1,6 @@
 name: tests
 on:
+  pull_request:
   workflow_run:
     workflows: ["docs"]
     types:
@@ -39,6 +40,7 @@ jobs:
         with:
           output: test-results/coverage.svg
       - name: Deploy badge to gh-pages branch
+        if: github.event_name == 'workflow_run'
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages

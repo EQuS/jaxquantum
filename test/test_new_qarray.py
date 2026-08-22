@@ -5,9 +5,11 @@ import os
 # Add the jaxquantum directory to the sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import jaxquantum as jqt
+import jax
 import jax.numpy as jnp
 from jax.experimental import sparse
+
+import jaxquantum as jqt
 
 minimum_version_for_tests = "0.2.0"
 
@@ -70,9 +72,115 @@ def test_conversion_between_implementations():
 
 def test_internal_results_do_not_repeat_public_tidy():
     source = jqt.Qarray.create(jnp.array([1e-13]), qtype="ket")
+    operator = jqt.Qarray.create(jnp.zeros((2, 2)), qtype="oper")
 
     assert jqt.Qarray.create(jnp.array([1e-15]), qtype="ket").data[0] == 0
     assert (source * 1e-2).data[0] == 1e-15
+    assert (operator + 1e-15).data[0, 0] == 1e-15
+
+
+@pytest.mark.parametrize(
+    "implementation",
+    [
+        jqt.QarrayImplType.DENSE,
+        jqt.QarrayImplType.SPARSE_BCOO,
+        jqt.QarrayImplType.SPARSE_DIA,
+    ],
+)
+def test_scalar_operator_arithmetic_is_jittable(implementation):
+    operator = jqt.Qarray.create(
+        jnp.diag(jnp.arange(3.0)).astype(jnp.complex64),
+        implementation=implementation,
+    )
+
+    added, subtracted = jax.jit(
+        lambda value, scalar: (value + scalar, value - scalar)
+    )(operator, jnp.asarray(0.25))
+    identity = 0.25 * jnp.eye(3)
+    assert jnp.allclose(added.to_dense().data, operator.to_dense().data + identity)
+    assert jnp.allclose(
+        subtracted.to_dense().data,
+        operator.to_dense().data - identity,
+    )
+    batched = jax.jit(lambda value, scalar: value + scalar)(
+        operator,
+        jnp.asarray([0.1, 0.2]),
+    )
+    expected = (
+        operator.to_dense().data
+        + jnp.asarray([0.1, 0.2])[:, None, None] * jnp.eye(3)
+    )
+    assert jnp.allclose(batched.to_dense().data, expected)
+
+    promoted = operator + jnp.asarray(0.25, jnp.float64)
+    assert promoted.dtype == jnp.complex128
+
+
+def test_scalar_operator_arithmetic_is_differentiable():
+    operator = jqt.identity(3)
+    derivative = jax.grad(
+        lambda scalar: jnp.real(jnp.trace((operator + scalar).data))
+    )(0.25)
+    assert jnp.allclose(derivative, 3.0)
+
+
+@pytest.mark.parametrize(
+    "implementation",
+    [
+        jqt.QarrayImplType.DENSE,
+        jqt.QarrayImplType.SPARSE_BCOO,
+        jqt.QarrayImplType.SPARSE_DIA,
+    ],
+)
+def test_reshape_qdims_preserves_implementation(implementation):
+    operator = jqt.Qarray.create(
+        jnp.eye(4),
+        dims=[[4], [4]],
+        implementation=implementation,
+    )
+    reshaped = jax.jit(lambda value: value.reshape_qdims(2, 2))(operator)
+
+    assert reshaped.impl_type == implementation
+    assert reshaped.dims == ((2, 2), (2, 2))
+    assert jnp.allclose(reshaped.to_dense().data, operator.to_dense().data)
+
+
+@pytest.mark.parametrize(
+    "implementation",
+    [
+        jqt.QarrayImplType.DENSE,
+        jqt.QarrayImplType.SPARSE_BCOO,
+        jqt.QarrayImplType.SPARSE_DIA,
+    ],
+)
+def test_reshape_bdims_preserves_implementation(implementation):
+    operator = jqt.Qarray.create(
+        jnp.stack([jnp.eye(4)] * 4),
+        dims=[[4], [4]],
+        implementation=implementation,
+    )
+    reshaped = jax.jit(lambda value: value.reshape_bdims(2, 2))(operator)
+
+    assert reshaped.impl_type == implementation
+    assert reshaped.bdims == (2, 2)
+    assert jnp.allclose(
+        reshaped.to_dense().data,
+        operator.to_dense().data.reshape(2, 2, 4, 4),
+    )
+
+
+def test_dense_operator_norm_matches_singular_values_under_jit():
+    data = jnp.asarray(
+        [
+            [1.0 + 0.2j, -0.3j, 0.4],
+            [0.7, -0.1 + 0.5j, 0.2j],
+            [-0.4j, 0.8, 0.6 - 0.2j],
+        ]
+    )
+    operator = jqt.Qarray.create(jnp.stack((data, 0.5 * data)))
+    actual = jax.jit(lambda value: value.norm())(operator)
+    expected = jnp.sum(jnp.linalg.svd(operator.data, compute_uv=False), axis=-1)
+    assert jnp.allclose(actual, expected, atol=1e-12)
 
 
 def test_implementation_preservation():

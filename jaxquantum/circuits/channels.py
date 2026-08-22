@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 
 import jax
-from jax import lax
 import jax.numpy as jnp
+from jax import lax
 
 from jaxquantum.circuits.gates import Gate
 from jaxquantum.core.qarray import Qarray
@@ -56,6 +56,8 @@ def apply_kraus_map(kraus, rho):
         matrix = lax.dynamic_index_in_dim(kraus, index, 0, False)
         return matrix @ rho @ jnp.swapaxes(jnp.conj(matrix), -1, -2)
 
+    if kraus.shape[0] == 1:
+        return branch(0)
     return lax.fori_loop(
         1,
         kraus.shape[0],

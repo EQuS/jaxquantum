@@ -142,6 +142,35 @@ def test_local_unitary_is_jittable_and_differentiable():
     assert jnp.allclose(derivative, expected_derivative, atol=1e-12)
 
 
+def test_local_unitary_accepts_sparse_initial_state():
+    register = jqtc.Register.create([2])
+    circuit = jqtc.Circuit.create(register)
+    circuit.append(jqtc.X(), 0)
+    state = jqt.basis(
+        2,
+        0,
+        implementation=jqt.QarrayImplType.SPARSE_BCOO,
+    )
+
+    actual = jqtc.simulate_final(circuit, state)
+    assert actual.is_dense
+    assert jnp.allclose(actual.data, jqt.basis(2, 1).data)
+
+
+def test_empty_circuit_preserves_sparse_result_batch():
+    register = jqtc.Register.create([3])
+    state = jqt.basis(
+        3,
+        1,
+        implementation=jqt.QarrayImplType.SPARSE_BCOO,
+    )
+
+    result = jqtc.simulate(jqtc.Circuit.create(register), state)[0]
+    assert result.is_sparse_bcoo
+    assert result.shape == (1, 3)
+    assert jnp.allclose(result.to_dense().data[0], state.to_dense().data)
+
+
 def _promoted_kraus_result(layer, state):
     kraus = layer.gen_KM()
     return (kraus @ state.to_dm() @ kraus.dag()).collapse()
@@ -174,33 +203,42 @@ def test_local_oscillator_channels_match_promoted_maps():
         assert jnp.allclose(actual.data, expected.data, atol=1e-12)
 
 
-def test_generic_local_kraus_supports_noncontiguous_targets():
+@pytest.mark.parametrize("probability", [0.13, jnp.asarray([0.13, 0.27])])
+def test_generic_local_kraus_supports_noncontiguous_targets(probability):
     reg = jqtc.Register([2, 3, 2])
     identity = jqt.identity(2) ^ jqt.identity(2)
     flip = jqt.sigmax() ^ jqt.sigmax()
-    probability = 0.13
-    gate = jqtc.Gate.create(
-        [2, 2],
-        gen_KM=lambda _: jqt.Qarray.from_list(
-            [
-                jnp.sqrt(1 - probability) * identity,
-                jnp.sqrt(probability) * flip,
-            ]
-        ),
-        num_modes=2,
-    )
-    layer = jqtc.Layer.create(
-        [jqtc.Operation.create(gate, [2, 0], reg)],
-        default_simulate_mode=jqtc.SimulateMode.KRAUS,
-    )
+
+    def make_layer(value):
+        gate = jqtc.Gate.create(
+            [2, 2],
+            gen_KM=lambda _: jqt.Qarray.from_list(
+                [
+                    jnp.sqrt(1 - value) * identity,
+                    jnp.sqrt(value) * flip,
+                ]
+            ),
+            num_modes=2,
+        )
+        return jqtc.Layer.create(
+            [jqtc.Operation.create(gate, [2, 0], reg)],
+            default_simulate_mode=jqtc.SimulateMode.KRAUS,
+        )
+
+    layer = make_layer(probability)
     state = (
         jqt.basis(12, 0).reshape_qdims(*reg.dims)
         + 0.3 * jqt.basis(12, 11).reshape_qdims(*reg.dims)
     ).unit()
 
     actual = jqtc.simulate(jqtc.Circuit.create(reg, [layer]), state)[-1][-1]
-    expected = _promoted_kraus_result(layer, state)
-    assert jnp.allclose(actual.data, expected.data, atol=1e-12)
+    if jnp.ndim(probability):
+        expected = jnp.stack(
+            [_promoted_kraus_result(make_layer(value), state).data for value in probability]
+        )
+    else:
+        expected = _promoted_kraus_result(layer, state).data
+    assert jnp.allclose(actual.data, expected, atol=1e-12)
 
 
 def test_direct_channels_are_jittable_and_differentiable():
@@ -436,6 +474,16 @@ def test_apply_channel_supports_batched_parameters():
         fallback = jqtc.apply_kraus_map(channel.KM, rho)
         assert direct.shape == fallback.shape == (2, 4, 4)
         assert jnp.allclose(direct, fallback, atol=1e-12)
+
+
+def test_thermal_qubit_kraus_supports_batched_parameters():
+    channel = jqtc.Thermal_Ch_Qb(jnp.asarray([0.1, 0.2]), 0.05)
+    rho = jqt.basis(2, 1).to_dm().data
+
+    fallback = jqtc.apply_kraus_map(channel.KM, rho)
+    direct = jqtc.apply_channel(channel, rho)
+    assert channel.KM.data.shape == (4, 2, 2, 2)
+    assert jnp.allclose(fallback, direct, atol=1e-12)
 
 
 def test_direct_dephasing_reset_matches_promoted_map():

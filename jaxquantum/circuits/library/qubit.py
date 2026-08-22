@@ -268,15 +268,27 @@ def CX():
 
 
 def _Thermal_Kraus_Ops_Qb(err_prob, n_bar):
-    """ " Returns the Kraus Operators for a thermal channel with probability
-    err_prob and average photon number n_bar in a Hilbert Space of size 2"""
-    p0 = (n_bar + 1) / (2 * n_bar + 1)
-    p1 = n_bar / (2 * n_bar + 1)
+    """Return generalized amplitude-damping Kraus operators for a qubit."""
+    err_prob = jnp.asarray(err_prob)
+    zero = jnp.zeros_like(err_prob)
+    one = jnp.ones_like(err_prob)
+    normalization = 2 * n_bar + 1
+    sqrt_p0 = jnp.sqrt((n_bar + 1) / normalization)[..., None, None]
+    sqrt_p1 = jnp.sqrt(n_bar / normalization)[..., None, None]
+    retained = jnp.sqrt(1 - err_prob)
+    lost = jnp.sqrt(err_prob)
+
+    def matrix(a, b, c, d):
+        return jnp.stack(
+            (jnp.stack((a, b), -1), jnp.stack((c, d), -1)),
+            -2,
+        )
+
     return [
-        Qarray.create(jnp.sqrt(p0) * jnp.array([[1, 0], [0, jnp.sqrt(1 - err_prob)]])),
-        Qarray.create(jnp.sqrt(p0) * jnp.array([[0, jnp.sqrt(err_prob)], [0, 0]])),
-        Qarray.create(jnp.sqrt(p1) * jnp.array([[0, 0], [jnp.sqrt(err_prob), 0]])),
-        Qarray.create(jnp.sqrt(p1) * jnp.array([[jnp.sqrt(1 - err_prob), 0], [0, 1]])),
+        Qarray.create(sqrt_p0 * matrix(one, zero, zero, retained)),
+        Qarray.create(sqrt_p0 * matrix(zero, lost, zero, zero)),
+        Qarray.create(sqrt_p1 * matrix(zero, zero, lost, zero)),
+        Qarray.create(sqrt_p1 * matrix(retained, zero, zero, one)),
     ]
 
 

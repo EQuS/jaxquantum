@@ -191,16 +191,16 @@ class Device(ABC):
         return {"vals": values, "vecs": vectors}
 
     def get_op_in_H_eigenbasis(self, op: Qarray):
-        evecs = self.eig_systems["vecs"][:, : self.N]
+        evecs = self.eig_systems["vecs"][..., :, : self.N]
         dims = [[self.N], [self.N]]
         return get_op_in_new_basis(op, evecs, dims)
 
     def get_op_data_in_H_eigenbasis(self, op: Array):
-        evecs = self.eig_systems["vecs"][:, : self.N]
+        evecs = self.eig_systems["vecs"][..., :, : self.N]
         return get_op_data_in_new_basis(op, evecs)
 
     def get_vec_in_H_eigenbasis(self, vec: Qarray):
-        evecs = self.eig_systems["vecs"][:, : self.N]
+        evecs = self.eig_systems["vecs"][..., :, : self.N]
         if vec.qtype == Qtypes.ket:
             dims = [[self.N], [1]]
         else:
@@ -208,7 +208,7 @@ class Device(ABC):
         return get_vec_in_new_basis(vec, evecs, dims)
 
     def get_vec_data_in_H_eigenbasis(self, vec: Array):
-        evecs = self.eig_systems["vecs"][:, : self.N]
+        evecs = self.eig_systems["vecs"][..., :, : self.N]
         return get_vec_data_in_new_basis(vec, evecs)
 
     def full_ops(self):

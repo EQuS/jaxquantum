@@ -99,6 +99,38 @@ def test_direct_noisy_cd_matches_kraus_map(inverse):
     assert jnp.allclose(actual, expected, atol=1e-12)
 
 
+def test_direct_reset_matches_kraus_map():
+    dimension = 5
+    oscillator = jqt.displace(dimension, 0.2j) @ jqt.basis(dimension, 0)
+    density = (oscillator @ oscillator.dag()).data
+    ancilla = 0.5 * jnp.ones((2, 2))
+    joint = jnp.einsum("ij,mn->imjn", ancilla, density)
+    probability, duration, chi, order = 0.13, 0.4, 0.7, 5
+    half_round = sbs.build_sbs_half_round(
+        dimension,
+        (0.0,) * 3,
+        (jnp.eye(2),) * 4,
+        (0.0,) * 3,
+        (0.0,) * 4,
+        duration,
+        sbs.SBSNoise(reset_error=probability, reset_chi=chi),
+        max_reset=order,
+    )
+
+    actual = sbs._apply_reset(joint, half_round.reset)
+    expected = sbs._apply_joint_kraus(
+        joint,
+        jqtc.Dephasing_Reset(
+            dimension,
+            probability,
+            duration,
+            chi,
+            order,
+        ).KM.data,
+    )
+    assert jnp.allclose(actual, expected, atol=1e-12)
+
+
 def test_cd_population_can_differ_from_idle_population():
     ops = sbs.build_sbs_half_round(
         4,
@@ -316,11 +348,11 @@ def test_gkp_protocol_supports_experimental_four_way_control():
         big_displacement=control["big_displacement"],
         epsilon_model=control["epsilon_model"],
     )[0]
-    phase = jnp.diag(jnp.exp(-1j * control["final_storage_rotation"] * jnp.arange(7)))
-    rotation = jnp.kron(jnp.eye(2), phase)
+    phase = jnp.exp(-1j * control["final_storage_rotation"] * jnp.arange(7))
+    phase_factor = phase[:, None] * phase.conj()[None, :]
     assert jnp.allclose(
-        protocol.rounds[0].reset_kraus,
-        jnp.einsum("ij,kjl->kil", rotation, reference.reset_kraus),
+        protocol.rounds[0].reset.phase_factor,
+        phase_factor * reference.reset.phase_factor,
     )
     for forward, reverse in zip(protocol.rounds, protocol.alternate_rounds):
         assert jnp.allclose(
@@ -534,6 +566,9 @@ def test_decay_fit_floor_excludes_low_signal_tail():
         ({"displacements": (0.0, 0.0)}, "three displacements"),
         ({"rotations": (jnp.eye(2),) * 3}, "four rotations"),
         ({"microsteps": 0}, "microsteps"),
+        ({"jump_samples": 0}, "jump_samples"),
+        ({"max_loss": -1}, "max_loss"),
+        ({"max_reset": 1}, "max_reset"),
         ({"storage_placement": "invalid"}, "storage_placement"),
     ],
 )

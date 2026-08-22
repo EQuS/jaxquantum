@@ -618,22 +618,18 @@ def _dephasing_reset_factors(N, p, t_rst, chi, max_l):
     return transfer, excited
 
 
-def _dephasing_reset_apply(rho, params, dimension, max_l):
-    """Apply structured ancilla reset directly to density-matrix blocks."""
-    transfer_factor, excited_factor = _dephasing_reset_factors(
-        dimension,
-        params["p"],
-        params["t_rst"],
-        params["chi"],
-        max_l,
-    )
+def _apply_dephasing_reset_factors(
+    rho,
+    transfer_factor,
+    excited_factor,
+    dimension,
+    phase_factor=1,
+):
     blocks = rho.reshape(rho.shape[:-2] + (2, dimension, 2, dimension))
-    ground = blocks[..., 0, :, 0, :]
-    excited = blocks[..., 1, :, 1, :]
-    transfer = transfer_factor[..., None, :, :]
-    excited_factor = excited_factor[..., None, :, :]
-    ground = ground + transfer * excited
-    excited = excited_factor * excited
+    ground = phase_factor * (
+        blocks[..., 0, :, 0, :] + transfer_factor * blocks[..., 1, :, 1, :]
+    )
+    excited = phase_factor * excited_factor * blocks[..., 1, :, 1, :]
     zero = jnp.zeros_like(ground)
     output = jnp.stack(
         (
@@ -643,6 +639,23 @@ def _dephasing_reset_apply(rho, params, dimension, max_l):
         axis=-4,
     )
     return output.reshape(output.shape[:-4] + (2 * dimension,) * 2)
+
+
+def _dephasing_reset_apply(rho, params, dimension, max_l):
+    """Apply structured ancilla reset directly to density-matrix blocks."""
+    transfer_factor, excited_factor = _dephasing_reset_factors(
+        dimension,
+        params["p"],
+        params["t_rst"],
+        params["chi"],
+        max_l,
+    )
+    return _apply_dephasing_reset_factors(
+        rho,
+        transfer_factor[..., None, :, :],
+        excited_factor[..., None, :, :],
+        dimension,
+    )
 
 
 def Dephasing_Reset(N, p, t_rst, chi, max_l):

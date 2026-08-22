@@ -159,6 +159,44 @@ Reproduce the kernel profile with `sbs_device.py`. The experiment-specific
 error-budget, comparison, and control-sweep runners are archived with their cat
 and GKP projects in `bosonic-sims`.
 
+## Final core review
+
+The PR-polish pass retained small, backend-neutral changes with exact numerical
+agreement and no measured memory regression:
+
+| Change | CPU cold | CPU warm/eager | RTX 4080 cold | RTX 4080 warm/eager | Compiler result |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Metadata-only `reshape_qdims` | 3.46x | 16.05x eager | 3.70x | 159x eager | StableHLO 6.38x smaller |
+| Direct scalar-identity arithmetic | 1.23x | 1.80x eager | 1.27x | 1.87x eager | StableHLO 2.09x–2.64x smaller |
+| Dense operator norm | 1.35x | 3.08x | neutral | neutral | CPU StableHLO 1.83x smaller |
+| Single-branch Kraus map | 1.16x | 1.15x | 1.22x | 1.01x | lowering 1.73x–1.77x faster |
+| Shared local-Kraus layout | 1.12x | 0.99x | 1.15x | 0.99x | compile 1.13x–1.18x faster |
+
+`reshape_qdims` now changes only static quantum metadata, while
+`reshape_bdims` reuses the existing backend implementation after reshaping.
+Scalar operator arithmetic no longer recursively constructs and tidies a
+Qarray, and is now JIT- and gradient-safe. SparseDIA identities remain sparse;
+BCOO scalar batches use sparse-native identities and broadcasting. Warm JIT
+execution and compiler memory were unchanged for these Qarray operations.
+
+Dense operator norms now compute singular values directly on CPU and retain
+the Gram/eigenvalue route on accelerators, where small-matrix SVD was much
+slower. At batch 4 and dimension 64, CPU compiler temporary memory rose from
+512 KiB to 770 KiB, while reported peak memory stayed unchanged. The relative
+numerical difference was about `4e-16`.
+
+For a dimension-52 sBs half-round with 12 reset branches, replacing the
+prebuilt dense reset Kraus stack with its exact blockwise factors improved CPU
+cold/warm time by 1.08x/1.89x and GPU cold/warm time by 1.89x/1.22x. Argument
+memory fell 2.97x; compiler peak memory fell 2.70x on CPU and 1.34x on GPU.
+GPU compile time improved 1.66x and StableHLO lines fell 1.76x. The maximum
+density-matrix difference was `2.08e-17`.
+
+The review also fixed sparse initial-state simulation, batched thermal-qubit
+Kraus construction, batched device eigenvector slicing, SparseDIA batch
+reshaping, and operator quantum-dimension reshaping. These are compatibility
+fixes rather than benchmark claims.
+
 ## Rejected experiments
 
 - A composite `ptrace` lowered HLO from 96 to 55 lines, but cold time was
@@ -169,3 +207,10 @@ and GKP projects in `bosonic-sims`.
   sequential reduction.
 - Direct storage channels improve the cat-sBs CPU path but slow its GPU kernel;
   the benchmark keeps storage and ancilla selection explicit.
+- Moving the first noisy round inside `simulate_repeated` reduced StableHLO by
+  about 1.8x and GPU cold time by 1.42x, but a first-round ket-to-density-matrix
+  conversion changes the loop carry pytree. The general API keeps the
+  behavior-preserving structure.
+- Chunking generic high-branch Kraus maps improved a 64-branch GPU kernel by
+  2.73x warm, but raised temporary/peak memory by 23%/18% and gave negligible
+  gains at 16–32 branches. The sequential default remains simpler and leaner.

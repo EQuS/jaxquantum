@@ -5,15 +5,16 @@ Implements the JAX experimental BCOO sparse format as a Qarray storage backend.
 
 from __future__ import annotations
 
+from copy import deepcopy
+
+import jax.numpy as jnp
 from flax import struct
 from jax import Array
-from copy import deepcopy
-import jax.numpy as jnp
 from jax.experimental import sparse
 
 # QarrayImpl and friends are imported below (after qarray.py is fully loaded)
 # to match the pattern used by sparse_dia.py and avoid circular imports.
-from jaxquantum.core.qarray import QarrayImpl, DenseImpl, QarrayImplType  # noqa: E402
+from jaxquantum.core.qarray import DenseImpl, QarrayImpl, QarrayImplType  # noqa: E402
 from jaxquantum.core.settings import SETTINGS  # noqa: E402
 
 
@@ -101,6 +102,7 @@ class SparseBCOOImpl(QarrayImpl):
         if a is not self:
             return a.add(b)
         x, y = self._data, b._data
+        x, y = self._broadcast_pair(x, y)
         if x.indices.dtype != y.indices.dtype:
             y = sparse.BCOO((y.data, y.indices.astype(x.indices.dtype)), shape=y.shape)
         return SparseBCOOImpl._make(x + y)
@@ -118,9 +120,25 @@ class SparseBCOOImpl(QarrayImpl):
         if a is not self:
             return a.sub(b)
         x, y = self._data, b._data
+        x, y = self._broadcast_pair(x, y)
         if x.indices.dtype != y.indices.dtype:
             y = sparse.BCOO((y.data, y.indices.astype(x.indices.dtype)), shape=y.shape)
         return SparseBCOOImpl._make(x - y)
+
+    @staticmethod
+    def _broadcast_pair(x: sparse.BCOO, y: sparse.BCOO):
+        shape = jnp.broadcast_shapes(x.shape, y.shape)
+        if x.shape != shape:
+            dims = range(len(shape) - x.ndim, len(shape))
+            x = sparse.bcoo_broadcast_in_dim(
+                x, shape=shape, broadcast_dimensions=dims
+            )
+        if y.shape != shape:
+            dims = range(len(shape) - y.ndim, len(shape))
+            y = sparse.bcoo_broadcast_in_dim(
+                y, shape=shape, broadcast_dimensions=dims
+            )
+        return x, y
 
     def mul(self, scalar) -> QarrayImpl:
         """Scalar multiplication.
@@ -273,6 +291,19 @@ class SparseBCOOImpl(QarrayImpl):
             A ``sparse.BCOO`` identity matrix of shape ``(n, n)``.
         """
         return sparse.eye(n, dtype=dtype)
+
+    @classmethod
+    def _scaled_identity(cls, n: int, scalar, dtype=None) -> SparseBCOOImpl:
+        """Create a batched scaled identity without dense broadcasting."""
+        scalar = jnp.ones((), dtype=dtype) * (jnp.asarray(scalar) + 0.0j)
+        batch_shape = scalar.shape
+        diagonal = jnp.arange(n)
+        indices = jnp.stack((diagonal, diagonal), axis=-1)
+        indices = jnp.broadcast_to(indices, (*batch_shape, n, 2))
+        values = jnp.broadcast_to(scalar[..., None], (*batch_shape, n))
+        return cls._make(
+            sparse.BCOO((values, indices), shape=(*batch_shape, n, n))
+        )
 
     @classmethod
     def can_handle_data(cls, arr) -> bool:
