@@ -14,6 +14,25 @@ import jaxquantum as jqt
 import jaxquantum.circuits as jqtc
 
 
+def test_gate_direct_constructor_keeps_legacy_field_order():
+    unitary = jqt.identity(2)
+    gate = jqtc.Gate(
+        [2],
+        unitary,
+        None,
+        None,
+        jqt.Qarray.from_list([]),
+        {},
+        jnp.array([]),
+        "legacy",
+        1,
+    )
+
+    assert gate.U is unitary
+    assert gate.channel_apply is None
+    assert jnp.allclose(gate.KM[0].data, unitary.data)
+
+
 def test_unitary_simulation():
     N = 10
     beta = 2

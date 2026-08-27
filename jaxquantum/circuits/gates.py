@@ -19,12 +19,14 @@ class Gate:
     _Ht: Optional[Array] # Hamiltonian
     _KM: Optional[Qarray] # Kraus map
     _c_ops: Optional[Qarray]
-    _gen_KM: Optional[Callable] = struct.field(pytree_node=False)
-    _channel_apply: Optional[Callable] = struct.field(pytree_node=False)
     _params: Dict[str, Any]
     _ts: Array
     _name: str = struct.field(pytree_node=False)
     num_modes: int = struct.field(pytree_node=False)
+    _gen_KM: Optional[Callable] = struct.field(pytree_node=False, default=None)
+    _channel_apply: Optional[Callable] = struct.field(
+        pytree_node=False, default=None
+    )
 
     @classmethod
     def create(
