@@ -114,4 +114,5 @@ nav:
       - Bosonic Codes: documentation/tutorials/bosonic_codes.ipynb
       - Circuits: documentation/tutorials/circuits.ipynb
       - Sparse Backends: documentation/tutorials/sparse_backends.ipynb
+      - Sharding: documentation/tutorials/sharding.ipynb
   - Code Reference: reference/
