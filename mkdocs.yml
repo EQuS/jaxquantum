@@ -52,7 +52,7 @@ watch:
 plugins:
   - search
   - mkdocs-jupyter:
-      execute: false
+      execute: true
       include: ["*.ipynb"]
   - gen-files:
       scripts:
