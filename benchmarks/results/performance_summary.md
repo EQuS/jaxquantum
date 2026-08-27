@@ -197,6 +197,25 @@ Kraus construction, batched device eigenvector slicing, SparseDIA batch
 reshaping, and operator quantum-dimension reshaping. These are compatibility
 fixes rather than benchmark claims.
 
+## Diffrax solver interface
+
+The native Diffrax interface adds solver, controller, `SaveAt`, adjoint,
+event, progress-meter, and continuation-state controls without changing the
+lowered computation. CPU and GPU compiler temporary/peak memory and StableHLO
+line counts were identical before and after the interface update.
+
+| Workload | CPU cold (old -> new) | CPU warm (old -> new) | RTX 4080 cold (old -> new) | RTX 4080 warm (old -> new) |
+| --- | ---: | ---: | ---: | ---: |
+| `sesolve` | 0.387 -> 0.373 s | 43.7 -> 45.0 us | 0.455 -> 0.444 s | 1.476 -> 1.542 ms |
+| `mesolve` | 0.447 -> 0.454 s | 110.0 -> 107.6 us | 0.549 -> 0.533 s | 2.254 -> 2.041 ms |
+| Circuit solve | 0.417 -> 0.409 s | 58.0 -> 60.2 us | 0.525 -> 0.488 s | 2.822 -> 2.716 ms |
+
+These small mixed changes are benchmark noise rather than an execution-path
+regression: output norms were identical, and numerical equivalence tests cover
+the legacy and native interfaces. Default calls retain the existing progress
+bar, `max_steps=100_000`, save-at-input-times behavior, and Qarray return type.
+Legacy string/bool options remain available with `FutureWarning` guidance.
+
 ## Rejected experiments
 
 - A composite `ptrace` lowered HLO from 96 to 55 lines, but cold time was

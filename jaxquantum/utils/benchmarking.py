@@ -11,7 +11,6 @@ from typing import Any
 import jax
 import numpy as np
 
-
 _MEMORY_FIELDS = (
     "argument_size_in_bytes",
     "output_size_in_bytes",
@@ -285,7 +284,7 @@ def benchmark_precision(
                 real_dtype,
                 complex_dtype,
             )
-            reports[name], outputs[name] = _benchmark_once(
+            reports[name], output = _benchmark_once(
                 function,
                 precision_args,
                 iterations,
@@ -295,6 +294,8 @@ def benchmark_precision(
                 jit_kwargs,
                 precision_kwargs,
             )
+            outputs[name] = jax.device_get(output)
+            del output
     finally:
         jax.config.update("jax_enable_x64", original_x64)
         if clear_caches:

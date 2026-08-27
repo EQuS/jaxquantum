@@ -4,6 +4,7 @@ Each tutorial is a self-contained Jupyter notebook that can be run locally or in
 
 | Tutorial | Topics |
 |---|---|
+| [Diffrax Solvers](diffrax_solvers.ipynb) | Native solvers and controllers, result objects, saving, events, differentiation, continuation |
 | [Devices & Systems](devices.ipynb) | `Transmon`, `TunableTransmon`, `eig_systems`, `plot_wavefunctions`, `jax.vmap` flux sweeps, `jax.grad` fitting |
 | [Bosonic Codes](bosonic_codes.ipynb) | `CatQubit`, `SquareGKPQubit`, `BinomialQubit`, `plot_code_states`, logical gates, `mesolve` dynamics |
 | [Circuits](circuits.ipynb) | `Register`, `Circuit`, `Layer`, gate library, unitary/Hamiltonian/Kraus simulation, circuit optimization |

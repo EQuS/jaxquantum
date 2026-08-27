@@ -10,6 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import diffrax
 import jax
 import jax.numpy as jnp
 
@@ -22,9 +23,9 @@ def _runner(dimension, spectator, times, collapse):
     collapse_ops = (
         jqt.Qarray.from_list([0.03 * jqt.destroy(dimension)]) if collapse else None
     )
-    options = jqt.SolverOptions.create(
-        progress_meter=False,
-        stepsize_controller="ConstantStepSize",
+    options = jqt.SolverOptions(
+        stepsize_controller=diffrax.ConstantStepSize(),
+        progress_meter=None,
     )
 
     def run(amplitude, state):
@@ -48,9 +49,9 @@ def _promoted_runner(dimension, spectator, times, collapse):
     collapse_ops = (
         jqt.Qarray.from_list([0.03 * jqt.destroy(dimension)]) if collapse else None
     )
-    options = jqt.SolverOptions.create(
-        progress_meter=False,
-        stepsize_controller="ConstantStepSize",
+    options = jqt.SolverOptions(
+        stepsize_controller=diffrax.ConstantStepSize(),
+        progress_meter=None,
     )
 
     def run(amplitude, state):

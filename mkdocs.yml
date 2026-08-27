@@ -109,6 +109,7 @@ nav:
       - The Sharp Bits 🔪: documentation/getting_started/sharp_bits.md
     - Tutorials:
       - documentation/tutorials/index.md
+      - Diffrax Solvers: documentation/tutorials/diffrax_solvers.ipynb
       - Devices & Systems: documentation/tutorials/devices.ipynb
       - Bosonic Codes: documentation/tutorials/bosonic_codes.ipynb
       - Circuits: documentation/tutorials/circuits.ipynb

@@ -49,6 +49,14 @@ pip install -e ".[dev,docs,tests]"
 ```
 This installs the `dev` , `tests` and `docs` extras as well, which are useful when developing the package. Since it is installed in editable mode, the package will automatically pick up new changes pulled in the repository. Add the `gpu` or `tpu` extra if needed.
 
+Before submitting changes, run the complete test suite from the repository root:
+
+```bash
+bash test.sh --docs
+```
+
+This runs ordinary tests, isolated virtual-CPU sharding tests, and every documentation notebook. Omit `--docs` for code tests only.
+
 ## Check Hardware
 
 To check which hardware JAX is running on, run the following python code:

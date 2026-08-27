@@ -628,7 +628,7 @@ class TestMesolve:
         omega = 1.0
         H_dense = jqt.num(N_modes) * omega
         H_dia = jqt.num(N_modes, implementation=QarrayImplType.SPARSE_DIA) * omega
-        opts = jqt.SolverOptions.create(progress_meter=False)
+        opts = jqt.SolverOptions(progress_meter=None)
 
         rho0 = jqt.basis(N_modes, 1).to_dm()
         tlist = jnp.linspace(0, 1.0, 20)
@@ -645,7 +645,7 @@ class TestMesolve:
         N_modes = 4
         kappa = 0.1
         H = jqt.num(N_modes)
-        opts = jqt.SolverOptions.create(progress_meter=False)
+        opts = jqt.SolverOptions(progress_meter=None)
 
         c_dense = jqt.Qarray.from_list([jqt.destroy(N_modes) * jnp.sqrt(kappa)])
         c_dia = jqt.Qarray.from_list(
@@ -759,7 +759,7 @@ class TestBatchedSparseDIA:
         kappa = 0.1
         gamma = 0.05
         H = jqt.num(N_modes)
-        opts = jqt.SolverOptions.create(progress_meter=False)
+        opts = jqt.SolverOptions(progress_meter=None)
         rho0 = jqt.basis(N_modes, 2).to_dm()
         tlist = jnp.linspace(0, 2.0, 30)
 

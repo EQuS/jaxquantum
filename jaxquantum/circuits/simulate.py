@@ -293,21 +293,16 @@ def simulate(
     save_states: bool = True,
     **kwargs,
 ) -> Results:
-    """
-    Simulates the evolution of a quantum state through a given quantum circuit.
+    """Simulate a circuit and optionally retain each layer's states.
 
     Args:
-        circuit (Circuit): The quantum circuit to simulate. The circuit is composed of layers,
-                           each of which can generate unitary or Kraus operators.
-        initial_state (Qarray): The initial quantum state to be evolved. This can be a state vector
-                                or a density matrix.
-        mode (SimulateMode, optional): The mode of simulation. It can be either SimulateMode.UNITARY
-                                       for unitary evolution or SimulateMode.KRAUS for Kraus operator
-                                       evolution. Defaults to SimulateMode.UNITARY.
+        circuit: Circuit to simulate.
+        initial_state: Initial ket or density matrix.
+        mode: Simulation mode, or each layer's default mode.
+        save_states: Whether to retain intermediate layer states.
 
     Returns:
-        Results: An object containing the results of the simulation, which includes the quantum states
-                 at each step of the circuit.
+        Saved states, or only the final state when ``save_states=False``.
     """
 
     results = Results.create(
@@ -468,24 +463,8 @@ def _simulate_layer(
     mode: SimulateMode = SimulateMode.UNITARY,
     start_time: float = 0,
     **kwargs,
-) -> Qarray:
-    """
-    Simulates the evolution of a quantum state through a given layer.
-
-    Args:
-        layer (Layer): The layer through which the quantum state evolves.
-                       This layer should have methods to generate unitary (gen_U)
-                       and Kraus (gen_KM) operators.
-        initial_state (Qarray): The initial quantum state to be evolved.
-                                This can be a state vector or a density matrix.
-        mode (SimulateMode, optional): The mode of simulation. It can be either
-                                       SimulateMode.UNITARY for unitary evolution
-                                       or SimulateMode.KRAUS for Kraus operator evolution
-                                       or SimulateMode.DEFAULT to use the default simulate mode in the layer.
-                                       Defaults to SimulateMode.UNITARY.
-    Returns:
-        Qarray: The result of the simulation containing the evolved quantum state.
-    """
+) -> dict:
+    """Simulate one circuit layer and return its states and ending time."""
 
     state = initial_state
 
@@ -501,7 +480,7 @@ def _simulate_layer(
 
         solver_options = kwargs.pop(
             "solver_options",
-            SolverOptions.create(progress_meter=False),
+            SolverOptions(progress_meter=None),
         )
         ts = layer.gen_ts()
         ts = ts + start_time

@@ -64,7 +64,7 @@ def Ht(t):
     H0 = omega_a*n
     return H0
 
-solver_options = jqt.SolverOptions.create(progress_meter=True)
+solver_options = jqt.SolverOptions(progress_meter="default")
 states = jqt.mesolve(Ht, initial_state_dm, ts, c_ops=c_ops, solver_options=solver_options)
 nt = jnp.real(jqt.overlap(n, states))
 a_real = jnp.real(jqt.overlap(a, states))

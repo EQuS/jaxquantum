@@ -1,15 +1,17 @@
-import sys
 import os
+import sys
 
 # Add the jaxquantum directory to the sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import jaxquantum as jqt
-import jaxquantum.circuits as jqtc
+import diffrax
 import jax
 import jax.numpy as jnp
-from jax.scipy.special import gammaln
 import pytest
+from jax.scipy.special import gammaln
+
+import jaxquantum as jqt
+import jaxquantum.circuits as jqtc
 
 
 def test_unitary_simulation():
@@ -682,9 +684,10 @@ def test_direct_qubit_channels_are_jittable_and_differentiable():
 def test_local_hamiltonian_and_lindblad_match_promoted_solvers():
     reg = jqtc.Register([2, 4, 2])
     times = jnp.linspace(0.0, 0.3, 7)
-    options = jqt.SolverOptions.create(
-        progress_meter=False,
-        stepsize_controller="ConstantStepSize",
+    options = jqt.SolverOptions(
+        stepsize_controller=diffrax.ConstantStepSize(),
+        dt0=times[1] - times[0],
+        progress_meter=None,
     )
     state = (
         jqt.basis(16, 0).reshape_qdims(*reg.dims)
