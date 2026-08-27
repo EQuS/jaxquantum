@@ -68,11 +68,17 @@ Reproduce with `construction.py` and `hamiltonian.py --include-reference`.
 | Hoisted Transmon Hamiltonian ops | 1.28x | 0.99x | 2.77x | 1.36x | compile 1.32x CPU / 3.47x GPU faster |
 | Hoisted KNO Hamiltonian ops | 1.31x | 1.71x | 2.63x | 0.99x | HLO lines 1.98x lower |
 | Vectorized Transmon wavefunctions | 41.93x | 2.30x | 1,192.89x | 1.38x | HLO lines 110x lower |
+| Vectorized FluxDevice Fock wavefunctions | 3.66x | 3.30x | 4.47x | 1.40x | CPU temp 3.49x / HLO lines 7.63x lower |
+| Vectorized FluxDevice charge wavefunctions | 1.69x | 1.05x | 4.53x | 1.10x | CPU temp 1.93x / HLO lines 1.83x lower |
 | `vmap` parameter sweep | 2.92x | 2.55x | 1.21x | 40.97x | HLO lines 10.51x lower |
 
 The vectorized GPU wavefunction path trades compiler memory for its very large
 compile reduction: temporary memory rises from 0.025 MB to 4.01 MB. The GPU
 sweep also raises peak memory by about 9%.
+
+The FluxDevice Fock comparison uses an equivalent repeated JAX recurrence.
+Against the previous non-JIT SciPy path, the compiled recurrence is 31.36x
+faster warm on CPU and 6.01x on GPU; maximum absolute error is `8.33e-16`.
 
 Reproduce with `scan.py` and `devices.py`.
 

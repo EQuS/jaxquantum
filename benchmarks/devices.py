@@ -14,8 +14,9 @@ import jax
 import jax.numpy as jnp
 
 import jaxquantum as jqt
-from jaxquantum.devices import KNO, Transmon
+from jaxquantum.devices import KNO, SNAIL, Resonator, Transmon
 from jaxquantum.devices.analysis import run_jax_sweep
+from jaxquantum.devices.common.utils import harm_osc_wavefunction
 
 
 def _transmon(offset, repeated):
@@ -80,6 +81,50 @@ def _wavefunctions(phases, repeated):
     )
 
 
+def _fock_wavefunctions(phases, repeated):
+    device = Resonator.create(
+        N=8,
+        N_pre_diag=21,
+        params={"Ec": 0.2, "El": 1.0},
+    )
+    if not repeated:
+        return device._calculate_wavefunctions_fock(phases)
+    length = jnp.real(device.phi_zpf() * jnp.sqrt(2))
+    basis = jnp.stack(
+        [
+            harm_osc_wavefunction(level, phases, length)
+            for level in range(device.N_pre_diag)
+        ]
+    )
+    return device.get_vec_data_in_H_eigenbasis(basis)
+
+
+def _charge_wavefunctions(phases, repeated):
+    device = SNAIL.create(
+        N=8,
+        N_pre_diag=21,
+        params={
+            "Ec": 0.2,
+            "Ej": 3.0,
+            "alpha": 0.25,
+            "m": 2,
+            "phi_ext": 0.1,
+            "ng": 0.05,
+        },
+    )
+    if not repeated:
+        return device._calculate_wavefunctions_charge(phases)
+    labels = jnp.diag(device.original_ops["n"].data)
+    basis = jnp.stack(
+        [
+            jnp.exp(-2j * jnp.pi * label * phases) / jnp.sqrt(2 * jnp.pi)
+            for label in labels
+        ]
+    )
+    wavefunctions = device.get_vec_data_in_H_eigenbasis(basis)
+    return jnp.power(1j, jnp.arange(wavefunctions.shape[-2]))[:, None] * wavefunctions
+
+
 def _transmon_sweep(offsets, vectorized):
     def metric(params):
         return (
@@ -124,6 +169,16 @@ def main():
             phases,
             iterations=args.iterations,
         )
+    for name, function in (
+        ("fock_wavefunctions", _fock_wavefunctions),
+        ("charge_wavefunctions", _charge_wavefunctions),
+    ):
+        for suffix, repeated in (("repeated", True), ("vectorized", False)):
+            reports[f"{name}_{suffix}"] = jqt.benchmark_jax_function(
+                lambda values, old=repeated, fn=function: fn(values, old),
+                phases,
+                iterations=args.iterations,
+            )
     offsets = jnp.linspace(-0.4, 0.4, args.sweep_points)
     for suffix, vectorized in (("unrolled", False), ("vmapped", True)):
         reports[f"sweep_{suffix}"] = jqt.benchmark_jax_function(
