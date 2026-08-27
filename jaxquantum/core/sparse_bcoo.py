@@ -5,15 +5,17 @@ Implements the JAX experimental BCOO sparse format as a Qarray storage backend.
 
 from __future__ import annotations
 
+from copy import deepcopy
+
+import jax.numpy as jnp
 from flax import struct
 from jax import Array
-from copy import deepcopy
-import jax.numpy as jnp
 from jax.experimental import sparse
 
 # QarrayImpl and friends are imported below (after qarray.py is fully loaded)
 # to match the pattern used by sparse_dia.py and avoid circular imports.
-from jaxquantum.core.qarray import QarrayImpl, DenseImpl, QarrayImplType  # noqa: E402
+from jaxquantum.core.qarray import DenseImpl, QarrayImpl, QarrayImplType  # noqa: E402
+from jaxquantum.core.settings import SETTINGS  # noqa: E402
 
 
 @struct.dataclass
@@ -29,6 +31,16 @@ class SparseBCOOImpl(QarrayImpl):
     PROMOTION_ORDER = 1  # noqa: RUF012 — not a struct field; no annotation intentional
 
     @classmethod
+    def _make(cls, data) -> "SparseBCOOImpl":
+        """Construct a ``SparseBCOOImpl`` (no sharding applied).
+
+        SparseBCOO has variable nnz per row and does not shard cleanly, so
+        ``_make`` is a pure pass-through. The default-sharding gate lives in
+        :meth:`from_data` instead, where users construct sharded Qarrays.
+        """
+        return cls(_data=data)
+
+    @classmethod
     def from_data(cls, data) -> "SparseBCOOImpl":
         """Wrap *data* in a new ``SparseBCOOImpl``, converting to BCOO if needed.
 
@@ -37,8 +49,20 @@ class SparseBCOOImpl(QarrayImpl):
 
         Returns:
             A ``SparseBCOOImpl`` wrapping a BCOO representation of *data*.
+
+        Raises:
+            NotImplementedError: If a default sharding is configured. BCOO
+                does not partition cleanly across devices; convert to Dense
+                or SparseDIA, or call ``jqt.clear_default_sharding()``.
         """
-        return cls(_data=cls._to_sparse(data))
+        if SETTINGS["default_sharding"] is not None:
+            raise NotImplementedError(
+                "Sharding is not supported for SparseBCOO (variable nnz "
+                "per shard). Convert to Dense or SparseDIA, or call "
+                "`jqt.clear_default_sharding()` before constructing a "
+                "SparseBCOO Qarray."
+            )
+        return cls._make(cls._to_sparse(data))
 
     def get_data(self) -> Array:
         """Return the underlying BCOO sparse array."""
@@ -59,11 +83,11 @@ class SparseBCOOImpl(QarrayImpl):
             sparse) containing the matrix product.
         """
         if isinstance(other, DenseImpl):
-            return DenseImpl(self._data @ other._data)
+            return DenseImpl._make(self._data @ other._data)
         a, b = self._coerce(other)
         if a is not self:
             return a.matmul(b)
-        return SparseBCOOImpl(self._data @ b._data)
+        return SparseBCOOImpl._make(self._data @ b._data)
 
     def add(self, other: QarrayImpl) -> QarrayImpl:
         """Element-wise addition ``self + other``, coercing types as needed.
@@ -78,9 +102,10 @@ class SparseBCOOImpl(QarrayImpl):
         if a is not self:
             return a.add(b)
         x, y = self._data, b._data
+        x, y = self._broadcast_pair(x, y)
         if x.indices.dtype != y.indices.dtype:
             y = sparse.BCOO((y.data, y.indices.astype(x.indices.dtype)), shape=y.shape)
-        return SparseBCOOImpl(x + y)
+        return SparseBCOOImpl._make(x + y)
 
     def sub(self, other: QarrayImpl) -> QarrayImpl:
         """Element-wise subtraction ``self - other``, coercing types as needed.
@@ -95,9 +120,25 @@ class SparseBCOOImpl(QarrayImpl):
         if a is not self:
             return a.sub(b)
         x, y = self._data, b._data
+        x, y = self._broadcast_pair(x, y)
         if x.indices.dtype != y.indices.dtype:
             y = sparse.BCOO((y.data, y.indices.astype(x.indices.dtype)), shape=y.shape)
-        return SparseBCOOImpl(x - y)
+        return SparseBCOOImpl._make(x - y)
+
+    @staticmethod
+    def _broadcast_pair(x: sparse.BCOO, y: sparse.BCOO):
+        shape = jnp.broadcast_shapes(x.shape, y.shape)
+        if x.shape != shape:
+            dims = range(len(shape) - x.ndim, len(shape))
+            x = sparse.bcoo_broadcast_in_dim(
+                x, shape=shape, broadcast_dimensions=dims
+            )
+        if y.shape != shape:
+            dims = range(len(shape) - y.ndim, len(shape))
+            y = sparse.bcoo_broadcast_in_dim(
+                y, shape=shape, broadcast_dimensions=dims
+            )
+        return x, y
 
     def mul(self, scalar) -> QarrayImpl:
         """Scalar multiplication.
@@ -108,7 +149,7 @@ class SparseBCOOImpl(QarrayImpl):
         Returns:
             A ``SparseBCOOImpl`` with each stored value multiplied by *scalar*.
         """
-        return SparseBCOOImpl(scalar * self._data)
+        return SparseBCOOImpl._make(scalar * self._data)
 
     def dag(self) -> QarrayImpl:
         """Conjugate transpose without densifying.
@@ -130,7 +171,7 @@ class SparseBCOOImpl(QarrayImpl):
             (jnp.conj(transposed_data.data), transposed_data.indices),
             shape=transposed_data.shape,
         )
-        return SparseBCOOImpl(conjugated_data)
+        return SparseBCOOImpl._make(conjugated_data)
 
     def to_dense(self) -> "DenseImpl":
         """Convert to a ``DenseImpl`` via ``todense()``.
@@ -138,7 +179,7 @@ class SparseBCOOImpl(QarrayImpl):
         Returns:
             A ``DenseImpl`` with the same values as this sparse array.
         """
-        return DenseImpl(self._data.todense())
+        return DenseImpl._make(self._data.todense())
 
     @classmethod
     def _to_sparse(cls, data) -> sparse.BCOO:
@@ -197,7 +238,7 @@ class SparseBCOOImpl(QarrayImpl):
         Returns:
             A ``SparseBCOOImpl`` containing the real parts of stored values.
         """
-        return SparseBCOOImpl(SparseBCOOImpl._real(self._data))
+        return SparseBCOOImpl._make(SparseBCOOImpl._real(self._data))
 
     @classmethod
     def _imag(cls, data):
@@ -210,7 +251,7 @@ class SparseBCOOImpl(QarrayImpl):
         Returns:
             A ``SparseBCOOImpl`` containing the imaginary parts of stored values.
         """
-        return SparseBCOOImpl(SparseBCOOImpl._imag(self._data))
+        return SparseBCOOImpl._make(SparseBCOOImpl._imag(self._data))
 
     @classmethod
     def _conj(cls, data):
@@ -223,7 +264,7 @@ class SparseBCOOImpl(QarrayImpl):
         Returns:
             A ``SparseBCOOImpl`` containing the complex-conjugated stored values.
         """
-        return SparseBCOOImpl(SparseBCOOImpl._conj(self._data))
+        return SparseBCOOImpl._make(SparseBCOOImpl._conj(self._data))
 
     @classmethod
     def _abs(cls, data):
@@ -236,7 +277,7 @@ class SparseBCOOImpl(QarrayImpl):
         Returns:
             A ``SparseBCOOImpl`` containing the absolute values of stored entries.
         """
-        return SparseBCOOImpl(SparseBCOOImpl._abs(self._data))
+        return SparseBCOOImpl._make(SparseBCOOImpl._abs(self._data))
 
     @classmethod
     def _eye_data(cls, n: int, dtype=None):
@@ -250,6 +291,19 @@ class SparseBCOOImpl(QarrayImpl):
             A ``sparse.BCOO`` identity matrix of shape ``(n, n)``.
         """
         return sparse.eye(n, dtype=dtype)
+
+    @classmethod
+    def _scaled_identity(cls, n: int, scalar, dtype=None) -> SparseBCOOImpl:
+        """Create a batched scaled identity without dense broadcasting."""
+        scalar = jnp.ones((), dtype=dtype) * (jnp.asarray(scalar) + 0.0j)
+        batch_shape = scalar.shape
+        diagonal = jnp.arange(n)
+        indices = jnp.stack((diagonal, diagonal), axis=-1)
+        indices = jnp.broadcast_to(indices, (*batch_shape, n, 2))
+        values = jnp.broadcast_to(scalar[..., None], (*batch_shape, n))
+        return cls._make(
+            sparse.BCOO((values, indices), shape=(*batch_shape, n, n))
+        )
 
     @classmethod
     def can_handle_data(cls, arr) -> bool:
@@ -318,7 +372,7 @@ class SparseBCOOImpl(QarrayImpl):
         values = self._data.data
         is_diag = indices[:, -2] == indices[:, -1]
         new_values = values * is_diag
-        return SparseBCOOImpl(sparse.BCOO((new_values, indices), shape=self._data.shape))
+        return SparseBCOOImpl._make(sparse.BCOO((new_values, indices), shape=self._data.shape))
 
     def l2_norm_batched(self, bdims: tuple) -> Array:
         """Compute the L2 norm per batch element without densifying.
@@ -351,7 +405,7 @@ class SparseBCOOImpl(QarrayImpl):
             return jnp.sqrt(sum_sq).reshape(bdims)
 
     def __deepcopy__(self, memo=None):
-        return SparseBCOOImpl(_data=deepcopy(self._data, memo))
+        return SparseBCOOImpl._make(deepcopy(self._data, memo))
 
     def tidy_up(self, atol) -> "SparseBCOOImpl":
         """Zero out stored values whose real or imaginary magnitude is below *atol*.
@@ -366,7 +420,7 @@ class SparseBCOOImpl(QarrayImpl):
         re = jnp.real(values)
         im = jnp.imag(values)
         new_values = re * (jnp.abs(re) > atol) + 1j * im * (jnp.abs(im) > atol)
-        return SparseBCOOImpl(
+        return SparseBCOOImpl._make(
             sparse.BCOO((new_values, self._data.indices), shape=self._data.shape)
         )
 
@@ -384,7 +438,7 @@ class SparseBCOOImpl(QarrayImpl):
         if a is not self:
             return a.kron(b)
         sparse_kron = sparse.sparsify(jnp.kron)
-        return SparseBCOOImpl(sparse_kron(self._data, b._data))
+        return SparseBCOOImpl._make(sparse_kron(self._data, b._data))
 
 
 # Register with the enum registry

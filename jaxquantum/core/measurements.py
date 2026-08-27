@@ -34,15 +34,22 @@ def overlap(rho: Qarray, sigma: Qarray) -> Array:
     """
 
     if rho.is_vec() and sigma.is_vec():
-        return jnp.abs(((rho.to_ket().dag() @ sigma.to_ket()).trace())) ** 2
+        # |<a|b>|^2. Compute the inner product directly over the trailing space
+        # axis (vectors are stored as (..., N)); robust for batched states.
+        a = rho.to_ket().data
+        b = sigma.to_ket().data
+        inner = jnp.sum(jnp.conj(a) * b, axis=-1)
+        return jnp.abs(inner) ** 2
     elif rho.is_vec():
-        rho = rho.to_ket()
-        res = (rho.dag() @ sigma @ rho).data
-        return res.squeeze(-1).squeeze(-1)
+        # <psi|sigma|psi>
+        psi = rho.to_ket()
+        Opsi = (sigma @ psi).data
+        return jnp.sum(jnp.conj(psi.data) * Opsi, axis=-1)
     elif sigma.is_vec():
-        sigma = sigma.to_ket()
-        res = (sigma.dag() @ rho @ sigma).data
-        return res.squeeze(-1).squeeze(-1)
+        # <psi|rho|psi>
+        psi = sigma.to_ket()
+        Opsi = (rho @ psi).data
+        return jnp.sum(jnp.conj(psi.data) * Opsi, axis=-1)
     else:
         return (rho.dag() @ sigma).trace()
 

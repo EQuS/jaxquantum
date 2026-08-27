@@ -2,13 +2,13 @@
 
 from abc import abstractmethod
 
-from flax import struct
-from jax import config
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+from flax import struct
+from jax import config
 
-from jaxquantum.devices.common.utils import harm_osc_wavefunction
-from jaxquantum.devices.base.base import Device, BasisTypes
+from jaxquantum.devices.base.base import BasisTypes, Device
+from jaxquantum.devices.common.utils import harm_osc_wavefunctions
 
 config.update("jax_enable_x64", True)
 
@@ -22,51 +22,24 @@ class FluxDevice(Device):
     def _calculate_wavefunctions_fock(self, phi_vals):
         """Calculate wavefunctions at phi_exts."""
         phi_osc = self.phi_zpf() * jnp.sqrt(2)  # length of oscillator
-        phi_vals = jnp.array(phi_vals)
-
-        # calculate basis functions
-        basis_functions = []
-        for n in range(self.N_pre_diag):
-            basis_functions.append(
-                harm_osc_wavefunction(n, phi_vals, jnp.real(phi_osc))
-            )
-        basis_functions = jnp.array(basis_functions)
-
-        # transform to better diagonal basis
-        basis_functions_in_H_eigenbasis = self.get_vec_data_in_H_eigenbasis(
-            basis_functions
+        basis_functions = harm_osc_wavefunctions(
+            self.N_pre_diag,
+            phi_vals,
+            jnp.real(phi_osc),
         )
-
-        # the below is equivalent to evecs_in_H_eigenbasis @ basis_functions_in_H_eigenbasis
-        # since evecs in H_eigenbasis is diagonal, i.e. the identity matrix
-        wavefunctions = basis_functions_in_H_eigenbasis
-        return wavefunctions
+        return self.get_vec_data_in_H_eigenbasis(basis_functions)
 
     def _calculate_wavefunctions_charge(self, phi_vals):
         phi_vals = jnp.array(phi_vals)
-
-        # calculate basis functions
-        basis_functions = []
         n_labels = jnp.diag(self.original_ops["n"].data)
-        for n in n_labels:
-            basis_functions.append(
-                1 / (jnp.sqrt(2 * jnp.pi)) * jnp.exp(1j * n * (2 * jnp.pi * -1 * phi_vals)) # Added a -1 to work with the SNAIL
-            )
-        basis_functions = jnp.array(basis_functions)
-
-        # transform to better diagonal basis
-        basis_functions_in_H_eigenbasis = self.get_vec_data_in_H_eigenbasis(
-            basis_functions
+        basis_functions = jnp.exp(
+            -2j * jnp.pi * n_labels[:, None] * phi_vals
+        ) / jnp.sqrt(2 * jnp.pi)
+        wavefunctions = self.get_vec_data_in_H_eigenbasis(
+            basis_functions,
         )
-
-        # the below is equivalent to evecs_in_H_eigenbasis @ basis_functions_in_H_eigenbasis
-        # since evecs in H_eigenbasis is diagonal, i.e. the identity matrix
-        num_eigenstates = basis_functions_in_H_eigenbasis.shape[0]
-        phase_correction_factors = (1j ** (jnp.arange(0, num_eigenstates))).reshape(
-            num_eigenstates, 1
-        )  # TODO: review why these are needed...
-        wavefunctions = basis_functions_in_H_eigenbasis * phase_correction_factors
-        return wavefunctions
+        correction = jnp.power(1j, jnp.arange(wavefunctions.shape[-2]))
+        return correction[:, None] * wavefunctions
 
     @abstractmethod
     def potential(self, phi):

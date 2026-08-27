@@ -572,7 +572,10 @@ class TestNormFn:
     def test_norm_density_matrix_sparse(self):
         """A normalised density matrix has trace (and hence norm) = 1."""
         ket = jqt.basis(4, 1, implementation=QarrayImplType.SPARSE_BCOO)
-        rho = jqt.ket2dm(ket)
+        # ket2dm of a sparse *vector* densifies the outer product (sparse state
+        # vectors are not natively supported); re-sparsify to exercise the
+        # sparse-operator norm path.
+        rho = jqt.ket2dm(ket).to_sparse_bcoo()
         assert rho.is_sparse_bcoo
         assert jnp.allclose(jqt.norm(rho), 1.0)
 
@@ -986,7 +989,7 @@ class TestMesolveSparseCollapse:
         """mesolve with sparse c_ops must not raise any exception."""
         H, rho0, c_ops_sparse, tlist = self._make_decay_system(sparse_c=True)
         result = jqt.mesolve(H, rho0, tlist, c_ops=c_ops_sparse,
-                              solver_options=jqt.SolverOptions.create(progress_meter=False))
+                              solver_options=jqt.SolverOptions(progress_meter=None))
         assert result is not None
 
     def test_sparse_c_ops_match_dense(self):
@@ -995,7 +998,7 @@ class TestMesolveSparseCollapse:
         H, rho0, c_ops_dense, tlist = self._make_decay_system(N=N, sparse_c=False)
         _, _, c_ops_sparse, _ = self._make_decay_system(N=N, sparse_c=True)
 
-        opts = jqt.SolverOptions.create(progress_meter=False)
+        opts = jqt.SolverOptions(progress_meter=None)
         dense_result = jqt.mesolve(H, rho0, tlist, c_ops=c_ops_dense, solver_options=opts)
         sparse_result = jqt.mesolve(H, rho0, tlist, c_ops=c_ops_sparse, solver_options=opts)
 
@@ -1013,7 +1016,7 @@ class TestMesolveSparseCollapse:
         H, rho0, c_ops_sparse, tlist = self._make_decay_system(
             N=N, kappa=kappa, sparse_c=True
         )
-        opts = jqt.SolverOptions.create(progress_meter=False)
+        opts = jqt.SolverOptions(progress_meter=None)
         result = jqt.mesolve(H, rho0, tlist, c_ops=c_ops_sparse, solver_options=opts)
 
         # Final state: last time point

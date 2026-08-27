@@ -1,11 +1,44 @@
 """Sweeping tools."""
 
-from copy import deepcopy
 import itertools
+import os
+from copy import deepcopy
 from tempfile import NamedTemporaryFile
+
+import jax
 import jax.numpy as jnp
 from tqdm import tqdm
-import os
+
+
+def run_jax_sweep(
+    params,
+    sweep_params,
+    metrics_func,
+    fixed_kwargs=None,
+    is_parallel=False,
+):
+    """Evaluate a pure metric over sweep points with ``jax.vmap``."""
+    if not sweep_params:
+        raise ValueError("sweep_params must not be empty")
+    keys = tuple(sweep_params)
+    values = tuple(jnp.asarray(sweep_params[key]) for key in keys)
+    if is_parallel:
+        length = values[0].shape[0]
+        if not all(value.shape[0] == length for value in values):
+            raise ValueError("parallel sweep parameters must have equal lengths")
+        points = values
+    else:
+        points = tuple(
+            grid.reshape(-1) for grid in jnp.meshgrid(*values, indexing="ij")
+        )
+    fixed_kwargs = dict(fixed_kwargs or {})
+
+    def evaluate(*point):
+        current = dict(params)
+        current.update(zip(keys, point))
+        return metrics_func(current, **fixed_kwargs)
+
+    return jax.vmap(evaluate)(*points)
 
 
 def run_sweep(
@@ -27,7 +60,7 @@ def run_sweep(
             key: The parameter name.
             value: The list of values to sweep over.
         metrics_func (function): The function to evaluate the metrics.
-        fixed_params (dict, optional): The fixed parameters to send into metrics_func. Defaults to None.
+        fixed_kwargs (dict, optional): Fixed keyword arguments for metrics_func.
         data (dict, optional): The data to append to. Defaults to None.
         is_parallel (bool, optional): Whether to sweep through the sweep_params lists in parallel or through their cartesian product. Defaults to False.
         save_file (str, optional): The file to save the data to. Defaults to None, in which case data is saved to a temporary file, which will be deleted upon closing (e.g. during garbage collection).
@@ -61,7 +94,7 @@ def run_sweep(
 
     if is_parallel:
         sweep_length = len(next(iter(sweep_params.values())))
-        assert [len(vals) == sweep_length for vals in sweep_params.values()], (
+        assert all(len(vals) == sweep_length for vals in sweep_params.values()), (
             "Parallel sweep parameters must have the same length."
         )
 

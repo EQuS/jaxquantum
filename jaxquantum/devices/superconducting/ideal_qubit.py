@@ -58,5 +58,8 @@ class IdealQubit(Device):
 
     def get_H_full(self):
         """Return full H in linear basis."""
-         
-        return self.get_H_linear() + self.params["Δ"] / 2 * self.linear_ops["sigmax"] 
+        ops = self.linear_ops
+        return (
+            self.get_linear_frequency() / 2 * ops["sigmaz"]
+            + self.params["Δ"] / 2 * ops["sigmax"]
+        )

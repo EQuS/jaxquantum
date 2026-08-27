@@ -220,7 +220,7 @@ def plot_qp(
         _, axs = plt.subplots(
             bdims[0],
             bdims[1],
-            figsize=(4 * bdims[1], 3 * bdims[0]),
+            figsize=(3.3 * bdims[1], 3 * bdims[0]),
             dpi=200,
         )
 
@@ -281,7 +281,7 @@ def plot_qp(
     )
 
     fig = axs[bdims[0] - 1, bdims[1] - 1].get_figure()
-    fig.tight_layout()
+    fig.tight_layout(w_pad=0.3, h_pad=0.3)
     if figtitle is not None:
         fig.suptitle(figtitle, y=1.04)
     return axs, im
@@ -393,7 +393,8 @@ def _plot_qp_gif(
 
     if axs is None:
         _, axs = plt.subplots(
-            rows, cols, figsize=(4 * cols, 3 * rows), dpi=200
+            rows, cols, figsize=(3.3 * cols, 3 * rows), dpi=200,
+            layout="constrained",
         )
     axs_arr = axs
     for _ in range(added_baxes):
@@ -407,9 +408,9 @@ def _plot_qp_gif(
         if ts is not None:
             t_str = f"t = {float(ts[k]):.3g}"
             title = f"{figtitle} | {t_str}" if figtitle else t_str
-            fig.suptitle(title, y=0.98)
+            fig.suptitle(title)
         elif figtitle is not None:
-            fig.suptitle(figtitle, y=0.98)
+            fig.suptitle(figtitle)
 
     _render_qp_grid(
         axs_arr,
@@ -429,12 +430,19 @@ def _plot_qp_gif(
         decorate=True,
     )
     _set_suptitle(0)
-    if has_suptitle:
-        # Reserve top strip of the figure so the suptitle isn't clipped in the
-        # rendered animation (PillowWriter uses the figure bbox as-is).
-        fig.tight_layout(rect=[0, 0, 1, 0.92])
+    # PillowWriter saves at the fixed figure bbox (no bbox_inches="tight"), so
+    # anything spilling past the edges is clipped. tight_layout mis-handles
+    # equal-aspect axes (the square box is resized at draw time, after layout),
+    # which pushed the bottom Re[α] label off-frame. constrained_layout instead
+    # shrinks the axes to fit the suptitle/colorbars/labels, so nothing clips;
+    # tighten its inter-panel spacing to keep the batched panels close together.
+    engine = fig.get_layout_engine()
+    if engine is not None and engine.__class__.__name__ == "ConstrainedLayoutEngine":
+        engine.set(w_pad=0.04, h_pad=0.04, wspace=0.02, hspace=0.02)
+    elif has_suptitle:
+        fig.tight_layout(rect=[0, 0, 1, 0.92], w_pad=0.3, h_pad=0.3)
     else:
-        fig.tight_layout()
+        fig.tight_layout(w_pad=0.3, h_pad=0.3)
 
     def update(k):
         for r in range(rows):
@@ -814,7 +822,7 @@ def plot_cf(
         _, axs = plt.subplots(
             bdims[0],
             bdims[1]*2,
-            figsize=(4 * bdims[1]*2, 3 * bdims[0]),
+            figsize=(3.3 * bdims[1]*2, 3 * bdims[0]),
             dpi=200,
         )
 
@@ -874,7 +882,7 @@ def plot_cf(
     )
 
     fig = axs[0, 0].get_figure()
-    fig.tight_layout()
+    fig.tight_layout(w_pad=0.3, h_pad=0.3)
     if figtitle is not None:
         fig.suptitle(figtitle, y=1.04)
     return axs, im
@@ -904,10 +912,10 @@ def _plot_cf_gif(
     ``(rows, 2*cols)`` grid of real|imag subplot pairs rendered via
     :func:`_render_cf_grid`. Same conventions: animation axis chosen by
     ``gif_params['batch_animation_axis']``, remaining batch dims form the
-    per-frame layout, suptitle inside the figure with
-    ``tight_layout(rect=[0, 0, 1, 0.92])`` so it doesn't clip in the saved
-    gif, and ``anim._repr_html_`` patched + figure closed for inline
-    Jupyter rendering.
+    per-frame layout, suptitle inside the figure with ``constrained_layout``
+    so the suptitle and labels don't clip in the saved gif, and
+    ``anim._repr_html_`` patched + figure closed for inline Jupyter
+    rendering.
     """
     save_path = gif_params.get("save_path", None)
     interval_ms = gif_params.get("interval_ms", 200)
@@ -979,7 +987,8 @@ def _plot_cf_gif(
 
     if axs is None:
         _, axs = plt.subplots(
-            rows, 2 * cols, figsize=(4 * 2 * cols, 3 * rows), dpi=200
+            rows, 2 * cols, figsize=(3.3 * 2 * cols, 3 * rows), dpi=200,
+            layout="constrained",
         )
     axs_arr = np.asarray(axs)
     if axs_arr.ndim == 1:
@@ -993,9 +1002,9 @@ def _plot_cf_gif(
         if ts is not None:
             t_str = f"t = {float(ts[k]):.3g}"
             title = f"{figtitle} | {t_str}" if figtitle else t_str
-            fig.suptitle(title, y=0.98)
+            fig.suptitle(title)
         elif figtitle is not None:
-            fig.suptitle(figtitle, y=0.98)
+            fig.suptitle(figtitle)
 
     _render_cf_grid(
         axs_arr,
@@ -1016,10 +1025,15 @@ def _plot_cf_gif(
         decorate=True,
     )
     _set_suptitle(0)
-    if has_suptitle:
-        fig.tight_layout(rect=[0, 0, 1, 0.92])
+    # See _plot_qp_gif: constrained_layout keeps the equal-aspect panels from
+    # clipping their labels in the fixed-bbox animation (tight_layout can't).
+    engine = fig.get_layout_engine()
+    if engine is not None and engine.__class__.__name__ == "ConstrainedLayoutEngine":
+        engine.set(w_pad=0.04, h_pad=0.04, wspace=0.02, hspace=0.02)
+    elif has_suptitle:
+        fig.tight_layout(rect=[0, 0, 1, 0.92], w_pad=0.3, h_pad=0.3)
     else:
-        fig.tight_layout()
+        fig.tight_layout(w_pad=0.3, h_pad=0.3)
 
     def update(k):
         for r in range(rows):

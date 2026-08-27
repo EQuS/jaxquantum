@@ -1,5 +1,6 @@
 name: tests
 on:
+  pull_request:
   workflow_run:
     workflows: ["docs"]
     types:
@@ -19,11 +20,16 @@ jobs:
           pip install -e ".[tests]"
       - name: Test with pytest
         run: |
-          pytest ./test --doctest-modules --junitxml=junit/test-results.xml --cov=jaxquantum --cov-report=xml --cov-report=html:cov_html
+          pytest ./test --ignore=test/test_sharding.py --doctest-modules --junitxml=junit/test-results.xml --cov=jaxquantum --cov-report=xml --cov-report=html:cov_html
+      - name: Test sharding with virtual CPU devices
+        env:
+          JAX_PLATFORMS: cpu
+        run: |
+          pytest ./test/test_sharding.py --junitxml=junit/test-results-sharding.xml --cov=jaxquantum --cov-append --cov-report=xml --cov-report=html:cov_html
       - name: Move files
         run: |
           mkdir test-results
-          mv junit/test-results.xml ./test-results
+          mv junit/*.xml ./test-results
           mv ./coverage.xml ./test-results
           mv ./cov_html ./test-results
           rm ./test-results/cov_html/.gitignore
@@ -34,9 +40,21 @@ jobs:
         with:
           output: test-results/coverage.svg
       - name: Deploy badge to gh-pages branch
+        if: github.event_name == 'workflow_run'
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages
           clean: false
           folder: test-results
           target-folder: test-results
+  notebooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[docs]"
+      - name: Execute documentation notebooks
+        run: python test/run_docs.py

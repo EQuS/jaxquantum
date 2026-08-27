@@ -49,16 +49,19 @@ class Fluxonium(FluxDevice):
     def get_H_linear(self):
         """Return linear terms in H."""
         w = self.get_linear_frequency()
+        ops = self.linear_ops
         return w * (
-            self.linear_ops["a_dag"] @ self.linear_ops["a"]
-            + 0.5 * self.linear_ops["id"]
+            ops["a_dag"] @ ops["a"]
+            + 0.5 * ops["id"]
         )
 
     def get_H_full(self):
         """Return full H in linear basis."""
-
-        phi_op = self.linear_ops["phi"]
-        return self.get_H_linear() + self.get_H_nonlinear(phi_op)
+        ops = self.linear_ops
+        linear = self.get_linear_frequency() * (
+            ops["a_dag"] @ ops["a"] + 0.5 * ops["id"]
+        )
+        return linear + self.get_H_nonlinear(ops["phi"])
 
     def get_H_nonlinear(self, phi_op):
         op_cos_phi = cosm(phi_op)

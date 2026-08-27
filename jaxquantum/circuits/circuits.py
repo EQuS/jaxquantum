@@ -155,15 +155,16 @@ class Layer:
 
         indices_order = []
         for operation in self.operations:
-            if len(operation.gate.KM) == 0:
+            gate_map = operation.gate.KM
+            if len(gate_map) == 0:
                 continue
 
             indices_order += operation.indices
 
             if len(KM) == 0:
-                KM = deepcopy(operation.gate.KM)
+                KM = deepcopy(gate_map)
             else:
-                KM = KM ^ operation.gate.KM
+                KM = KM ^ gate_map
 
         if len(KM) == 0:
             return KM

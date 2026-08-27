@@ -1,10 +1,9 @@
 """Utility functions"""
 
-from scipy.special import pbdv
-from scipy import constants
-
-import jax.scipy as jsp
 import jax.numpy as jnp
+import jax.scipy as jsp
+from jax import lax
+from scipy import constants
 
 
 def factorial_approx(n):
@@ -18,15 +17,9 @@ def factorial_approx(n):
 
 def harm_osc_wavefunction(n, x, l_osc):
     r"""
-    Taken from scqubits... not jit-able
-
     For given quantum number n=0,1,2,... return the value of the harmonic
     oscillator wave function :math:`\psi_n(x) = N H_n(x/l_{osc}) \exp(-x^2/2l_\text{
     osc})`, N being the proper normalization factor.
-
-    Directly uses `scipy.special.pbdv` (implementation of the parabolic cylinder
-    function) to mitigate numerical stability issues with the more commonly used
-    expression in terms of a Gaussian and a Hermite polynomial factor.
 
     Parameters
     ----------
@@ -41,10 +34,35 @@ def harm_osc_wavefunction(n, x, l_osc):
     -------
         value of harmonic oscillator wave function
     """
-    x = 2 * jnp.pi * x
-    result = pbdv(n, jnp.sqrt(2.0) * x / l_osc)[0]
-    result = result / jnp.sqrt(l_osc * jnp.sqrt(jnp.pi) * factorial_approx(n))
-    return result
+    return harm_osc_wavefunctions(n + 1, x, l_osc)[n]
+
+
+def harm_osc_wavefunctions(num_levels, x, l_osc):
+    """Evaluate the first ``num_levels`` normalized oscillator wavefunctions."""
+    if num_levels < 1:
+        raise ValueError("num_levels must be positive")
+
+    coordinate = 2 * jnp.pi * jnp.asarray(x) / l_osc
+    psi0 = jnp.exp(-(coordinate**2) / 2) / jnp.sqrt(l_osc * jnp.sqrt(jnp.pi))
+    if num_levels == 1:
+        return psi0[None]
+
+    psi1 = jnp.sqrt(2.0) * coordinate * psi0
+
+    def next_level(carry, level):
+        previous, current = carry
+        following = (
+            jnp.sqrt(2.0 / (level + 1)) * coordinate * current
+            - jnp.sqrt(level / (level + 1)) * previous
+        )
+        return (current, following), following
+
+    _, remaining = lax.scan(
+        next_level,
+        (psi0, psi1),
+        jnp.arange(1, num_levels - 1),
+    )
+    return jnp.concatenate((psi0[None], psi1[None], remaining), axis=0)
 
 
 def calculate_lambda_over_four_resonator_zpf(freq, impedance):

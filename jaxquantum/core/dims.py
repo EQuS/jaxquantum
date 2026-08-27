@@ -34,13 +34,27 @@ def check_dims(dims: Tuple[Tuple[int]], bdims: Tuple[int], data_shape: Array) ->
         assert dims == ((), ())
         return
 
-    assert bdims == data_shape[:-2], "Data shape should be consistent with dimensions."
-    assert data_shape[-2] == prod(dims[0]), (
-        "Data shape should be consistent with dimensions."
-    )
-    assert data_shape[-1] == prod(dims[1]), (
-        "Data shape should be consistent with dimensions."
-    )
+    if isop_dims(dims) and not (isket_dims(dims) or isbra_dims(dims)):
+        # Operator: the last two axes hold the matrix dimensions.
+        assert bdims == data_shape[:-2], (
+            "Data shape should be consistent with dimensions."
+        )
+        assert data_shape[-2] == prod(dims[0]), (
+            "Data shape should be consistent with dimensions."
+        )
+        assert data_shape[-1] == prod(dims[1]), (
+            "Data shape should be consistent with dimensions."
+        )
+    else:
+        # Ket/bra: the Hilbert space lives on a single trailing axis (no (N,1)).
+        # The trivial side of dims has product 1, so N == prod(dims[0])*prod(dims[1]).
+        N = prod(dims[0]) * prod(dims[1])
+        assert bdims == data_shape[:-1], (
+            "Data shape should be consistent with dimensions."
+        )
+        assert data_shape[-1] == N, (
+            "Data shape should be consistent with dimensions."
+        )
 
 
 class Qdims:

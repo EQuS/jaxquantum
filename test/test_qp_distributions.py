@@ -6,7 +6,21 @@ import jax.numpy as jnp
 from jax.scipy.special import factorial
 from jaxquantum import basis
 from jaxquantum.core.qarray import Qarray
-from jaxquantum.core.qp_distributions import (wigner, qfunc)
+from jaxquantum.core.qp_distributions import (
+    _qfunc_coherent_grid,
+    qfunc,
+    wigner,
+)
+
+
+def test_qfunc_grid_is_initialized_from_coordinates():
+    xvec = jnp.array([-2.0, 1.0])
+    yvec = jnp.array([-1.0, 3.0])
+
+    grid, _ = _qfunc_coherent_grid(xvec, yvec, g=2.0)
+    expected_x, expected_y = jnp.meshgrid(xvec, yvec)
+
+    assert jnp.array_equal(grid, expected_x - 1.0j * expected_y)
 
 
 #%%
