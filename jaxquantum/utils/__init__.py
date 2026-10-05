@@ -3,3 +3,4 @@
 from .units import *  # noqa
 from .utils import *  # noqa
 from .hermgauss import * # noqa
+from .benchmarking import *  # noqa

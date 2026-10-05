@@ -52,15 +52,14 @@ class KNO(Device):
     def get_H_linear(self):
         """Return linear terms in H."""
         w = self.get_linear_frequency()
-        return w * self.linear_ops["a_dag"] @ self.linear_ops["a"]
+        ops = self.linear_ops
+        return w * ops["a_dag"] @ ops["a"]
 
     def get_H_full(self):
         """Return full H in linear basis."""
         α = self.get_anharm()
-
-        return self.get_H_linear() + (α / 2) * (
-            self.linear_ops["a_dag"]
-            @ self.linear_ops["a_dag"]
-            @ self.linear_ops["a"]
-            @ self.linear_ops["a"]
+        ops = self.linear_ops
+        linear = self.get_linear_frequency() * ops["a_dag"] @ ops["a"]
+        return linear + (α / 2) * (
+            ops["a_dag"] @ ops["a_dag"] @ ops["a"] @ ops["a"]
         )

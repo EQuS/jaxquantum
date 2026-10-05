@@ -8,8 +8,8 @@ from flax import struct
 from jax import config, Array
 import jax.numpy as jnp
 
-from jaxquantum.core.qarray import Qarray
-from jaxquantum.core.dims import Qtypes
+from jaxquantum.core.qarray import DenseImpl, Qarray
+from jaxquantum.core.dims import Qdims, Qtypes
 
 config.update("jax_enable_x64", True)
 
@@ -165,11 +165,14 @@ class Device(ABC):
 
     def get_H(self):
         """
-        Return diagonalized H. Explicitly keep only diagonal elements of matrix.
+        Return the Hamiltonian truncated in its eigenbasis.
         """
-        return self.get_op_in_H_eigenbasis(
-            self._get_H_in_original_basis()
-        ).keep_only_diag_elements()
+        eig_systems = self.eig_systems
+        values = eig_systems["vals"][..., : self.N]
+        dtype = eig_systems["vecs"].dtype
+        data = values.astype(dtype)[..., :, None] * jnp.eye(self.N, dtype=dtype)
+        qdims = Qdims(((self.N,), (self.N,)))
+        return Qarray._from_impl(DenseImpl._make(data), qdims)
 
     def _get_H_in_original_basis(self):
         """This returns the Hamiltonian in the original specified basis. This can be overridden by subclasses."""
@@ -180,30 +183,24 @@ class Device(ABC):
             return self.get_H_full()
 
     def _calculate_eig_systems(self):
-        evs, evecs = jnp.linalg.eigh(self._get_H_in_original_basis().data)  # Hermitian
-        idxs_sorted = jnp.argsort(evs)
-        return evs[idxs_sorted], evecs[:, idxs_sorted]
+        return jnp.linalg.eigh(self._get_H_in_original_basis().data)
 
     @property
     def eig_systems(self):
-        eig_systems = {}
-        eig_systems["vals"], eig_systems["vecs"] = self._calculate_eig_systems()
-
-        eig_systems["vecs"] = eig_systems["vecs"]
-        eig_systems["vals"] = eig_systems["vals"]
-        return eig_systems
+        values, vectors = self._calculate_eig_systems()
+        return {"vals": values, "vecs": vectors}
 
     def get_op_in_H_eigenbasis(self, op: Qarray):
-        evecs = self.eig_systems["vecs"][:, : self.N]
+        evecs = self.eig_systems["vecs"][..., :, : self.N]
         dims = [[self.N], [self.N]]
         return get_op_in_new_basis(op, evecs, dims)
 
     def get_op_data_in_H_eigenbasis(self, op: Array):
-        evecs = self.eig_systems["vecs"][:, : self.N]
+        evecs = self.eig_systems["vecs"][..., :, : self.N]
         return get_op_data_in_new_basis(op, evecs)
 
     def get_vec_in_H_eigenbasis(self, vec: Qarray):
-        evecs = self.eig_systems["vecs"][:, : self.N]
+        evecs = self.eig_systems["vecs"][..., :, : self.N]
         if vec.qtype == Qtypes.ket:
             dims = [[self.N], [1]]
         else:
@@ -211,32 +208,33 @@ class Device(ABC):
         return get_vec_in_new_basis(vec, evecs, dims)
 
     def get_vec_data_in_H_eigenbasis(self, vec: Array):
-        evecs = self.eig_systems["vecs"][:, : self.N]
+        evecs = self.eig_systems["vecs"][..., :, : self.N]
         return get_vec_data_in_new_basis(vec, evecs)
 
     def full_ops(self):
-        # TODO: use JAX vmap here
-
         linear_ops = self.linear_ops
-        ops = {}
-        for name, op in linear_ops.items():
-            ops[name] = self.get_op_in_H_eigenbasis(op)
-
-        return ops
+        vectors = self.eig_systems["vecs"][..., :, : self.N]
+        dims = ((self.N,), (self.N,))
+        return {
+            name: get_op_in_new_basis(op, vectors, dims)
+            for name, op in linear_ops.items()
+        }
 
 
 def get_op_in_new_basis(op: Qarray, evecs: Array, dims: List[List[int]]) -> Qarray:
     data = get_op_data_in_new_basis(op.data, evecs)
-    return Qarray.create(data, dims=dims)
+    return Qarray._from_impl(DenseImpl._make(data), Qdims(dims))
 
 
 def get_op_data_in_new_basis(op_data: Array, evecs: Array) -> Array:
-    return jnp.dot(jnp.conjugate(evecs.transpose()), jnp.dot(op_data, evecs))
+    evecs_dag = jnp.swapaxes(jnp.conj(evecs), -1, -2)
+    return evecs_dag @ (op_data @ evecs)
 
 
 def get_vec_in_new_basis(vec: Qarray, evecs: Array, dims: List[List[int]]) -> Qarray:
-    return Qarray.create(get_vec_data_in_new_basis(vec.data, evecs), dims=dims)
+    data = jnp.einsum("...ji,...j->...i", jnp.conj(evecs), vec.data)
+    return Qarray._from_impl(DenseImpl._make(data), Qdims(dims))
 
 
 def get_vec_data_in_new_basis(vec_data: Array, evecs: Array) -> Array:
-    return jnp.dot(jnp.conjugate(evecs.transpose()), vec_data)
+    return jnp.swapaxes(jnp.conj(evecs), -1, -2) @ vec_data

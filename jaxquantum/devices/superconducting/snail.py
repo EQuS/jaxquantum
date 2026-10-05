@@ -98,7 +98,8 @@ class SNAIL(FluxDevice):
     def get_H_linear(self):
         """Return linear terms in H."""
         w = self.get_linear_frequency()
-        return w * self.original_ops["a_dag"] @ self.original_ops["a"]
+        ops = self.original_ops
+        return w * ops["a_dag"] @ ops["a"]
 
     def get_H_full(self):
         """Return full H in specified basis."""
@@ -108,9 +109,11 @@ class SNAIL(FluxDevice):
         phi_ext = self.params["phi_ext"]
         Ej = self.Ej
 
-        H_charge = self.original_ops["H_charge"]
-        H_inductive = - α * Ej * self.original_ops["cos(φ)"] - m * Ej * (
-            jnp.cos(2 * jnp.pi * phi_ext/m) * self.original_ops["cos(φ/m)"] + jnp.sin(2 * jnp.pi * phi_ext/m) * self.original_ops["sin(φ/m)"]
+        ops = self.original_ops
+        H_charge = ops["H_charge"]
+        H_inductive = - α * Ej * ops["cos(φ)"] - m * Ej * (
+            jnp.cos(2 * jnp.pi * phi_ext / m) * ops["cos(φ/m)"]
+            + jnp.sin(2 * jnp.pi * phi_ext / m) * ops["sin(φ/m)"]
         )
         return H_charge + H_inductive
     

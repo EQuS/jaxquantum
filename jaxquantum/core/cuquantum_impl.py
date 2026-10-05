@@ -143,10 +143,8 @@ def _cuqnt_scalar_mul(scalar, ot: OperatorTerm) -> OperatorTerm:
 def _cuqnt_matmul(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
     """Matrix product of two ``OperatorTerm``s — Cartesian product of their products.
 
-    The new product is ``(*left_prod, *right_prod)``: cuDensityMat composes the
-    operators in the order they appear in the product tuple, so a product
-    ``[A, B]`` on the same mode acts as the matrix ``A @ B``.  Hence
-    ``left @ right`` lays out ``left``'s factors before ``right``'s.
+    cuDensityMat applies factors in tuple order: ``[A, B]`` acts as ``B @ A``.
+    Thus ``left @ right`` puts the right factors before the left factors.
     """
     _cuqnt_check_dims(left, right, "matrix multiplication")
     out = OperatorTerm(left.dims)
@@ -162,20 +160,20 @@ def _cuqnt_matmul(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
                 raise TypeError(
                     "Cannot matmul OperatorTerms with mixed ElementaryOperator and MatrixOperator products."
                 )
-            joined = tuple(_cuqnt_copy_base_op(op) for op in (*left_prod, *right_prod))
+            joined = tuple(_cuqnt_copy_base_op(op) for op in (*right_prod, *left_prod))
             coeff = left_coeff * right_coeff
             if left_type is ElementaryOperator:
                 out.append(
                     joined,
-                    modes=(*left_modes, *right_modes),
-                    duals=(*left_duals, *right_duals),
+                    modes=(*right_modes, *left_modes),
+                    duals=(*right_duals, *left_duals),
                     coeff=coeff,
                 )
             else:
                 out.append(
                     joined,
-                    conjs=(*left_conjs, *right_conjs),
-                    duals=(*left_duals, *right_duals),
+                    conjs=(*right_conjs, *left_conjs),
+                    duals=(*right_duals, *left_duals),
                     coeff=coeff,
                 )
     return out
@@ -471,9 +469,8 @@ class CuquantumImpl(QarrayImpl):
         for op_prod, modes, coeff_arr in zip(
             self._data.op_prods, self._data.modes, self._data.coeffs
         ):
-            # cuquantum's ``append([A, B], modes=[i, i], ...)`` composes A and
-            # B *in order* — equivalent to A @ B on that mode.  Pre-compose
-            # any per-mode multi-factor product into per-mode matrices.
+            # cuDensityMat applies factors in tuple order: [A, B] is B @ A.
+            # Pre-compose each new factor on the left of earlier factors.
             mode_to_matrix = {}
             idx = 0
             for elem_op in op_prod:
@@ -491,7 +488,7 @@ class CuquantumImpl(QarrayImpl):
                     )
                 m = int(modes[idx])
                 if m in mode_to_matrix:
-                    mode_to_matrix[m] = mode_to_matrix[m] @ mat
+                    mode_to_matrix[m] = mat @ mode_to_matrix[m]
                 else:
                     mode_to_matrix[m] = mat
                 idx += 1

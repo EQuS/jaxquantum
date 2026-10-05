@@ -56,6 +56,7 @@ docs = [
     "mkdocs-gen-files",
     "mkdocstrings-python",
     "mkdocs-jupyter",
+    "nbconvert",
     "pymdown-extensions",
 ]
 tests = [

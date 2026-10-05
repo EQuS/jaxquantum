@@ -23,23 +23,23 @@ ts = jnp.linspace(0, 4*2*jnp.pi/omega_a, 101)
 a = jqt.destroy(N)
 n = a.dag() @ a
 
-c_ops = [a*jnp.sqrt(kappa)]
+c_ops = jqt.Qarray.from_list([a*jnp.sqrt(kappa)])
 
 @jit
 def Ht(t):
     H0 = omega_a*n
     return H0
 
-solver_options = jqt.SolverOptions.create(progress_meter=True)
-states = jqt.mesolve(initial_state_dm, ts, c_ops=c_ops, Ht=Ht, solver_options=solver_options) 
-nt = jnp.real(jqt.calc_expect(n, states))
-a_real = jnp.real(jqt.calc_expect(a, states))
-a_imag = jnp.imag(jqt.calc_expect(a, states))
+solver_options = jqt.SolverOptions(progress_meter="default")
+states = jqt.mesolve(Ht, initial_state_dm, ts, c_ops=c_ops, solver_options=solver_options)
+nt = jnp.real(jqt.overlap(n, states))
+a_real = jnp.real(jqt.overlap(a, states))
+a_imag = jnp.imag(jqt.overlap(a, states))
 
 fig, axs = plt.subplots(2,1, dpi=200, figsize=(6,5))
 ax = axs[0]
 ax.plot(ts, a_real, label=r"$Re[\langle a(t)\rangle]$")
-ax.plot(ts, a_imag, label=r"$Re[\langle a(t)\rangle]$")
+ax.plot(ts, a_imag, label=r"$Im[\langle a(t)\rangle]$")
 ax.set_xlabel("Time (ns)")
 ax.set_ylabel("Expectations")
 ax.legend()

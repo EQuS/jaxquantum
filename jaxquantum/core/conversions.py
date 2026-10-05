@@ -68,7 +68,9 @@ def extract_dims(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None)
         Qarray dims.
     """
     if isinstance(dims[0], Number):
-        is_op = arr.shape[-2] == arr.shape[-1]
+        # A 1-D array is a ket; a square 2-D array is an operator; anything else
+        # (non-square 2-D) is a batch of kets. Vectors are stored as (N,).
+        is_op = arr.ndim >= 2 and arr.shape[-2] == arr.shape[-1]
         if is_op:
             dims = [dims, dims]
         else:

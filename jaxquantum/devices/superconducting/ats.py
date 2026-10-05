@@ -45,9 +45,10 @@ class ATS(FluxDevice):
     def get_H_linear(self):
         """Return linear terms in H."""
         w = self.get_linear_frequency()
+        ops = self.linear_ops
         return w * (
-            self.linear_ops["a_dag"] @ self.linear_ops["a"]
-            + 0.5 * self.linear_ops["id"]
+            ops["a_dag"] @ ops["a"]
+            + 0.5 * ops["id"]
         )
 
     @staticmethod
@@ -110,10 +111,11 @@ class ATS(FluxDevice):
 
     def get_H_full(self):
         """Return full H in linear basis."""
-        phi_b = self.linear_ops["phi"]
-        H_nl = self.get_H_nonlinear(phi_b)
-        H = self.get_H_linear() + H_nl
-        return H
+        ops = self.linear_ops
+        linear = self.get_linear_frequency() * (
+            ops["a_dag"] @ ops["a"] + 0.5 * ops["id"]
+        )
+        return linear + self.get_H_nonlinear(ops["phi"])
 
     def potential(self, phi):
         """Return potential energy for a given phi."""

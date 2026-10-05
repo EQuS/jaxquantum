@@ -41,7 +41,7 @@ def main():
 
     states = jqt.mesolve(
         H, rho0, ts, c_ops=c_ops,
-        solver_options=jqt.SolverOptions.create(progress_meter=False),
+        solver_options=jqt.SolverOptions(progress_meter=None),
     )
     n_t = jnp.real(jqt.overlap(jqt.num(N), states))      # (101, 2)
     a_t = jqt.overlap(jqt.destroy(N), states)             # (101, 2) complex

@@ -46,10 +46,15 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/EQuS/jaxquantum
+watch:
+  - docs
+  - jaxquantum
 plugins:
   - search
   - mkdocs-jupyter:
-      execute: false
+      execute: true
+      execute_ignore:
+        - cuquantum.ipynb  # Requires the optional cuQuantum package and CUDA.
       include: ["*.ipynb"]
   - gen-files:
       scripts:
@@ -57,10 +62,7 @@ plugins:
   - literate-nav:
       nav_file: summary.md
   - section-index
-  - mkdocstrings:
-      watch:
-      - docs
-      - jaxquantum
+  - mkdocstrings
 markdown_extensions:
   - toc
   - admonition
@@ -102,13 +104,18 @@ nav:
     - documentation/index.md
     - Getting Started:
       - Installation: documentation/getting_started/installation.md
+      - NVIDIA GPU on Windows: documentation/getting_started/gpu_windows.md
+      - Profiling JAX code: documentation/getting_started/profiling.ipynb
+      - Custom direct channels: documentation/getting_started/channels.md
       - Qarray: documentation/getting_started/qarray.ipynb
       - The Sharp Bits 🔪: documentation/getting_started/sharp_bits.md
     - Tutorials:
       - documentation/tutorials/index.md
+      - Diffrax Solvers: documentation/tutorials/diffrax_solvers.ipynb
       - Devices & Systems: documentation/tutorials/devices.ipynb
       - Bosonic Codes: documentation/tutorials/bosonic_codes.ipynb
       - Circuits: documentation/tutorials/circuits.ipynb
       - Sparse Backends: documentation/tutorials/sparse_backends.ipynb
       - cuQuantum Backend: documentation/tutorials/cuquantum.ipynb
+      - Sharding: documentation/tutorials/sharding.ipynb
   - Code Reference: reference/

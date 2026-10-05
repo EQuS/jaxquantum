@@ -2,7 +2,7 @@
 Cat Code Qubit
 """
 
-from typing import Tuple
+from typing import ClassVar, Tuple
 
 
 from jaxquantum.utils.utils import comb
@@ -21,7 +21,7 @@ class BinomialQubit(BosonicQubit):
     Binomial Qubit Class.
     """
 
-    PARAMETERS = ["L", "G", "D"]
+    PARAMETERS: ClassVar[list[str]] = ["L", "G", "D"]
 
     name = "binomial"
 

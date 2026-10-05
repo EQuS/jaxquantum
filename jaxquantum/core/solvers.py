@@ -1,41 +1,82 @@
-"""Solvers"""
+import logging
+import warnings
+from collections.abc import Callable
+from typing import Any, Literal
 
-from diffrax import (
-    diffeqsolve,
-    ODETerm,
-    SaveAt,
-    PIDController,
-    TqdmProgressMeter,
-    NoProgressMeter,
-)
-import diffrax as dx
-
-from flax import struct
-from jax import Array
-from typing import Callable, Optional, Union
 import diffrax
 import jax.numpy as jnp
-import warnings
 import tqdm
-import logging
+from flax import struct
+from jax import Array
+from jax.experimental import sparse as _sparse
 
-
-from jaxquantum.core.qarray import Qarray, Qtypes, QarrayImplType, dag_data
-from jaxquantum.core.conversions import jnp2jqt
+from jaxquantum.core.dims import Qdims
 from jaxquantum.core.operators import identity_like, multi_mode_basis_set
+from jaxquantum.core.qarray import DenseImpl, Qarray, QarrayImplType, Qtypes, dag_data
 from jaxquantum.utils.utils import robust_isscalar
 
-# ----
+
+def _is_dense_array(x) -> bool:
+    """True for a dense JAX array (not BCOO, not SparseDIA data)."""
+    return not isinstance(x, _sparse.BCOO) and not getattr(x, "_is_sparse_dia", False)
+
+
+def _default_stepsize_controller() -> diffrax.AbstractStepSizeController:
+    return diffrax.PIDController(rtol=1e-7, atol=1e-9)
 
 
 @struct.dataclass
 class SolverOptions:
-    progress_meter: bool = struct.field(pytree_node=False)
-    solver: str = (struct.field(pytree_node=False),)
-    max_steps: int = (struct.field(pytree_node=False),)
-    rtol: float = (struct.field(pytree_node=False),)
-    atol: float = (struct.field(pytree_node=False),)
-    stepsize_controller: str =(struct.field(pytree_node=False),)
+    """Options forwarded to :func:`diffrax.diffeqsolve`.
+
+    Attributes:
+        solver: Native Diffrax solver; strings are deprecated.
+        stepsize_controller: Native Diffrax controller; strings are deprecated.
+        stepsize_controller_kwargs: Deprecated controller constructor arguments.
+        saveat: Custom save policy; overrides JAXQuantum's save-time handling.
+        dt0: Initial step, ``"tlist"`` for the first interval, or ``None`` for
+            Diffrax's automatic choice.
+        adjoint: Differentiation strategy. ``None`` uses Diffrax's default.
+        event: Native Diffrax termination event.
+        max_steps: Maximum solver steps.
+        throw: Whether unsuccessful solves raise an exception.
+        progress_meter: ``None``, ``"default"``, or a native progress meter.
+            Booleans are deprecated.
+        solver_state: Solver state used to continue a previous solve.
+        controller_state: Controller state used to continue a previous solve.
+        made_jump: Previous jump state used when continuing a solve.
+
+    ``saveat=None`` saves at ``saveat_tlist`` (or ``tlist`` when omitted).
+    ``adjoint=None`` and ``progress_meter=None`` preserve Diffrax's defaults.
+    Native Diffrax objects pass through unchanged. Legacy values still work and
+    issue a ``FutureWarning``.
+    """
+
+    progress_meter: bool | Literal["default"] | diffrax.AbstractProgressMeter | None = (
+        struct.field(pytree_node=False, default="default")
+    )
+    solver: diffrax.AbstractSolver | str = struct.field(
+        pytree_node=False, default_factory=diffrax.Tsit5
+    )
+    max_steps: int | None = struct.field(pytree_node=False, default=100_000)
+    stepsize_controller: diffrax.AbstractStepSizeController | str = struct.field(
+        pytree_node=False, default_factory=_default_stepsize_controller
+    )
+    stepsize_controller_kwargs: dict[str, Any] | None = struct.field(
+        pytree_node=False, default=None
+    )
+    saveat: diffrax.SaveAt | None = struct.field(pytree_node=False, default=None)
+    dt0: float | Array | None | Literal["tlist"] = struct.field(
+        pytree_node=False, default="tlist"
+    )
+    adjoint: diffrax.AbstractAdjoint | None = struct.field(
+        pytree_node=False, default=None
+    )
+    event: diffrax.Event | None = struct.field(pytree_node=False, default=None)
+    throw: bool = struct.field(pytree_node=False, default=True)
+    solver_state: Any = None
+    controller_state: Any = None
+    made_jump: bool | Array | None = None
 
     @classmethod
     def create(
@@ -43,180 +84,297 @@ class SolverOptions:
         progress_meter: bool = True,
         solver: str = "Tsit5",
         max_steps: int = 100_000,
-        rtol: float = 1e-7,
-        atol: float = 1e-9,
-        stepsize_controller: Optional[str] = None,
-    ):
-        return cls(progress_meter, solver, max_steps, rtol, atol, stepsize_controller)
+        stepsize_controller: str = "PIDController",
+        stepsize_controller_kwargs: dict[str, Any] | None = None,
+    ) -> "SolverOptions":
+        """Create options with the deprecated string-based interface."""
+        warnings.warn(
+            "SolverOptions.create() is deprecated; use SolverOptions with native "
+            "objects, such as solver=diffrax.Tsit5() and "
+            "progress_meter='default'.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        return cls(
+            solver=_diffrax_object(solver, diffrax.AbstractSolver),
+            stepsize_controller=_diffrax_object(
+                stepsize_controller,
+                diffrax.AbstractStepSizeController,
+                _legacy_controller_kwargs(
+                    stepsize_controller, stepsize_controller_kwargs
+                ),
+            ),
+            max_steps=max_steps,
+            progress_meter="default" if progress_meter else None,
+        )
 
 
-class CustomProgressMeter(TqdmProgressMeter):
+class CustomProgressMeter(diffrax.TqdmProgressMeter):
+    """JAXQuantum's default Diffrax progress bar."""
+
     @staticmethod
     def _init_bar() -> tqdm.tqdm:
-        bar_format = "{desc}: {percentage:3.0f}% |{bar}| [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
+        bar_format = (
+            "{desc}: {percentage:3.0f}% |{bar}| "
+            "[{elapsed}<{remaining}, {rate_fmt}{postfix}]"
+        )
         return tqdm.tqdm(
             total=100, bar_format=bar_format, unit="%", colour="MAGENTA", ascii="░▒█"
         )
 
 
-def solve(f, ρ0, tlist, saveat_tlist, args, solver_options: Optional[
-    SolverOptions] = None):
-    """Gets teh desired solver from diffrax.
+def _resolve_saveat(
+    options: SolverOptions,
+    tlist: Array,
+    saveat_tlist: Array | None,
+) -> diffrax.SaveAt:
+    if options.saveat is not None:
+        if saveat_tlist is not None:
+            raise ValueError(
+                "Pass save times through saveat_tlist or SolverOptions.saveat, not both."
+            )
+        return options.saveat
 
-    Args:
-        f: function defining the ODE
-        ρ0: initial state
-        tlist: time list
-        saveat_tlist: list of times at which to save the state
-            pass in [-1] to save only at final time
-        args: additional arguments to f
-        solver_options: dictionary with solver options
+    times = tlist if saveat_tlist is None else jnp.atleast_1d(saveat_tlist)
+    return diffrax.SaveAt(t1=True) if len(times) == 0 else diffrax.SaveAt(ts=times)
 
-    Returns:
-        solution
-    """
 
-    # f and ts
-    term = ODETerm(f)
-    
-    if saveat_tlist.shape[0] == 1 and saveat_tlist == -1:
-        saveat = SaveAt(t1=True)
-    else:
-        saveat = SaveAt(ts=saveat_tlist)
+def _resolve_progress_meter(
+    progress_meter: (bool | Literal["default"] | diffrax.AbstractProgressMeter | None),
+) -> diffrax.AbstractProgressMeter | None:
+    if progress_meter is None:
+        return None
+    if isinstance(progress_meter, bool):
+        return CustomProgressMeter() if progress_meter else None
+    if isinstance(progress_meter, str):
+        if progress_meter == "default":
+            return CustomProgressMeter()
+        raise ValueError(
+            "progress_meter must be None, 'default', or a Diffrax progress meter."
+        )
+    if not isinstance(progress_meter, diffrax.AbstractProgressMeter):
+        raise TypeError(
+            "progress_meter must be a Diffrax AbstractProgressMeter instance."
+        )
+    return progress_meter
 
-    # solver
-    solver_options = solver_options or SolverOptions.create()
 
-    solver_name = solver_options.solver
-    solver = getattr(diffrax, solver_name)()
-    
-    if solver_options.stepsize_controller is not None:
-        stepsize_controller = getattr(dx, solver_options.stepsize_controller)()
-    else:
-        stepsize_controller = PIDController(rtol=solver_options.rtol, atol=solver_options.atol)
+def _diffrax_object(
+    name: str,
+    expected_type: type,
+    kwargs: dict[str, Any] | None = None,
+):
+    try:
+        value = getattr(diffrax, name)(**(kwargs or {}))
+    except AttributeError as error:
+        raise ValueError(f"Unknown Diffrax type: {name!r}.") from error
+    if not isinstance(value, expected_type):
+        raise TypeError(f"diffrax.{name} is not a {expected_type.__name__}.")
+    return value
 
-    # solve!
+
+def _legacy_controller_kwargs(
+    name: str, kwargs: dict[str, Any] | None
+) -> dict[str, Any]:
+    if kwargs is not None:
+        return kwargs
+    return {"rtol": 1e-7, "atol": 1e-9} if name == "PIDController" else {}
+
+
+def _uses_legacy_options(options: SolverOptions) -> bool:
+    return (
+        isinstance(options.solver, str)
+        or isinstance(options.stepsize_controller, str)
+        or options.stepsize_controller_kwargs is not None
+        or isinstance(options.progress_meter, bool)
+    )
+
+
+def _resolve_solver(solver: diffrax.AbstractSolver | str) -> diffrax.AbstractSolver:
+    if isinstance(solver, str):
+        return _diffrax_object(solver, diffrax.AbstractSolver)
+    if not isinstance(solver, diffrax.AbstractSolver):
+        raise TypeError("solver must be a Diffrax AbstractSolver instance.")
+    return solver
+
+
+def _resolve_stepsize_controller(
+    options: SolverOptions,
+) -> diffrax.AbstractStepSizeController:
+    controller = options.stepsize_controller
+    if isinstance(controller, str):
+        return _diffrax_object(
+            controller,
+            diffrax.AbstractStepSizeController,
+            _legacy_controller_kwargs(controller, options.stepsize_controller_kwargs),
+        )
+    if options.stepsize_controller_kwargs is not None:
+        raise ValueError(
+            "Pass controller arguments when constructing stepsize_controller."
+        )
+    if not isinstance(controller, diffrax.AbstractStepSizeController):
+        raise TypeError(
+            "stepsize_controller must be a Diffrax AbstractStepSizeController instance."
+        )
+    return controller
+
+
+def _resolve_dt0(options: SolverOptions, tlist: Array) -> float | Array | None:
+    if isinstance(options.dt0, str):
+        if options.dt0 != "tlist":
+            raise ValueError("dt0 must be a number, None, or 'tlist'.")
+        return tlist[1] - tlist[0]
+    return options.dt0
+
+
+def solve(
+    f: Callable,
+    y0: Array,
+    tlist: Array,
+    saveat_tlist: Array | None = None,
+    args: Any = None,
+    solver_options: SolverOptions | None = None,
+) -> diffrax.Solution:
+    """Solve an ODE using native Diffrax configuration from ``SolverOptions``."""
+    options = SolverOptions() if solver_options is None else solver_options
+    if _uses_legacy_options(options):
+        warnings.warn(
+            "String and boolean SolverOptions values are deprecated; use native "
+            "objects such as solver=diffrax.Tsit5(), "
+            "stepsize_controller=diffrax.PIDController(...), and "
+            "progress_meter='default' or None.",
+            FutureWarning,
+            stacklevel=2,
+        )
+    kwargs = {
+        "saveat": _resolve_saveat(options, tlist, saveat_tlist),
+        "stepsize_controller": _resolve_stepsize_controller(options),
+        "args": args,
+        "max_steps": options.max_steps,
+        "throw": options.throw,
+    }
+    optional = {
+        "adjoint": options.adjoint,
+        "event": options.event,
+        "progress_meter": _resolve_progress_meter(options.progress_meter),
+        "solver_state": options.solver_state,
+        "controller_state": options.controller_state,
+        "made_jump": options.made_jump,
+    }
+    kwargs.update(
+        (name, value) for name, value in optional.items() if value is not None
+    )
+
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore",
-                                message="Complex dtype support in Diffrax",
-                                category=UserWarning)  # NOTE: suppresses complex dtype warning in diffrax
-        sol = diffeqsolve(
-            term,
-            solver,
+        warnings.filterwarnings(
+            "ignore",
+            message="Complex dtype support in Diffrax",
+            category=UserWarning,
+        )
+        return diffrax.diffeqsolve(
+            diffrax.ODETerm(f),
+            _resolve_solver(options.solver),
             t0=tlist[0],
             t1=tlist[-1],
-            dt0=tlist[1] - tlist[0],
-            y0=ρ0,
-            saveat=saveat,
-            stepsize_controller=stepsize_controller,
-            args=args,
-            max_steps=solver_options.max_steps,
-            progress_meter=CustomProgressMeter()
-            if solver_options.progress_meter
-            else NoProgressMeter(),
+            dt0=_resolve_dt0(options, tlist),
+            y0=y0,
+            **kwargs,
         )
-
-    return sol
 
 
 def mesolve(
-    H: Union[Qarray, Callable[[float], Qarray]],
+    H: Qarray | Callable[[float], Qarray],
     rho0: Qarray,
     tlist: Array,
-    saveat_tlist: Optional[Array] = None,
-    c_ops: Optional[Qarray] = None,
-    solver_options: Optional[SolverOptions] = None,
+    saveat_tlist: Array | None = None,
+    c_ops: Qarray | None = None,
+    solver_options: SolverOptions | None = None,
 ) -> Qarray:
-    """Quantum Master Equation solver.
+    """Solve a Lindblad master equation and return the saved states.
 
     Args:
-        H: time dependent Hamiltonian function or time-independent Qarray.
-        rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
-        tlist: time list
-        saveat_tlist: list of times at which to save the state.
-            If -1 or [-1], save only at final time.
-            If None, save at all times in tlist. Default: None.
-        c_ops: qarray list of collapse operators
-        solver_options: SolverOptions with solver options
+        H: Static Hamiltonian or callable ``H(t)``.
+        rho0: Initial ket or density matrix.
+        tlist: Integration interval; also the default save times.
+        saveat_tlist: Save times. An empty array saves only the final state.
+        c_ops: Collapse operators.
+        solver_options: Native Diffrax configuration.
 
     Returns:
-        list of states
+        Saved density matrices as a batched ``Qarray``.
+
+    See Also:
+        :func:`mesolve_result` returns the complete Diffrax solution.
     """
+    solution = mesolve_result(
+        H,
+        rho0,
+        tlist,
+        saveat_tlist=saveat_tlist,
+        c_ops=c_ops,
+        solver_options=solver_options,
+    )
+    qdims = Qdims((rho0.space_dims, rho0.space_dims))
+    return Qarray._from_impl(DenseImpl._make(solution.ys), qdims)
 
-    saveat_tlist = saveat_tlist if saveat_tlist is not None else tlist
 
-    saveat_tlist = jnp.atleast_1d(saveat_tlist)
+def mesolve_result(
+    H: Qarray | Callable[[float], Qarray],
+    rho0: Qarray,
+    tlist: Array,
+    saveat_tlist: Array | None = None,
+    c_ops: Qarray | None = None,
+    solver_options: SolverOptions | None = None,
+) -> diffrax.Solution:
+    """Solve a Lindblad master equation and return its Diffrax solution.
 
-    c_ops = c_ops if c_ops is not None else Qarray.from_list([])
+    Use this form for solver statistics, events, dense interpolation, custom
+    ``SaveAt`` functions, or continuation state.
+    """
+    collapse_ops = c_ops if c_ops is not None else Qarray.from_list([])
 
-    # if isinstance(H, Qarray):
-
-    if len(c_ops) == 0 and rho0.qtype != Qtypes.oper:
-        logging.warning(
-            "Consider using `jqt.sesolve()` instead, as `c_ops` is an empty list and the initial state is not a density matrix."
+    if len(collapse_ops) == 0 and rho0.qtype != Qtypes.oper:
+        logging.warning(  # noqa: LOG015
+            "Consider sesolve(): no collapse operators were provided and the "
+            "initial state is not a density matrix."
         )
 
-    # Dispatch to the cuquantum solver path when H is cuquantum-backed.
-    # The cuquantum path needs the Qarray (for OperatorTerm + dims), so it
-    # branches *before* the .data extraction used by the dense / sparse path.
-    H_test = H if isinstance(H, Qarray) else (H(0.0) if callable(H) else None)
-    if isinstance(H_test, Qarray) and H_test.impl_type == QarrayImplType.CUQUANTUM:
-        return _mesolve_cuquantum(H, rho0, tlist, saveat_tlist, c_ops, solver_options)
-
-    ρ0 = rho0.to_dm().to_dense()
+    h_test = H if isinstance(H, Qarray) else H(tlist[0]) if callable(H) else None
+    if isinstance(h_test, Qarray) and h_test.impl_type == QarrayImplType.CUQUANTUM:
+        return _mesolve_cuquantum_result(
+            H, rho0, tlist, saveat_tlist, collapse_ops, solver_options
+        )
+    rho_data = rho0.to_dm().to_dense()
 
     if robust_isscalar(H):
-        H = H * identity_like(ρ0)  # treat scalar H as a multiple of the identity
-
-    dims = ρ0.dims
-    ρ0 = ρ0.data
-
-    c_ops = c_ops.data
+        H = H * identity_like(rho_data)
 
     if isinstance(H, Qarray):
-        Ht_data = lambda t: H.data
+        H_data = lambda t: H.data
     else:
-        Ht_data = lambda t: H(t).data
+        H_data = lambda t: H(t).data
 
-    ys = _mesolve_data(Ht_data, ρ0, tlist, saveat_tlist, c_ops,
-                       solver_options=solver_options)
+    return _mesolve_result_data(
+        H_data,
+        rho_data.data,
+        tlist,
+        saveat_tlist,
+        collapse_ops.data,
+        solver_options=solver_options,
+    )
 
-    return jnp2jqt(ys, dims=dims)
 
-
-def _mesolve_data(
+def _mesolve_result_data(
     H: Callable[[float], Array],
     rho0: Array,
     tlist: Array,
-    saveat_tlist: Array,
-    c_ops: Optional[Qarray] = None,
-    solver_options: Optional[SolverOptions] = None,
-) -> Array:
-    """Quantum Master Equation solver.
-
-    Args:
-        H: time dependent Hamiltonian function or time-independent Array.
-        rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
-        tlist: time list
-        saveat_tlist: list of times at which to save the state
-            If -1 or [-1], save only at final time.
-            If None, save at all times in tlist. Default: None.
-        c_ops: qarray list of collapse operators
-        solver_options: SolverOptions with solver options
-
-    Returns:
-        list of states
-    """
+    saveat_tlist: Array | None,
+    c_ops: Array | None = None,
+    solver_options: SolverOptions | None = None,
+) -> diffrax.Solution:
+    """Array-level master-equation implementation."""
 
     c_ops = c_ops if c_ops is not None else jnp.array([])
-
-    # check is in mesolve
-    # if len(c_ops) == 0 and not is_dm_data(rho0):
-    #     logging.warning(
-    #         "Consider using `jqt.sesolve()` instead, as `c_ops` is an empty list and the initial state is not a density matrix."
-    #     )
-
-    ρ0 = rho0
 
     # Shape inference: when c_ops contains batched operators (e.g. shape
     # (1, B, N, N)), the initial state ρ0 must be broadcast to (B, N, N) so
@@ -224,23 +382,19 @@ def _mesolve_data(
     #
     # The output batch shape is the broadcast of:
     #   c_ops[0] batch dims  →  c_ops.shape[1:-2]  (outer batch index stripped)
-    #   H batch dims         →  H(0.0).shape[:-2]
+    #   H batch dims         →  H(tlist[0]).shape[:-2]
     #   ρ0 batch dims        →  ρ0.shape[:-2]
     # This is a pure shape calculation — no array values are materialised.
-    H0_shape = H(0.0).shape
+    H0_shape = H(tlist[0]).shape
     if len(c_ops) == 0:
-        batch_shape = jnp.broadcast_shapes(H0_shape[:-2], ρ0.shape[:-2])
+        batch_shape = jnp.broadcast_shapes(H0_shape[:-2], rho0.shape[:-2])
     else:
         # c_ops.shape[1:-2]: strip the outermost (c_op index) dim and the two
         # matrix dims to get the batch dims that will be broadcast into ρ.
         batch_shape = jnp.broadcast_shapes(
-            c_ops.shape[1:-2], H0_shape[:-2], ρ0.shape[:-2]
+            c_ops.shape[1:-2], H0_shape[:-2], rho0.shape[:-2]
         )
-    ρ0 = jnp.resize(ρ0, batch_shape + ρ0.shape[-2:])  # ensure correct shape
-
-    if len(c_ops) != 0:
-        c_ops_bdims = c_ops.shape[:-2]
-        c_ops = c_ops.reshape(*c_ops_bdims, c_ops.shape[-2], c_ops.shape[-1])
+    rho = jnp.broadcast_to(rho0, batch_shape + rho0.shape[-2:])
 
     # Precompute the adjoint once, outside the ODE hot-loop.
     # dag_data dispatches to the correct impl (dense or sparse) automatically,
@@ -280,343 +434,232 @@ def _mesolve_data(
 
         return rho_dot
 
-    sol = solve(f, ρ0, tlist, saveat_tlist, (c_ops, c_ops_dag),
-                solver_options=solver_options)
-
-    return sol.ys
+    return solve(
+        f,
+        rho,
+        tlist,
+        saveat_tlist,
+        (c_ops, c_ops_dag),
+        solver_options=solver_options,
+    )
 
 
 def sesolve(
-    H: Union[Qarray, Callable[[float], Qarray]],
+    H: Qarray | Callable[[float], Qarray],
     rho0: Qarray,
     tlist: Array,
-    saveat_tlist: Optional[Array] = None,
-    solver_options: Optional[SolverOptions] = None,
+    saveat_tlist: Array | None = None,
+    solver_options: SolverOptions | None = None,
 ) -> Qarray:
-    """Schrödinger Equation solver.
+    """Solve a Schrödinger equation and return the saved states.
 
     Args:
-        H: time dependent Hamiltonian function or time-independent Qarray.
-        rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
-        tlist: time list
-        saveat_tlist: list of times at which to save the state.
-            If -1 or [-1], save only at final time.
-            If None, save at all times in tlist. Default: None.
-        solver_options: SolverOptions with solver options
+        H: Static Hamiltonian or callable ``H(t)``.
+        rho0: Initial ket.
+        tlist: Integration interval; also the default save times.
+        saveat_tlist: Save times. An empty array saves only the final state.
+        solver_options: Native Diffrax configuration.
 
     Returns:
-        list of states
+        Saved kets as a batched ``Qarray``.
+
+    See Also:
+        :func:`sesolve_result` returns the complete Diffrax solution.
     """
+    solution = sesolve_result(
+        H,
+        rho0,
+        tlist,
+        saveat_tlist=saveat_tlist,
+        solver_options=solver_options,
+    )
+    return Qarray._from_impl(DenseImpl._make(solution.ys), rho0.qdims)
 
-    saveat_tlist = saveat_tlist if saveat_tlist is not None else tlist
 
-    saveat_tlist = jnp.atleast_1d(saveat_tlist)
+def sesolve_result(
+    H: Qarray | Callable[[float], Qarray],
+    rho0: Qarray,
+    tlist: Array,
+    saveat_tlist: Array | None = None,
+    solver_options: SolverOptions | None = None,
+) -> diffrax.Solution:
+    """Solve a Schrödinger equation and return its Diffrax solution.
 
-    ψ = rho0
+    Use this form for solver statistics, events, dense interpolation, custom
+    ``SaveAt`` functions, or continuation state.
+    """
+    if rho0.qtype == Qtypes.oper:
+        raise ValueError("Use mesolve() for an initial density matrix.")
 
-    if ψ.qtype == Qtypes.oper:
-        raise ValueError(
-            "Please use `jqt.mesolve` for initial state inputs in density matrix form."
-        )
-
-    # Dispatch to the cuquantum solver path when H is cuquantum-backed.
-    H_test = H if isinstance(H, Qarray) else (H(0.0) if callable(H) else None)
-    if isinstance(H_test, Qarray) and H_test.impl_type == QarrayImplType.CUQUANTUM:
-        return _sesolve_cuquantum(H, ψ, tlist, saveat_tlist, solver_options)
-
-    ψ = ψ.to_ket().to_dense()
+    h_test = H if isinstance(H, Qarray) else H(tlist[0]) if callable(H) else None
+    if isinstance(h_test, Qarray) and h_test.impl_type == QarrayImplType.CUQUANTUM:
+        return _sesolve_cuquantum_result(H, rho0, tlist, saveat_tlist, solver_options)
+    state = rho0.to_ket().to_dense()
 
     if robust_isscalar(H):
-        H = H * identity_like(ψ)  # treat scalar H as a multiple of the identity
-
-    dims = ψ.dims
-    ψ = ψ.data
+        H = H * identity_like(state)
 
     if isinstance(H, Qarray):
-        Ht_data = lambda t: H.data
+        H_data = lambda t: H.data
     else:
-        Ht_data = lambda t: H(t).data
+        H_data = lambda t: H(t).data
 
-    ys = _sesolve_data(Ht_data, ψ, tlist, saveat_tlist,
-                       solver_options=solver_options)
+    return _sesolve_result_data(
+        H_data,
+        state.data,
+        tlist,
+        saveat_tlist,
+        solver_options=solver_options,
+    )
 
-    return jnp2jqt(ys, dims=dims)
 
-
-def _sesolve_data(
+def _sesolve_result_data(
     H: Callable[[float], Array],
     rho0: Array,
     tlist: Array,
-    saveat_tlist: Array,
-    solver_options: Optional[SolverOptions] = None,
-):
-    """Schrödinger Equation solver.
-
-    Args:
-        H: time dependent Hamiltonian function or time-independent Array.
-        rho0: initial state, must be a density matrix. For statevector evolution, please use sesolve.
-        tlist: time list
-        saveat_tlist: list of times at which to save the state.
-            If -1 or [-1], save only at final time.
-            If None, save at all times in tlist. Default: None.
-        solver_options: SolverOptions with solver options
-
-    Returns:
-        list of states
-    """
-
-    ψ = rho0
+    saveat_tlist: Array | None,
+    solver_options: SolverOptions | None = None,
+) -> diffrax.Solution:
+    """Array-level Schrödinger-equation implementation."""
 
     def f(t: float, ψₜ: Array, _):
         H_val = H(t)  # type: ignore
 
-        ψₜ_dot = -1j * (H_val @ ψₜ)
+        # State vectors live on a single trailing axis (..., N). For a dense
+        # Hamiltonian contract that axis directly via einsum (batch-safe, and no
+        # (N,1) is ever materialised — keeps the scan carry 1-D). For a sparse
+        # Hamiltonian use a transient column local to this RHS (sparse is not the
+        # TPU-padding path).
+        if _is_dense_array(H_val):
+            ψₜ_dot = -1j * jnp.einsum("...ij,...j->...i", H_val, ψₜ)
+        else:
+            ψₜ_dot = -1j * (H_val @ ψₜ[..., None])[..., 0]
 
         return ψₜ_dot
 
-    ψ_test = f(0, ψ, None)
-    ψ = jnp.resize(ψ, ψ_test.shape)  # ensure correct shape
+    batch_shape = jnp.broadcast_shapes(H(tlist[0]).shape[:-2], rho0.shape[:-1])
+    state = jnp.broadcast_to(rho0, batch_shape + rho0.shape[-1:])
 
-    sol = solve(f, ψ, tlist, saveat_tlist, None, solver_options=solver_options)
-    return sol.ys
-
-
-# ---------------------------------------------------------------------------
-# cuQuantum solver path
-# ---------------------------------------------------------------------------
-
-# def _build_cuquantum_dissipator_terms(L_qarray):
-#     """Generate Ls_term entries that encode ``D[L]ρ`` in cuquantum form.
-
-#     Mirrors the dissipator recipe used in
-#     ``local/lattice_2d_operator_action.py``:
-
-#       D[L]ρ = LρL† − ½ L†L ρ − ½ ρ L†L
-
-#     Yields ``(matrices, modes, duals, coeff)`` tuples that should be
-#     appended to a single ``Ls_term`` ``OperatorTerm``.
-
-#     Args:
-#         L_qarray: Qarray[CuquantumImpl] holding the collapse operator.
-
-#     Yields:
-#         Successive term tuples ready to be passed to OperatorTerm.append
-#         (after wrapping each matrix in an ElementaryOperator).
-#     """
-#     L_data = L_qarray._impl._data            # OperatorTerm
-#     LdagL_data = (L_qarray.dag() @ L_qarray)._impl._data  # OperatorTerm
-
-#     def _iter_products(op_term):
-#         """Yield ``(matrices, modes, coeff_scalar)`` for each product in op_term."""
-#         for op_prod, modes, coeff_arr in zip(
-#             op_term.op_prods, op_term.modes, op_term.coeffs
-#         ):
-#             mats = tuple(jnp.squeeze(elem.data, axis=0) for elem in op_prod)
-#             yield mats, tuple(modes), coeff_arr[0] if coeff_arr.ndim else coeff_arr
-
-#     # L ρ L† = sum over (a, b) of cₐ * conj(c_b) * (L_a) ρ (L_b)†.
-#     # In cuQuantum's elementary product convention, ``[X, Y]`` on the same mode
-#     # acts as the matrix ``X @ Y`` — i.e. operators are composed left-to-right
-#     # in the tuple — so to encode ``L_a ρ L_b†`` we put ``L_a``'s factors with
-#     # ``dual=False`` then ``L_b``'s daggered factors (in reverse order) with
-#     # ``dual=True``.
-#     L_products = list(_iter_products(L_data))
-#     for (mats_a, modes_a, coeff_a) in L_products:
-#         for (mats_b, modes_b, coeff_b) in L_products:
-#             mats_b_dag_rev = tuple(_matrix_dag(m) for m in reversed(mats_b))
-#             modes_b_rev = tuple(reversed(modes_b))
-#             yield (
-#                 tuple(mats_a) + mats_b_dag_rev,
-#                 tuple(modes_a) + modes_b_rev,
-#                 (False,) * len(mats_a) + (True,) * len(mats_b_dag_rev),
-#                 coeff_a * jnp.conj(coeff_b),
-#             )
-
-#     # -½ L†L ρ : L†L applied on the left side (all duals=False).
-#     # -½ ρ L†L : L†L applied on the right side (all duals=True).
-#     for (mats, modes, coeff) in _iter_products(LdagL_data):
-#         yield (mats, modes, (False,) * len(mats), -0.5 * coeff)
-#         yield (mats, modes, (True,) * len(mats), -0.5 * coeff)
-
-
-def _matrix_dag(matrix):
-    return jnp.conj(jnp.swapaxes(matrix, -1, -2))
-
-
-def _mesolve_cuquantum(
-    H,
-    rho0: Qarray,
-    tlist: Array,
-    saveat_tlist: Array,
-    c_ops: Qarray,
-    solver_options: Optional[SolverOptions] = None,
-) -> Qarray:
-    """Master-equation solver dispatched to cuQuantum's ``operator_action``.
-
-    The Hamiltonian and (optional) collapse operators must be cuquantum-backed
-    Qarrays; the state ``ρ0`` is densified before being handed to diffrax.
-    Inside the RHS we build a fresh ``Operator`` each step, append the
-    Hamiltonian commutator and the dissipator superterm, and call
-    ``operator_action`` — exactly mirroring
-    ``local/lattice_2d_operator_action.py``.
-    """
-    from jaxquantum.core.cuquantum_impl import CuquantumImpl, _cuqnt_dag
-    from cuquantum.densitymat.jax import (
-        ElementaryOperator,
-        Operator,
-        State,
-        operator_action,
-    )
-
-    from jaxquantum.utils.cuquantum_util import OperatorTerm 
-
-
-    # --- snapshot the static metadata we need outside the RHS ---
-    H_test = H if isinstance(H, Qarray) else H(0.0)
-    space_dims = tuple(int(d) for d in H_test.space_dims)
-
-    rho0_dense = rho0.to_dm().to_dense()
-    dims_meta = rho0_dense.dims
-    rho0_arr = rho0_dense.data
-
-    # Normalise c_ops to a Python list of cuquantum-backed Qarrays.
-    # ``Qarray.from_list`` does not preserve the cuquantum impl (no batched
-    # ``OperatorTerm`` exists), so cuquantum users should pass c_ops as a
-    # list directly:  ``mesolve(..., c_ops=[L1, L2])``.  We also accept an
-    # empty Qarray placeholder (which the public ``mesolve`` substitutes
-    # when c_ops is None).
-    if c_ops is None or (hasattr(c_ops, "__len__") and len(c_ops) == 0):
-        c_ops_list: list = []
-    elif isinstance(c_ops, (list, tuple)):
-        c_ops_list = list(c_ops)
-    elif isinstance(c_ops, Qarray) and c_ops.impl_type == QarrayImplType.CUQUANTUM:
-        c_ops_list = [c_ops[k] for k in range(len(c_ops))]
-    else:
-        raise TypeError(
-            "cuquantum mesolve requires c_ops to be a Python list of "
-            "cuquantum-backed Qarrays (Qarray.from_list densifies them)"
-        )
-
-    # Pre-build the dissipator OperatorTerm — it is static across t.
-    Ls_term: Optional["OperatorTerm"] = None
-    if c_ops_list:
-        Ls_term = OperatorTerm(space_dims)
-        for c_op in c_ops_list:
-            if not isinstance(c_op, Qarray) or c_op.impl_type != QarrayImplType.CUQUANTUM:
-                raise TypeError(
-                    "_mesolve_cuquantum requires every c_op to be a "
-                    "cuquantum-backed Qarray"
-                )
-            _l = c_op._impl._data
-            _ld = _cuqnt_dag(c_op._impl._data)
-            
-            if len(_l.op_prods) > 1:
-                raise ValueError("currently, only one term is allowed in the collapse operator") 
-
-            l = _l[0]
-            ld =_ld[0]
-
-            # l = ElementaryOperator((_l[0][0].data * _l.coeffs[0]).astype(_l[0][0].dtype))
-            # ld = ElementaryOperator(_ld[0][0].data * _ld.coeffs[0])
-
-            modes = c_op._impl._data.modes[0]
-            coeff = 1.0 * _l.coeffs[0] * jnp.conj(_l.coeffs[0])
-            
-            Ls_term.append([*l, *ld], modes=modes+modes, duals=[False, True], coeff=1.0 * coeff)
-            Ls_term.append([*ld, *l], modes=modes+modes, duals=[True, True], coeff=-0.5 * coeff)
-            Ls_term.append([*l, *ld], modes=modes+modes, duals=[False, False], coeff=-0.5 * coeff)
-
-
-    # The Hamiltonian's OperatorTerm depends on t; build it inside the RHS.
-    if isinstance(H, Qarray):
-        H_qarray_fn = lambda t: H
-    else:
-        H_qarray_fn = lambda t: H(t)
-
-    def f(t, rho, args):
-        H_term = H_qarray_fn(t)._impl.to_operator_term()
-        liouvillian = Operator(space_dims)
-        liouvillian.append(H_term, dual=False, coeff=-1j)
-        liouvillian.append(H_term, dual=True,  coeff= 1j)
-        if Ls_term is not None:
-            liouvillian.append(Ls_term, dual=False, coeff=1.0)
-        rho_shape = rho.shape
-        rho_state = State(rho.reshape(*space_dims, *space_dims))
-        rho_dot = operator_action(liouvillian, rho_state).get_data()[0]
-        return rho_dot.reshape(rho_shape)
-
-    try:
-        sol = solve(
-            f, rho0_arr, tlist, saveat_tlist, args=None,
-            solver_options=solver_options,
-        )
-    except ValueError as e:
-        if "operator terms" in str(e):
-            raise ValueError(
-                "please make sure the Hamiltonian and collapse operators are of the same dtype"
-            )
-        else:
-            raise e
-    return jnp2jqt(sol.ys, dims=dims_meta)
-
-
-def _sesolve_cuquantum(
-    H,
-    psi0: Qarray,
-    tlist: Array,
-    saveat_tlist: Array,
-    solver_options: Optional[SolverOptions] = None,
-) -> Qarray:
-    """Schrödinger-equation solver dispatched to cuQuantum's ``operator_action``.
-
-    Like ``_mesolve_cuquantum`` but evolves a ket: ``i ψ̇ = H ψ``.  No
-    dissipator is involved; the RHS reduces to a single ``-1j * H * ψ``
-    application.
-    """
-    from cuquantum.densitymat.jax import Operator, State, operator_action
-
-    H_test = H if isinstance(H, Qarray) else H(0.0)
-    space_dims = tuple(int(d) for d in H_test.space_dims)
-
-    psi0_ket = psi0.to_ket().to_dense()
-    dims_meta = psi0_ket.dims
-    psi0_arr = psi0_ket.data
-
-    if isinstance(H, Qarray):
-        H_qarray_fn = lambda t: H
-    else:
-        H_qarray_fn = lambda t: H(t)
-
-    def f(t, psi, args):
-        H_term = H_qarray_fn(t)._impl.to_operator_term()
-        op = Operator(space_dims)
-        op.append(H_term, dual=False, coeff=-1j)
-        psi_shape = psi.shape
-        # ψ has shape (*batch, full_dim, 1); collapse trailing 1 for the
-        # state grid then restore it after the action.
-        flat = psi.reshape(*psi.shape[:-2], *space_dims)
-        psi_dot = operator_action(op, State(flat)).get_data()[0]
-        return psi_dot.reshape(psi_shape)
-
-    sol = solve(
-        f, psi0_arr, tlist, saveat_tlist, args=None,
+    return solve(
+        f,
+        state,
+        tlist,
+        saveat_tlist,
         solver_options=solver_options,
     )
-    return jnp2jqt(sol.ys, dims=dims_meta)
 
 
-# ----
+# cuQuantum solver path ------------------------------------------------------
+
+
+def _mesolve_cuquantum_result(
+    H, rho0: Qarray, tlist: Array, saveat_tlist: Array | None,
+    c_ops, solver_options: SolverOptions | None,
+) -> diffrax.Solution:
+    """Solve a master equation using cuDensityMat operator actions."""
+    from cuquantum.densitymat.jax import Operator, State, operator_action
+    from jaxquantum.core.cuquantum_impl import _cuqnt_dag
+    from jaxquantum.utils.cuquantum_util import OperatorTerm
+
+    h_test = H if isinstance(H, Qarray) else H(tlist[0])
+    space_dims = tuple(int(d) for d in h_test.space_dims)
+    rho0_arr = rho0.to_dm().to_dense().data
+
+    if c_ops is None or len(c_ops) == 0:
+        collapse_ops = []
+    elif isinstance(c_ops, (list, tuple)):
+        collapse_ops = list(c_ops)
+    elif isinstance(c_ops, Qarray) and c_ops.impl_type == QarrayImplType.CUQUANTUM:
+        collapse_ops = [c_ops[k] for k in range(len(c_ops))]
+    else:
+        raise TypeError(
+            "cuquantum mesolve requires a list of cuquantum-backed collapse operators"
+        )
+
+    dissipator = None
+    if collapse_ops:
+        dissipator = OperatorTerm(space_dims)
+        for collapse_op in collapse_ops:
+            if not isinstance(collapse_op, Qarray) or collapse_op.impl_type != QarrayImplType.CUQUANTUM:
+                raise TypeError("Every collapse operator must use the cuquantum backend")
+            left = collapse_op._impl._data
+            right = _cuqnt_dag(left)
+            if len(left.op_prods) != 1:
+                raise ValueError("Only a single term is supported in a collapse operator")
+            left_factors = left[0]
+            right_factors = right[0]
+            modes = left.modes[0]
+            coeff = left.coeffs[0] * jnp.conj(left.coeffs[0])
+            dissipator.append(
+                [*left_factors, *right_factors], modes=modes + modes,
+                duals=[False, True], coeff=coeff,
+            )
+            dissipator.append(
+                [*right_factors, *left_factors], modes=modes + modes,
+                duals=[True, True], coeff=-0.5 * coeff,
+            )
+            dissipator.append(
+                [*left_factors, *right_factors], modes=modes + modes,
+                duals=[False, False], coeff=-0.5 * coeff,
+            )
+
+    h_at = (lambda t: H) if isinstance(H, Qarray) else H
+
+    def rhs(t, rho, _):
+        h_term = h_at(t)._impl.to_operator_term()
+        liouvillian = Operator(space_dims)
+        liouvillian.append(h_term, dual=False, coeff=-1j)
+        liouvillian.append(h_term, dual=True, coeff=1j)
+        if dissipator is not None:
+            liouvillian.append(dissipator, dual=False, coeff=1.0)
+        rho_shape = rho.shape
+        state = State(rho.reshape(*rho.shape[:-2], *space_dims, *space_dims))
+        derivative = operator_action(liouvillian, state).get_data()[0]
+        return derivative.reshape(rho_shape)
+
+    try:
+        return solve(rhs, rho0_arr, tlist, saveat_tlist, solver_options=solver_options)
+    except ValueError as exc:
+        if "operator terms" in str(exc):
+            raise ValueError(
+                "please make sure the Hamiltonian and collapse operators are of the same dtype"
+            ) from exc
+        raise
+
+
+def _sesolve_cuquantum_result(
+    H, psi0: Qarray, tlist: Array, saveat_tlist: Array | None,
+    solver_options: SolverOptions | None,
+) -> diffrax.Solution:
+    """Solve a Schrödinger equation using cuDensityMat operator actions."""
+    from cuquantum.densitymat.jax import Operator, State, operator_action
+
+    h_test = H if isinstance(H, Qarray) else H(tlist[0])
+    space_dims = tuple(int(d) for d in h_test.space_dims)
+    psi0_arr = psi0.to_ket().to_dense().data
+    h_at = (lambda t: H) if isinstance(H, Qarray) else H
+
+    def rhs(t, psi, _):
+        h_term = h_at(t)._impl.to_operator_term()
+        op = Operator(space_dims)
+        op.append(h_term, dual=False, coeff=-1j)
+        psi_shape = psi.shape
+        state = State(psi.reshape(*psi.shape[:-1], *space_dims))
+        derivative = operator_action(op, state).get_data()[0]
+        return derivative.reshape(psi_shape)
+
+    return solve(rhs, psi0_arr, tlist, saveat_tlist, solver_options=solver_options)
 
 # propagators
-# ----
+
 
 def propagator(
-    H: Union[Qarray, Callable[[float], Qarray]],
-    ts: Union[float, Array],
-    saveat_tlist: Optional[Array] = None,
-    solver_options=None
-):
-    """ Generate the propagator for a time dependent Hamiltonian.
+    H: Qarray | Callable[[float], Qarray],
+    ts: float | Array,
+    saveat_tlist: Array | None = None,
+    solver_options: SolverOptions | None = None,
+) -> Qarray:
+    """Generate a propagator for a Hamiltonian.
 
     Args:
         H (Qarray or callable):
@@ -625,25 +668,18 @@ def propagator(
         ts (float or Array):
             A single time point or
             an Array of time points.
-        saveat_tlist: list of times at which to save the state.
-            If -1 or [-1], save only at final time.
-            If None, save at all times in tlist. Default: None.
+        saveat_tlist: Times at which to save the propagator.
+        solver_options: Native Diffrax configuration for time-dependent input.
 
     Returns:
-        Qarray or List[Qarray]:
-            The propagator for the Hamiltonian at time t.
-            OR a list of propagators for the Hamiltonian at each time in t.
-
+        The propagator at each saved time.
     """
-    
-
     ts_is_scalar = robust_isscalar(ts)
     H_is_qarray = isinstance(H, Qarray)
 
     if H_is_qarray:
         return (-1j * H * ts).expm()
     else:
-        
         if ts_is_scalar:
             H_first = H(0.0)
             if ts == 0:
@@ -653,8 +689,16 @@ def propagator(
             H_first = H(ts[0])
 
         basis_states = multi_mode_basis_set(H_first.space_dims)
-        results = sesolve(H, basis_states, ts, saveat_tlist=saveat_tlist)
-        propagators_data = results.data.squeeze(-1).mT
-        propagators = Qarray.create(propagators_data, dims=H_first.space_dims)
-        
-        return propagators
+        results = sesolve(
+            H,
+            basis_states,
+            ts,
+            saveat_tlist=saveat_tlist,
+            solver_options=solver_options,
+        )
+        # results.data is (T, M, M): T times, M evolved basis kets (batch), M
+        # ket components. Transpose the last two axes so each time slice is a
+        # propagator whose columns are the evolved basis states. No squeeze:
+        # kets no longer carry a trailing singleton.
+        propagators_data = results.data.mT
+        return Qarray.create(propagators_data, dims=H_first.space_dims)

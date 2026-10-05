@@ -8,6 +8,7 @@ import jax.numpy as jnp
 from jax.nn import one_hot
 
 from jaxquantum.core.qarray import Qarray, tensor, QarrayImplType
+from jaxquantum.core.settings import SETTINGS
 
 config.update("jax_enable_x64", True)
 
@@ -355,16 +356,13 @@ _KET_INCOMPATIBLE = frozenset({QarrayImplType.SPARSE_DIA, QarrayImplType.CUQUANT
 
 
 def _ket_safe_impl(implementation):
-    """Return ``implementation`` unless it can't represent a ket; then ``None``.
-
-    SPARSE_DIA stores diagonals of square matrices and CUQUANTUM is mode-
-    structured; neither has a meaningful representation for a column vector
-    ``(N, 1)``.  Falls back to the default backend (dense unless overridden
-    in SETTINGS) so the resulting state is usable in matmul.
-    """
-    if implementation is None:
-        return None
-    return None if QarrayImplType(implementation) in _KET_INCOMPATIBLE else implementation
+    """Use dense storage when the requested or default backend cannot hold a ket."""
+    selected = implementation
+    if selected is None:
+        selected = SETTINGS.get("default_backend", QarrayImplType.DENSE)
+    if QarrayImplType(selected) in _KET_INCOMPATIBLE:
+        return QarrayImplType.DENSE
+    return selected
 
 
 def basis(N: int, k: int, implementation=None):
@@ -381,10 +379,10 @@ def basis(N: int, k: int, implementation=None):
         Fock State |k>
     """
     return Qarray.create(
-        one_hot(k, N).reshape(N, 1),
+        one_hot(k, N),
+        qtype="ket",
         implementation=_ket_safe_impl(implementation),
     )
-
 
 def multi_mode_basis_set(Ns: List[int], implementation=None) -> Qarray:
     """Creates a multi-mode basis set.

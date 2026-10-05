@@ -28,13 +28,13 @@ def test_version():
 # ========================================
 def test_qarray_creation():
     a = jqt.Qarray.create(jnp.array([1,2,3]))
-    assert a.shape == (3,1)
+    assert a.shape == (3,)
 
     a = jqt.Qarray.create(jnp.array([[1,2,3],[4,5,6]]))
-    assert a.shape == (2,3,1)
+    assert a.shape == (2,3)
 
     a = jqt.Qarray.create(jnp.array([[1,2,],[4,5]]), bdims=(2,))
-    assert a.shape == (2,2,1)
+    assert a.shape == (2,2)
 
     a = jqt.Qarray.from_list([])
     assert a.dims == ((),()) and a.shape == jnp.array([]).shape
@@ -74,7 +74,7 @@ def test_qarray_properties():
         print(a[0][0])
 
     a_reshaped = a.reshape_bdims(2,1)
-    assert a_reshaped.shape == (2,1,3,1)
+    assert a_reshaped.shape == (2,1,3)
 
     assert len(a) == 2
     with pytest.raises(ValueError):
@@ -410,7 +410,7 @@ def test_eigh():
 
     evals, evecs = jqt.eigenstates(H)
 
-    assert evecs.shape == (2,3,4,4,1)
+    assert evecs.shape == (2,3,4,4)
     assert jnp.isclose(evals[0,1,1], 3.4, rtol=0, atol=1e-9)
 
     N = 10

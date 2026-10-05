@@ -34,15 +34,22 @@ def overlap(rho: Qarray, sigma: Qarray) -> Array:
     """
 
     if rho.is_vec() and sigma.is_vec():
-        return jnp.abs(((rho.to_ket().dag() @ sigma.to_ket()).trace())) ** 2
+        # |<a|b>|^2. Compute the inner product directly over the trailing space
+        # axis (vectors are stored as (..., N)); robust for batched states.
+        a = rho.to_ket().data
+        b = sigma.to_ket().data
+        inner = jnp.sum(jnp.conj(a) * b, axis=-1)
+        return jnp.abs(inner) ** 2
     elif rho.is_vec():
-        rho = rho.to_ket()
-        res = (rho.dag() @ sigma @ rho).data
-        return res.squeeze(-1).squeeze(-1)
+        # <psi|sigma|psi>
+        psi = rho.to_ket()
+        Opsi = (sigma @ psi).data
+        return jnp.sum(jnp.conj(psi.data) * Opsi, axis=-1)
     elif sigma.is_vec():
-        sigma = sigma.to_ket()
-        res = (sigma.dag() @ rho @ sigma).data
-        return res.squeeze(-1).squeeze(-1)
+        # <psi|rho|psi>
+        psi = sigma.to_ket()
+        Opsi = (rho @ psi).data
+        return jnp.sum(jnp.conj(psi.data) * Opsi, axis=-1)
     else:
         return (rho.dag() @ sigma).trace()
 
@@ -354,7 +361,7 @@ class QuantumStateTomography:
                 "No results to plot. Run quantum_state_tomography_mle first."
             )
 
-        fig, ax = plt.subplots(1, figsize=(5, 4))
+        _, ax = plt.subplots(1, figsize=(5, 4))
         if self._result.infidelity_history is not None:
             ax2 = ax.twinx()
 
@@ -387,7 +394,7 @@ def tensor_basis(single_basis: Qarray, n: int) -> Qarray:
     dims = single_basis.dims
 
     single_basis = single_basis.data
-    b, d, _ = single_basis.shape
+    b, _, _ = single_basis.shape
     indices = jnp.stack(jnp.meshgrid(*[jnp.arange(b)] * n, indexing="ij"),
                         axis=-1).reshape(-1, n)  # shape (b^n, n)
 

@@ -1,5 +1,5 @@
 import jax.numpy as jnp
-from jax import vmap, config
+from jax import config, lax, vmap
 from jax.scipy.special import factorial
 import jax
 
@@ -69,11 +69,12 @@ def wigner(psi, xvec, yvec, method="clenshaw", g=2):
 
     elif method == "clenshaw":
         rho = psi.to_dm()
+        bdims = rho.bdims
         rho = rho.data
 
         vmapped_wigner_clenshaw = [_wigner_clenshaw]
 
-        for _ in rho.shape[:-2]:
+        for _ in bdims:
             vmapped_wigner_clenshaw.append(
                 vmap(
                     vmapped_wigner_clenshaw[-1],
@@ -221,20 +222,45 @@ def qfunc(psi, xvec, yvec, g=2):
         def _compute_qfunc(psi, alpha_grid, prefactor, g):
             values, vectors = jnp.linalg.eigh(psi)
             vectors = vectors.T
-            out = values[0] * _qfunc_iterative_single(
-                vectors[0], alpha_grid, prefactor, g
+            chunk_size = min(8, values.shape[0])
+            chunks = (values.shape[0] + chunk_size - 1) // chunk_size
+            padding = chunks * chunk_size - values.shape[0]
+            values = jnp.pad(values, (0, padding))
+            vectors = jnp.pad(vectors, ((0, padding), (0, 0)))
+
+            def add_chunk(index, total):
+                start = index * chunk_size
+                chunk_values = lax.dynamic_slice_in_dim(
+                    values, start, chunk_size
+                )
+                chunk_vectors = lax.dynamic_slice_in_dim(
+                    vectors, start, chunk_size
+                )
+                components = vmap(
+                    lambda vector: _qfunc_iterative_single(
+                        vector, alpha_grid, prefactor, g
+                    )
+                )(chunk_vectors)
+                return total + jnp.tensordot(chunk_values, components, axes=1)
+
+            out = lax.fori_loop(
+                0,
+                chunks,
+                add_chunk,
+                jnp.zeros_like(alpha_grid.real),
             )
-            for value, vector in zip(values[1:], vectors[1:]):
-                out += value * _qfunc_iterative_single(vector, alpha_grid, prefactor, g)
             out /= jnp.pi
 
             return out
 
+    # Use the Qarray batch dims rather than data.shape[:-2]: kets now have a
+    # single trailing space axis, so shape[:-2] would under-count batch dims.
+    bdims = psi.bdims
     psi = psi.data
 
     vmapped_compute_qfunc = [_compute_qfunc]
 
-    for _ in psi.shape[:-2]:
+    for _ in bdims:
         vmapped_compute_qfunc.append(
             vmap(
                 vmapped_compute_qfunc[-1],
@@ -268,10 +294,8 @@ def _qfunc_iterative_single(
 
 def _qfunc_coherent_grid(xvec, yvec, g):
     x, y = jnp.meshgrid(0.5 * g * xvec, 0.5 * g * yvec)
-    grid = jnp.empty(x.shape, dtype=jnp.complex128)
-    grid += x
     # We produce the adjoint of the coherent states to save an operation
     # later when computing dot products, hence the negative imaginary part.
-    grid += -y * 1.0j
+    grid = x - 1.0j * y
     prefactor = jnp.exp(-0.5 * (x * x + y * y)).astype(jnp.complex128)
     return grid, prefactor
