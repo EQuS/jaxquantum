@@ -553,16 +553,11 @@ def _sesolve_result_data(
 
 
 def _mesolve_cuquantum_result(
-    H,
-    rho0: Qarray,
-    tlist: Array,
-    saveat_tlist: Array | None,
-    c_ops,
-    solver_options: SolverOptions | None,
+    H, rho0: Qarray, tlist: Array, saveat_tlist: Array | None,
+    c_ops, solver_options: SolverOptions | None,
 ) -> diffrax.Solution:
     """Solve a master equation using cuDensityMat operator actions."""
     from cuquantum.densitymat.jax import Operator, State, operator_action
-
     from jaxquantum.core.cuquantum_impl import _cuqnt_dag
     from jaxquantum.utils.cuquantum_util import OperatorTerm
 
@@ -585,40 +580,27 @@ def _mesolve_cuquantum_result(
     if collapse_ops:
         dissipator = OperatorTerm(space_dims)
         for collapse_op in collapse_ops:
-            if (
-                not isinstance(collapse_op, Qarray)
-                or collapse_op.impl_type != QarrayImplType.CUQUANTUM
-            ):
-                raise TypeError(
-                    "Every collapse operator must use the cuquantum backend"
-                )
+            if not isinstance(collapse_op, Qarray) or collapse_op.impl_type != QarrayImplType.CUQUANTUM:
+                raise TypeError("Every collapse operator must use the cuquantum backend")
             left = collapse_op._impl._data
             right = _cuqnt_dag(left)
             if len(left.op_prods) != 1:
-                raise ValueError(
-                    "Only a single term is supported in a collapse operator"
-                )
+                raise ValueError("Only a single term is supported in a collapse operator")
             left_factors = left[0]
             right_factors = right[0]
             modes = left.modes[0]
             coeff = left.coeffs[0] * jnp.conj(left.coeffs[0])
             dissipator.append(
-                [*left_factors, *right_factors],
-                modes=modes + modes,
-                duals=[False, True],
-                coeff=coeff,
+                [*left_factors, *right_factors], modes=modes + modes,
+                duals=[False, True], coeff=coeff,
             )
             dissipator.append(
-                [*right_factors, *left_factors],
-                modes=modes + modes,
-                duals=[True, True],
-                coeff=-0.5 * coeff,
+                [*right_factors, *left_factors], modes=modes + modes,
+                duals=[True, True], coeff=-0.5 * coeff,
             )
             dissipator.append(
-                [*left_factors, *right_factors],
-                modes=modes + modes,
-                duals=[False, False],
-                coeff=-0.5 * coeff,
+                [*left_factors, *right_factors], modes=modes + modes,
+                duals=[False, False], coeff=-0.5 * coeff,
             )
 
     h_at = (lambda t: H) if isinstance(H, Qarray) else H
@@ -646,10 +628,7 @@ def _mesolve_cuquantum_result(
 
 
 def _sesolve_cuquantum_result(
-    H,
-    psi0: Qarray,
-    tlist: Array,
-    saveat_tlist: Array | None,
+    H, psi0: Qarray, tlist: Array, saveat_tlist: Array | None,
     solver_options: SolverOptions | None,
 ) -> diffrax.Solution:
     """Solve a Schrödinger equation using cuDensityMat operator actions."""
@@ -670,7 +649,6 @@ def _sesolve_cuquantum_result(
         return derivative.reshape(psi_shape)
 
     return solve(rhs, psi0_arr, tlist, saveat_tlist, solver_options=solver_options)
-
 
 # propagators
 

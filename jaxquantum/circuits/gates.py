@@ -1,12 +1,11 @@
 """Gates."""
 
-from collections.abc import Callable
 from copy import deepcopy
-from typing import Any
-
-import jax.numpy as jnp
 from flax import struct
 from jax import Array, config
+from typing import List, Dict, Any, Optional, Callable, Union
+import jax.numpy as jnp
+
 
 from jaxquantum.core.qarray import Qarray, concatenate
 
@@ -15,30 +14,32 @@ config.update("jax_enable_x64", True)
 
 @struct.dataclass
 class Gate:
-    dims: list[int] = struct.field(pytree_node=False)
-    _U: Array | None  # Unitary
-    _Ht: Array | None  # Hamiltonian
-    _KM: Qarray | None  # Kraus map
-    _c_ops: Qarray | None
-    _params: dict[str, Any]
+    dims: List[int] = struct.field(pytree_node=False)
+    _U: Optional[Array] # Unitary
+    _Ht: Optional[Array] # Hamiltonian
+    _KM: Optional[Qarray] # Kraus map
+    _c_ops: Optional[Qarray]
+    _params: Dict[str, Any]
     _ts: Array
     _name: str = struct.field(pytree_node=False)
     num_modes: int = struct.field(pytree_node=False)
-    _gen_KM: Callable | None = struct.field(pytree_node=False, default=None)
-    _channel_apply: Callable | None = struct.field(pytree_node=False, default=None)
+    _gen_KM: Optional[Callable] = struct.field(pytree_node=False, default=None)
+    _channel_apply: Optional[Callable] = struct.field(
+        pytree_node=False, default=None
+    )
 
     @classmethod
     def create(
         cls,
-        dims: int | list[int],
+        dims: Union[int, List[int]],
         name: str = "Gate",
-        params: dict[str, Any] | None = None,
-        ts: Array | None = None,
-        gen_U: Callable[[dict[str, Any]], Qarray] | None = None,
-        gen_Ht: Callable[[dict[str, Any]], Qarray] | None = None,
-        gen_c_ops: Callable[[dict[str, Any]], Qarray] | None = None,
-        gen_KM: Callable[[dict[str, Any]], list[Qarray]] | None = None,
-        channel_apply: Callable[[Array, dict[str, Any]], Array] | None = None,
+        params: Optional[Dict[str, Any]] = None,
+        ts: Optional[Array] = None,
+        gen_U: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
+        gen_Ht: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
+        gen_c_ops: Optional[Callable[[Dict[str, Any]], Qarray]] = None,
+        gen_KM: Optional[Callable[[Dict[str, Any]], List[Qarray]]] = None,
+        channel_apply: Optional[Callable[[Array, Dict[str, Any]], Array]] = None,
         lazy_kraus: bool = False,
         num_modes: int = 1,
     ):
@@ -67,21 +68,21 @@ class Gate:
         )
 
         # Unitary
-        _U = gen_U(params) if gen_U is not None else None
-        _Ht = gen_Ht(params) if gen_Ht is not None else None
+        _U = gen_U(params) if gen_U is not None else None 
+        _Ht = gen_Ht(params) if gen_Ht is not None else None 
         _c_ops = gen_c_ops(params) if gen_c_ops is not None else Qarray.from_list([])
 
         _KM = gen_KM(params) if gen_KM is not None and not lazy_kraus else None
 
         return Gate(
-            dims=dims,
-            _U=_U,
-            _Ht=_Ht,
-            _KM=_KM,
-            _c_ops=_c_ops,
+            dims = dims,
+            _U = _U,
+            _Ht = _Ht,
+            _KM = _KM,
+            _c_ops = _c_ops,
             _gen_KM=gen_KM if lazy_kraus else None,
             _channel_apply=channel_apply,
-            _params=params if params is not None else {},
+            _params = params if params is not None else {},
             _ts=ts if ts is not None else jnp.array([]),
             _name=name,
             num_modes=num_modes,
@@ -135,52 +136,51 @@ class Gate:
 
     def add_Ht(self, Ht: Callable[[float], Qarray]):
         """Add a Hamiltonian function to the gate."""
-
         def new_Ht(t):
             return Ht(t) + self.Ht(t) if self.Ht is not None else Ht(t)
 
         return Gate(
-            dims=self.dims,
-            _U=self.U,
-            _Ht=new_Ht,
-            _KM=self._KM,
-            _c_ops=self.c_ops,
+            dims = self.dims,
+            _U = self.U,
+            _Ht = new_Ht,
+            _KM = self._KM,
+            _c_ops = self.c_ops,
             _gen_KM=self._gen_KM,
             _channel_apply=self._channel_apply,
-            _params=self.params,
-            _ts=self.ts,
-            _name=self.name,
-            num_modes=self.num_modes,
+            _params = self.params,
+            _ts = self.ts,
+            _name = self.name,
+            num_modes = self.num_modes,
         )
 
     def add_c_ops(self, c_ops: Qarray):
         """Add a c_ops to the gate."""
         return Gate(
-            dims=self.dims,
-            _U=self.U,
-            _Ht=self.Ht,
-            _KM=self._KM,
-            _c_ops=concatenate([self.c_ops, c_ops]),
+            dims = self.dims,
+            _U = self.U,
+            _Ht = self.Ht,
+            _KM = self._KM,
+            _c_ops = concatenate([self.c_ops, c_ops]),
             _gen_KM=self._gen_KM,
             _channel_apply=self._channel_apply,
-            _params=self.params,
-            _ts=self.ts,
-            _name=self.name,
-            num_modes=self.num_modes,
+            _params = self.params,
+            _ts = self.ts,
+            _name = self.name,
+            num_modes = self.num_modes,
         )
 
     def copy(self):
         """Return a copy of the gate."""
         return Gate(
-            dims=deepcopy(self.dims),
-            _U=self.U,
-            _Ht=deepcopy(self.Ht),
-            _KM=self._KM,
-            _c_ops=self.c_ops,
+            dims = deepcopy(self.dims),
+            _U = self.U,
+            _Ht = deepcopy(self.Ht),
+            _KM = self._KM,
+            _c_ops = self.c_ops,
             _gen_KM=self._gen_KM,
             _channel_apply=self._channel_apply,
-            _params=deepcopy(self.params),
-            _ts=self.ts,
-            _name=self.name,
-            num_modes=self.num_modes,
+            _params = deepcopy(self.params),
+            _ts = self.ts,
+            _name = self.name,
+            num_modes = self.num_modes,
         )

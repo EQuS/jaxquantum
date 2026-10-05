@@ -1,12 +1,13 @@
 """ATS."""
 
-import jax.numpy as jnp
 from flax import struct
 from jax import config
 
-from jaxquantum.core.operators import create, destroy, identity
-from jaxquantum.core.qarray import cosm, sinm
+import jax.numpy as jnp
+
 from jaxquantum.devices.superconducting.flux_base import FluxDevice
+from jaxquantum.core.operators import identity, destroy, create
+from jaxquantum.core.qarray import cosm, sinm
 
 config.update("jax_enable_x64", True)
 
@@ -45,7 +46,10 @@ class ATS(FluxDevice):
         """Return linear terms in H."""
         w = self.get_linear_frequency()
         ops = self.linear_ops
-        return w * (ops["a_dag"] @ ops["a"] + 0.5 * ops["id"])
+        return w * (
+            ops["a_dag"] @ ops["a"]
+            + 0.5 * ops["id"]
+        )
 
     @staticmethod
     def get_H_nonlinear_static(phi_op, Ej, dEj, Ej2, phi_sum, phi_delta):

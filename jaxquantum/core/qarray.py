@@ -7,7 +7,7 @@ from copy import deepcopy
 from enum import Enum
 from math import prod
 from numbers import Number
-from typing import TYPE_CHECKING, Generic, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Generic, List, Literal, TypeVar, Union, overload
 
 import jax.numpy as jnp
 import jax.scipy as jsp
@@ -85,9 +85,7 @@ class QarrayImplType(Enum):
 
         if isinstance(x, str):
             xl = x.lower()
-            return any(
-                xl == member.value or xl == member.name.lower() for member in cls
-            )
+            return any(xl == member.value or xl == member.name.lower() for member in cls)
 
         # Try mapping from an implementation class to an enum member
         try:
@@ -97,7 +95,7 @@ class QarrayImplType(Enum):
             return False
 
     @classmethod
-    def from_impl_class(cls, impl_class) -> QarrayImplType:
+    def from_impl_class(cls, impl_class) -> "QarrayImplType":
         """Return the ``QarrayImplType`` member associated with *impl_class*.
 
         Args:
@@ -129,7 +127,7 @@ class QarrayImplType(Enum):
         raise ValueError(f"No impl class registered for {self}")
 
 
-def robust_asarray(data) -> Array | sparse.BCOO:
+def robust_asarray(data) -> Union[Array, sparse.BCOO]:
     """Convert *data* to a JAX array, leaving sparse / cuquantum containers untouched.
 
     Args:
@@ -172,6 +170,7 @@ class QarrayImpl(ABC):
     @abstractmethod
     def get_data(self) -> Array:
         """Return the underlying raw data array."""
+        pass
 
     @property
     def data(self) -> Array:
@@ -185,7 +184,7 @@ class QarrayImpl(ABC):
 
     @classmethod
     @abstractmethod
-    def from_data(cls, data) -> QarrayImpl:
+    def from_data(cls, data) -> "QarrayImpl":
         """Wrap raw data in this impl type.
 
         Args:
@@ -194,9 +193,10 @@ class QarrayImpl(ABC):
         Returns:
             A new instance of this implementation wrapping *data*.
         """
+        pass
 
     @abstractmethod
-    def matmul(self, other: QarrayImpl) -> QarrayImpl:
+    def matmul(self, other: "QarrayImpl") -> "QarrayImpl":
         """Matrix multiplication with *other*.
 
         Args:
@@ -205,9 +205,10 @@ class QarrayImpl(ABC):
         Returns:
             Result of ``self @ other`` as a ``QarrayImpl``.
         """
+        pass
 
     @abstractmethod
-    def add(self, other: QarrayImpl) -> QarrayImpl:
+    def add(self, other: "QarrayImpl") -> "QarrayImpl":
         """Element-wise addition with *other*.
 
         Args:
@@ -216,9 +217,10 @@ class QarrayImpl(ABC):
         Returns:
             Result of ``self + other`` as a ``QarrayImpl``.
         """
+        pass
 
     @abstractmethod
-    def sub(self, other: QarrayImpl) -> QarrayImpl:
+    def sub(self, other: "QarrayImpl") -> "QarrayImpl":
         """Element-wise subtraction of *other*.
 
         Args:
@@ -227,9 +229,10 @@ class QarrayImpl(ABC):
         Returns:
             Result of ``self - other`` as a ``QarrayImpl``.
         """
+        pass
 
     @abstractmethod
-    def mul(self, scalar) -> QarrayImpl:
+    def mul(self, scalar) -> "QarrayImpl":
         """Scalar multiplication.
 
         Args:
@@ -238,32 +241,36 @@ class QarrayImpl(ABC):
         Returns:
             Result of ``scalar * self`` as a ``QarrayImpl``.
         """
+        pass
 
     @abstractmethod
-    def dag(self) -> QarrayImpl:
+    def dag(self) -> "QarrayImpl":
         """Conjugate transpose.
 
         Returns:
             The conjugate transpose of this array as a ``QarrayImpl``.
         """
+        pass
 
     @abstractmethod
-    def to_dense(self) -> DenseImpl:
+    def to_dense(self) -> "DenseImpl":
         """Convert to a ``DenseImpl``.
 
         Returns:
             A ``DenseImpl`` wrapping the same data.
         """
+        pass
 
     @abstractmethod
-    def to_sparse_bcoo(self) -> SparseBCOOImpl:
+    def to_sparse_bcoo(self) -> "SparseBCOOImpl":
         """Convert to a ``SparseBCOOImpl`` (BCOO).
 
         Returns:
             A ``SparseBCOOImpl`` wrapping the same data.
         """
+        pass
 
-    def to_sparse_dia(self) -> QarrayImpl:
+    def to_sparse_dia(self) -> "QarrayImpl":
         """Convert to a ``SparseDiaImpl``.
 
         Default implementation goes through dense and auto-detects diagonals.
@@ -274,7 +281,6 @@ class QarrayImpl(ABC):
         """
         # Import here to avoid circular imports at module load time
         from jaxquantum.core.sparse_dia import SparseDiaImpl
-
         return SparseDiaImpl.from_data(self.to_dense()._data)
 
     @abstractmethod
@@ -284,6 +290,7 @@ class QarrayImpl(ABC):
         Returns:
             Tuple of dimension sizes.
         """
+        pass
 
     @abstractmethod
     def dtype(self):
@@ -292,6 +299,7 @@ class QarrayImpl(ABC):
         Returns:
             A numpy/JAX dtype object.
         """
+        pass
 
     @abstractmethod
     def __deepcopy__(self, memo=None):
@@ -307,9 +315,10 @@ class QarrayImpl(ABC):
         Returns:
             A new ``QarrayImpl`` with small values zeroed.
         """
+        pass
 
     @abstractmethod
-    def kron(self, other: QarrayImpl) -> QarrayImpl:
+    def kron(self, other: "QarrayImpl") -> "QarrayImpl":
         """Kronecker (tensor) product with another implementation.
 
         Args:
@@ -320,6 +329,7 @@ class QarrayImpl(ABC):
         Returns:
             A new ``QarrayImpl`` containing the Kronecker product.
         """
+        pass
 
     @classmethod
     @abstractmethod
@@ -333,6 +343,7 @@ class QarrayImpl(ABC):
         Returns:
             Raw identity matrix data in the format appropriate for this impl.
         """
+        pass
 
     @classmethod
     def _scaled_identity(cls, n: int, scalar, dtype=None) -> QarrayImpl:
@@ -358,6 +369,7 @@ class QarrayImpl(ABC):
         Returns:
             True if this impl can operate on *arr* without conversion.
         """
+        pass
 
     @classmethod
     @abstractmethod
@@ -373,8 +385,9 @@ class QarrayImpl(ABC):
         Returns:
             Conjugate transpose with the last two axes swapped.
         """
+        pass
 
-    def _promote_to(self, target_cls: type) -> QarrayImpl:
+    def _promote_to(self, target_cls: type) -> "QarrayImpl":
         """Convert this impl to *target_cls* by passing through dense.
 
         Args:
@@ -387,7 +400,7 @@ class QarrayImpl(ABC):
             return self
         return target_cls.from_data(self.to_dense()._data)
 
-    def _coerce(self, other: QarrayImpl) -> tuple[QarrayImpl, QarrayImpl]:
+    def _coerce(self, other: "QarrayImpl") -> "tuple[QarrayImpl, QarrayImpl]":
         """Coerce *self* and *other* to the same implementation type.
 
         The impl type with the higher ``PROMOTION_ORDER`` wins; the other side
@@ -417,10 +430,10 @@ class DenseImpl(QarrayImpl):
 
     _data: Array
 
-    PROMOTION_ORDER = 2
+    PROMOTION_ORDER = 2  # noqa: RUF012 — not a struct field; no annotation intentional
 
     @classmethod
-    def _make(cls, data) -> DenseImpl:
+    def _make(cls, data) -> "DenseImpl":
         """Construct a ``DenseImpl``, applying the configured default sharding.
 
         All internal construction sites route through this so that every
@@ -430,7 +443,7 @@ class DenseImpl(QarrayImpl):
         return cls(_data=_maybe_shard(data))
 
     @classmethod
-    def from_data(cls, data) -> DenseImpl:
+    def from_data(cls, data) -> "DenseImpl":
         """Wrap *data* in a new ``DenseImpl``.
 
         Args:
@@ -506,7 +519,7 @@ class DenseImpl(QarrayImpl):
         """
         return DenseImpl._make(jnp.moveaxis(jnp.conj(self._data), -1, -2))
 
-    def to_dense(self) -> DenseImpl:
+    def to_dense(self) -> "DenseImpl":
         """Return self (already dense).
 
         Returns:
@@ -514,14 +527,13 @@ class DenseImpl(QarrayImpl):
         """
         return self
 
-    def to_sparse_bcoo(self) -> SparseBCOOImpl:
+    def to_sparse_bcoo(self) -> "SparseBCOOImpl":
         """Convert to a ``SparseBCOOImpl`` via ``BCOO.fromdense``.
 
         Returns:
             A ``SparseBCOOImpl`` wrapping a BCOO conversion of this array.
         """
         from jaxquantum.core.sparse_bcoo import SparseBCOOImpl
-
         return SparseBCOOImpl(sparse.BCOO.fromdense(self._data))
 
     def shape(self) -> tuple:
@@ -593,7 +605,7 @@ class DenseImpl(QarrayImpl):
 
         return DenseImpl._make(data_new)
 
-    def kron(self, other: QarrayImpl) -> QarrayImpl:
+    def kron(self, other: "QarrayImpl") -> "QarrayImpl":
         """Kronecker product using ``jnp.kron``.
 
         Args:
@@ -702,31 +714,18 @@ class Qarray(Generic[ImplT]):
 
     @classmethod
     @overload
-    def create(
-        cls,
-        data,
-        dims=None,
-        bdims=None,
-        qtype=None,
-        implementation: Literal[QarrayImplType.DENSE] = QarrayImplType.DENSE,
-    ) -> Qarray[DenseImpl]: ...
+    def create(cls, data, dims=None, bdims=None, qtype=None, implementation: Literal[QarrayImplType.DENSE] = QarrayImplType.DENSE) -> "Qarray[DenseImpl]":
+        ...
 
     @classmethod
     @overload
-    def create(
-        cls,
-        data,
-        dims=None,
-        bdims=None,
-        qtype=None,
-        implementation: Literal[QarrayImplType.SPARSE_BCOO] = ...,
-    ) -> Qarray[SparseBCOOImpl]: ...
+    def create(cls, data, dims=None, bdims=None, qtype=None, implementation: Literal[QarrayImplType.SPARSE_BCOO] = ...) -> "Qarray[SparseBCOOImpl]":
+        ...
 
     @classmethod
     @overload
-    def create(
-        cls, data, dims=None, bdims=None, qtype=None, implementation=...
-    ) -> Qarray[DenseImpl]: ...
+    def create(cls, data, dims=None, bdims=None, qtype=None, implementation=...) -> "Qarray[DenseImpl]":
+        ...
 
     @classmethod
     def create(cls, data, dims=None, bdims=None, qtype=None, implementation=None):
@@ -925,7 +924,7 @@ class Qarray(Generic[ImplT]):
             bdims = tuple(bdims)
             if dims_full is None:
                 n = 1
-                for d in shape[len(bdims) :]:
+                for d in shape[len(bdims):]:
                     n *= d
                 dims_full = ((n,), (1,)) if qtype == Qtypes.ket else ((1,), (n,))
             return data, dims_full, bdims
@@ -940,16 +939,13 @@ class Qarray(Generic[ImplT]):
         inferred_n = s[-1] if s else 1
         bdims = tuple(s[:-1])
         if dims_full is None:
-            dims_full = (
-                ((inferred_n,), (1,)) if qtype == Qtypes.ket else ((1,), (inferred_n,))
-            )
+            dims_full = ((inferred_n,), (1,)) if qtype == Qtypes.ket else ((1,), (inferred_n,))
         return data, dims_full, bdims
 
     @classmethod
     @overload
-    def from_sparse_bcoo(
-        cls, data, dims=None, bdims=None
-    ) -> Qarray[SparseBCOOImpl]: ...
+    def from_sparse_bcoo(cls, data, dims=None, bdims=None) -> "Qarray[SparseBCOOImpl]":
+        ...
 
     @classmethod
     def from_sparse_bcoo(cls, data, dims=None, bdims=None):
@@ -963,12 +959,10 @@ class Qarray(Generic[ImplT]):
         Returns:
             A ``Qarray[SparseBCOOImpl]``.
         """
-        return cls.create(
-            data, dims=dims, bdims=bdims, implementation=QarrayImplType.SPARSE_BCOO
-        )
+        return cls.create(data, dims=dims, bdims=bdims, implementation=QarrayImplType.SPARSE_BCOO)
 
     @classmethod
-    def from_sparse_dia(cls, data, dims=None, bdims=None) -> Qarray:
+    def from_sparse_dia(cls, data, dims=None, bdims=None) -> "Qarray":
         """Create a SparseDIA-backed ``Qarray``.
 
         Accepts either a dense array-like (diagonals are auto-detected) or a
@@ -982,12 +976,10 @@ class Qarray(Generic[ImplT]):
         Returns:
             A ``Qarray`` backed by ``SparseDiaImpl``.
         """
-        return cls.create(
-            data, dims=dims, bdims=bdims, implementation=QarrayImplType.SPARSE_DIA
-        )
+        return cls.create(data, dims=dims, bdims=bdims, implementation=QarrayImplType.SPARSE_DIA)
 
     @classmethod
-    def from_impl(cls, impl: QarrayImpl, dims=None, bdims=None) -> Qarray:
+    def from_impl(cls, impl: "QarrayImpl", dims=None, bdims=None) -> "Qarray":
         """Wrap an already-constructed impl in a ``Qarray``.
 
         Use when a smart constructor (e.g. ``SparseDiaImpl.from_diags`` or
@@ -1028,18 +1020,16 @@ class Qarray(Generic[ImplT]):
 
     @classmethod
     @overload
-    def from_list(
-        cls, qarr_list: list[Qarray[DenseImpl]], qtype=None
-    ) -> Qarray[DenseImpl]: ...
+    def from_list(cls, qarr_list: List["Qarray[DenseImpl]"], qtype=None) -> "Qarray[DenseImpl]":
+        ...
 
     @classmethod
     @overload
-    def from_list(
-        cls, qarr_list: list[Qarray[SparseBCOOImpl]], qtype=None
-    ) -> Qarray[SparseBCOOImpl]: ...
+    def from_list(cls, qarr_list: List["Qarray[SparseBCOOImpl]"], qtype=None) -> "Qarray[SparseBCOOImpl]":
+        ...
 
     @classmethod
-    def from_list(cls, qarr_list: list[Qarray], qtype=None) -> Qarray:
+    def from_list(cls, qarr_list: List[Qarray], qtype=None) -> Qarray:
         """Create a batched ``Qarray`` from a list of same-shaped ``Qarray`` objects.
 
         The output implementation is determined by the element with the highest
@@ -1093,13 +1083,10 @@ class Qarray(Generic[ImplT]):
             # All inputs are SparseDIA — batch without densifying.
             # Compute union of offsets across all operators, then remap each
             # operator's _diags rows into the union shape and stack.
-            from jaxquantum.core.sparse_dia import (
-                SparseDiaData,  # lazy to avoid circular
-            )
-
-            union_offsets = tuple(
-                sorted(set().union(*[set(q._impl._offsets) for q in qarr_list]))
-            )
+            from jaxquantum.core.sparse_dia import SparseDiaData  # lazy to avoid circular
+            union_offsets = tuple(sorted(
+                set().union(*[set(q._impl._offsets) for q in qarr_list])
+            ))
             union_idx = {k: i for i, k in enumerate(union_offsets)}
             n = qarr_list[0]._impl._diags.shape[-1]
             dtype = jnp.result_type(*[q._impl._diags.dtype for q in qarr_list])
@@ -1111,42 +1098,26 @@ class Qarray(Generic[ImplT]):
                 remapped.append(row)
             stacked = jnp.stack(remapped, axis=0)  # (n_ops, n_union_diags, N)
             raw = SparseDiaData(offsets=union_offsets, diags=stacked)
-            return cls.create(
-                raw,
-                dims=dims,
-                bdims=new_bdims,
-                qtype=qtype,
-                implementation=QarrayImplType.SPARSE_DIA,
-            )
+            return cls.create(raw, dims=dims, bdims=new_bdims, qtype=qtype, implementation=QarrayImplType.SPARSE_DIA)
 
         if target_impl_type == QarrayImplType.SPARSE_BCOO:
             # All inputs are sparse BCOO — stack via dense intermediates then re-sparsify.
             data = jnp.array([q.data.todense() for q in qarr_list])
-            return cls.create(
-                data,
-                dims=dims,
-                bdims=new_bdims,
-                qtype=qtype,
-                implementation=QarrayImplType.SPARSE_BCOO,
-            )
+            return cls.create(data, dims=dims, bdims=new_bdims, qtype=qtype, implementation=QarrayImplType.SPARSE_BCOO)
 
         # Target is dense: promote any sparse inputs before stacking.
         data = jnp.array([q.to_dense().data for q in qarr_list])
-        return cls.create(
-            data,
-            dims=dims,
-            bdims=new_bdims,
-            qtype=qtype,
-            implementation=QarrayImplType.DENSE,
-        )
+        return cls.create(data, dims=dims, bdims=new_bdims, qtype=qtype, implementation=QarrayImplType.DENSE)
 
     @classmethod
     @overload
-    def from_array(cls, qarr_arr: Qarray[DenseImpl]) -> Qarray[DenseImpl]: ...
+    def from_array(cls, qarr_arr: "Qarray[DenseImpl]") -> "Qarray[DenseImpl]":
+        ...
 
     @classmethod
     @overload
-    def from_array(cls, qarr_arr: Qarray[SparseBCOOImpl]) -> Qarray[SparseBCOOImpl]: ...
+    def from_array(cls, qarr_arr: "Qarray[SparseBCOOImpl]") -> "Qarray[SparseBCOOImpl]":
+        ...
 
     @classmethod
     def from_array(cls, qarr_arr) -> Qarray:
@@ -1263,7 +1234,7 @@ class Qarray(Generic[ImplT]):
         """The ``QarrayImplType`` member of the current storage backend."""
         return self._impl.impl_type
 
-    def to_sparse_bcoo(self) -> Qarray[SparseBCOOImpl]:
+    def to_sparse_bcoo(self) -> "Qarray[SparseBCOOImpl]":
         """Return a BCOO-sparse-backed copy of this array.
 
         If the array is already sparse BCOO, returns self unchanged.
@@ -1276,7 +1247,7 @@ class Qarray(Generic[ImplT]):
         new_impl = self._impl.to_sparse_bcoo()
         return Qarray(new_impl, self._qdims, self._bdims)
 
-    def to_sparse_dia(self) -> Qarray:
+    def to_sparse_dia(self) -> "Qarray":
         """Return a SparseDIA-backed copy of this array.
 
         If the array is already SparseDIA, returns self unchanged.
@@ -1289,7 +1260,7 @@ class Qarray(Generic[ImplT]):
         new_impl = self._impl.to_sparse_dia()
         return Qarray(new_impl, self._qdims, self._bdims)
 
-    def to_dense(self) -> Qarray[DenseImpl]:
+    def to_dense(self) -> "Qarray[DenseImpl]":
         """Return a dense-backed copy of this array.
 
         If the array is already dense, returns self unchanged.
@@ -1302,7 +1273,7 @@ class Qarray(Generic[ImplT]):
         new_impl = self._impl.to_dense()
         return Qarray(new_impl, self._qdims, self._bdims)
 
-    def to_backend(self, implementation) -> Qarray:
+    def to_backend(self, implementation) -> "Qarray":
         """Return a ``Qarray`` with the same data on a different impl backend.
 
         Tries a direct ``to_<name>`` method on the current impl when available,
@@ -1360,7 +1331,7 @@ class Qarray(Generic[ImplT]):
             new_bdims,
         )
 
-    def space_to_qdims(self, space_dims: list[int]):
+    def space_to_qdims(self, space_dims: List[int]):
         """Convert Hilbert space dimensions to full quantum dims tuple.
 
         Args:
@@ -1454,18 +1425,15 @@ class Qarray(Generic[ImplT]):
 
         if self.is_sparse_bcoo and other.is_sparse_bcoo:
             # Fast structural path: same sparsity pattern → compare values only (no todense)
-            if self.data.indices.shape == other.data.indices.shape and bool(
-                jnp.all(self.data.indices == other.data.indices)
-            ):
+            if (self.data.indices.shape == other.data.indices.shape
+                    and bool(jnp.all(self.data.indices == other.data.indices))):
                 return bool(jnp.allclose(self.data.data, other.data.data))
             # Different patterns: fall back to dense comparison (unavoidable)
             return bool(jnp.all(self.data.todense() == other.data.todense()))
 
         # At least one dense: convert sparse side to dense for comparison
-        self_data = self.data.todense() if hasattr(self.data, "todense") else self.data
-        other_data = (
-            other.data.todense() if hasattr(other.data, "todense") else other.data
-        )
+        self_data  = self.data.todense()  if hasattr(self.data,  'todense') else self.data
+        other_data = other.data.todense() if hasattr(other.data, 'todense') else other.data
         return bool(jnp.all(self_data == other_data))
 
     def __ne__(self, other):
@@ -1711,9 +1679,7 @@ class Qarray(Generic[ImplT]):
                 return res
             else:
                 # Preserve implementation type
-                return Qarray.create(
-                    res, dims=self._qdims.dims, implementation=self.impl_type
-                )
+                return Qarray.create(res, dims=self._qdims.dims, implementation=self.impl_type)
 
         return func
 
@@ -1858,8 +1824,7 @@ class Qarray(Generic[ImplT]):
 
 # Qarray operations ---------------------------------------------------------------------
 
-
-def concatenate(qarr_list: list[Qarray], axis: int = 0) -> Qarray:
+def concatenate(qarr_list: List[Qarray], axis: int = 0) -> Qarray:
     """Concatenate a list of Qarrays along a specified axis.
 
     Args:
@@ -1902,14 +1867,10 @@ def collapse(qarr: Qarray, mode="sum") -> Qarray:
 
         # Preserve implementation type
         implementation = qarr.impl_type
-        return Qarray.create(
-            jnp.sum(qarr.data, axis=batch_axes),
-            dims=qarr.dims,
-            implementation=implementation,
-        )
+        return Qarray.create(jnp.sum(qarr.data, axis=batch_axes), dims=qarr.dims, implementation=implementation)
 
 
-def transpose(qarr: Qarray, indices: list[int]) -> Qarray:
+def transpose(qarr: Qarray, indices: List[int]) -> Qarray:
     """Transpose subsystem indices of the quantum array.
 
     Args:
@@ -2145,7 +2106,7 @@ def expm(qarr: Qarray, **kwargs) -> Qarray:
     return Qarray.create(data, dims=dims)
 
 
-def powm(qarr: Qarray, n: float, clip_eigvals=False) -> Qarray:
+def powm(qarr: Qarray, n: Union[int, float], clip_eigvals=False) -> Qarray:
     """Matrix power of a ``Qarray``.
 
     Args:
@@ -2166,9 +2127,7 @@ def powm(qarr: Qarray, n: float, clip_eigvals=False) -> Qarray:
     # SparseDIA fast path: binary exponentiation stays in SparseDIA format.
     if qarr.is_sparse_dia and isinstance(n, int) and n >= 0:
         new_impl = qarr._impl.powm(n)
-        return Qarray.create(
-            new_impl.data, dims=qarr.dims, implementation=new_impl.impl_type
-        )
+        return Qarray.create(new_impl.data, dims=qarr.dims, implementation=new_impl.impl_type)
 
     # Convert to dense for powm
     dense_qarr = qarr.to_dense()
@@ -2270,25 +2229,18 @@ def keep_only_diag_elements(qarr: Qarray) -> Qarray:
     dims = qarr.dims
     if qarr.is_sparse_bcoo:
         new_impl = qarr._impl.keep_only_diag()
-        return Qarray.create(
-            new_impl.data, dims=dims, implementation=QarrayImplType.SPARSE_BCOO
-        )
+        return Qarray.create(new_impl.data, dims=dims, implementation=QarrayImplType.SPARSE_BCOO)
     if qarr.is_sparse_dia:
         from jaxquantum.core.sparse_dia import SparseDiaImpl
-
         impl = qarr._impl
         n = impl._diags.shape[-1]
         if 0 in impl._offsets:
             i = impl._offsets.index(0)
-            main_diag = impl._diags[..., i : i + 1, :]
+            main_diag = impl._diags[..., i:i + 1, :]
         else:
-            main_diag = jnp.zeros(
-                (*impl._diags.shape[:-2], 1, n), dtype=impl._diags.dtype
-            )
+            main_diag = jnp.zeros((*impl._diags.shape[:-2], 1, n), dtype=impl._diags.dtype)
         new_impl = SparseDiaImpl(_offsets=(0,), _diags=main_diag)
-        return Qarray.create(
-            new_impl.get_data(), dims=dims, implementation=QarrayImplType.SPARSE_DIA
-        )
+        return Qarray.create(new_impl.get_data(), dims=dims, implementation=QarrayImplType.SPARSE_DIA)
     data = jnp.diag(jnp.diag(qarr.data))
     return Qarray.create(data, dims=dims)
 

@@ -3,17 +3,19 @@ JAX Utils
 """
 
 from numbers import Number
-from typing import Literal
+from typing import Dict
 
+from jax import lax, Array, device_put, config
+from jax._src.scipy.special import gammaln
 import jax.numpy as jnp
 import numpy as np
-from jax import Array, config, device_put, lax
-from jax._src.scipy.special import gammaln
+
+from typing import Literal
 
 config.update("jax_enable_x64", True)
 
 
-def device_put_params(params: dict, non_device_params=None):
+def device_put_params(params: Dict, non_device_params=None):
     non_device_params = [] if non_device_params is None else non_device_params
     for param, value in params.items():
         if param in non_device_params:
@@ -95,7 +97,6 @@ def robust_isscalar(val):
 
 # Precision
 
-
 def set_precision(precision: Literal["single", "double"]):
     """
     Set the precision of JAX operations.
@@ -135,21 +136,18 @@ def set_default_sharding(sharding):
             (equivalent to ``clear_default_sharding()``).
     """
     from jaxquantum.core.settings import SETTINGS
-
     SETTINGS["default_sharding"] = sharding
 
 
 def get_default_sharding():
     """Return the configured default sharding, or ``None`` if unset."""
     from jaxquantum.core.settings import SETTINGS
-
     return SETTINGS["default_sharding"]
 
 
 def clear_default_sharding():
     """Disable default sharding (return to single-device behaviour)."""
     from jaxquantum.core.settings import SETTINGS
-
     SETTINGS["default_sharding"] = None
 
 
@@ -196,12 +194,12 @@ def set_device_mesh(shape, axis_names, partition_spec=None, devices=None):
     """
     if len(shape) != len(axis_names):
         raise ValueError(
-            f"shape ({shape}) and axis_names ({axis_names}) must have the same length"
+            f"shape ({shape}) and axis_names ({axis_names}) must have the "
+            "same length"
         )
 
-    from math import prod
-
     import jax
+    from math import prod
     from jax.experimental import mesh_utils
     from jax.sharding import Mesh, NamedSharding, PartitionSpec
 

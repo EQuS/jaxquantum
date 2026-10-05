@@ -2,10 +2,12 @@
 Generic Bosonic Mode Class
 """
 
-from jax import config
+from typing import Tuple
 
-import jaxquantum as jqt
 from jaxquantum.codes.base import BosonicQubit
+import jaxquantum as jqt
+
+from jax import config
 
 config.update("jax_enable_x64", True)
 
@@ -18,7 +20,7 @@ class BosonicMode(BosonicQubit):
     def _params_validation(self):
         super()._params_validation()
 
-    def _get_basis_z(self) -> tuple[jqt.Qarray, jqt.Qarray]:
+    def _get_basis_z(self) -> Tuple[jqt.Qarray, jqt.Qarray]:
         """
         Construct basis states |+-x>, |+-y>, |+-z>
         """

@@ -1,7 +1,8 @@
-"""Units handling."""
+""" Units handling."""
 
+
+import scipy.constants as constants
 import jax.numpy as np
-from scipy import constants
 
 # Common Units
 # ================================================================================================
@@ -15,7 +16,6 @@ def GHz_to_joule(ghz):
 
 def joule_to_GHz(joule):
     return joule / (1e9 * constants.h)
-
 
 def n_thermal(frequency: float, temperature: float) -> float:
     """Calculate the average thermal photon number for a given frequency and temperature.
@@ -53,7 +53,6 @@ def inductive_energy_to_inductance(El):
 
     inv_L = GHz_to_joule(El) * (2 * np.pi) ** 2 / (FLUX_QUANTUM**2)
     return 1e9 / inv_L
-
 
 def inductance_to_inductive_energy(L):
     """Convert inductance to inductive energy E_L.
@@ -97,6 +96,7 @@ def calculate_resonator_zpf(freq, impedance):
     desired_E_C = np.sqrt(freq**2 / expected_E_L_over_E_C / 8)
     desired_E_L = freq**2 / desired_E_C / 8
     storage_q_zpf = (1 / 32 * desired_E_L / desired_E_C) ** (1 / 4)
+    
 
     # print((desired_E_L / desired_E_C), expected_E_L_over_E_C)
 

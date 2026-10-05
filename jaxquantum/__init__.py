@@ -2,10 +2,10 @@
 jaxquantum
 """
 
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import version, PackageNotFoundError
 
-from .core import *
-from .utils import *
+from .utils import *  # noqa
+from .core import *  # noqa
 
 try:
     __version__ = version("jaxquantum")

@@ -2,13 +2,13 @@
 Cat Code Qubit
 """
 
-from typing import ClassVar
+from typing import ClassVar, Tuple
 
-import jax.numpy as jnp
-from jax import config
-
-import jaxquantum as jqt
 from jaxquantum.codes.base import BosonicQubit
+import jaxquantum as jqt
+import jax.numpy as jnp
+
+from jax import config
 
 config.update("jax_enable_x64", True)
 
@@ -53,7 +53,7 @@ class CatQubit(BosonicQubit):
         minus = cls.displaced_squeezed_state(N, -alpha, delta)
         return jqt.unit(plus + (1 if parity == "even" else -1) * minus)
 
-    def _get_basis_z(self) -> tuple[jqt.Qarray, jqt.Qarray]:
+    def _get_basis_z(self) -> Tuple[jqt.Qarray, jqt.Qarray]:
         """Return the displaced squeezed states at +/- alpha."""
         N = self.params["N"]
         alpha = self.params["alpha"]

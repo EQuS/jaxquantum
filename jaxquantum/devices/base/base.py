@@ -1,15 +1,15 @@
 """Base device."""
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod, ABC
 from enum import Enum
-from typing import Any
+from typing import Dict, Any, List
 
-import jax.numpy as jnp
 from flax import struct
-from jax import Array, config
+from jax import config, Array
+import jax.numpy as jnp
 
-from jaxquantum.core.dims import Qdims, Qtypes
 from jaxquantum.core.qarray import DenseImpl, Qarray
+from jaxquantum.core.dims import Qdims, Qtypes
 
 config.update("jax_enable_x64", True)
 
@@ -73,7 +73,7 @@ class Device(ABC):
 
     N: int = struct.field(pytree_node=False)
     N_pre_diag: int = struct.field(pytree_node=False)
-    params: dict[str, Any]
+    params: Dict[str, Any]
     _label: int = struct.field(pytree_node=False)
     _basis: BasisTypes = struct.field(pytree_node=False)
     _hamiltonian: HamiltonianTypes = struct.field(pytree_node=False)
@@ -81,6 +81,7 @@ class Device(ABC):
     @classmethod
     def param_validation(cls, N, N_pre_diag, params, hamiltonian, basis):
         """This can be overridden by subclasses."""
+        pass
 
     @classmethod
     def create(
@@ -147,7 +148,7 @@ class Device(ABC):
         return self.full_ops()
 
     @abstractmethod
-    def common_ops(self) -> dict[str, Qarray]:
+    def common_ops(self) -> Dict[str, Qarray]:
         """Set up common ops in the specified basis."""
 
     @abstractmethod
@@ -220,7 +221,7 @@ class Device(ABC):
         }
 
 
-def get_op_in_new_basis(op: Qarray, evecs: Array, dims: list[list[int]]) -> Qarray:
+def get_op_in_new_basis(op: Qarray, evecs: Array, dims: List[List[int]]) -> Qarray:
     data = get_op_data_in_new_basis(op.data, evecs)
     return Qarray._from_impl(DenseImpl._make(data), Qdims(dims))
 
@@ -230,7 +231,7 @@ def get_op_data_in_new_basis(op_data: Array, evecs: Array) -> Array:
     return evecs_dag @ (op_data @ evecs)
 
 
-def get_vec_in_new_basis(vec: Qarray, evecs: Array, dims: list[list[int]]) -> Qarray:
+def get_vec_in_new_basis(vec: Qarray, evecs: Array, dims: List[List[int]]) -> Qarray:
     data = jnp.einsum("...ji,...j->...i", jnp.conj(evecs), vec.data)
     return Qarray._from_impl(DenseImpl._make(data), Qdims(dims))
 

@@ -1,13 +1,14 @@
 """Transmon."""
 
-import jax.numpy as jnp
 from flax import struct
 from jax import config
 
-from jaxquantum.core.conversions import jnp2jqt
-from jaxquantum.core.operators import create, destroy, identity
+import jax.numpy as jnp
+
 from jaxquantum.devices.base.base import BasisTypes, HamiltonianTypes
 from jaxquantum.devices.superconducting.flux_base import FluxDevice
+from jaxquantum.core.operators import identity, destroy, create
+from jaxquantum.core.conversions import jnp2jqt
 
 config.update("jax_enable_x64", True)
 
@@ -25,13 +26,9 @@ class Transmon(FluxDevice):
     def param_validation(cls, N, N_pre_diag, params, hamiltonian, basis):
         """This can be overridden by subclasses."""
         if hamiltonian == HamiltonianTypes.linear:
-            assert basis == BasisTypes.fock, (
-                "Linear Hamiltonian only works with Fock basis."
-            )
+            assert basis == BasisTypes.fock, "Linear Hamiltonian only works with Fock basis."
         elif hamiltonian == HamiltonianTypes.truncated:
-            assert basis == BasisTypes.fock, (
-                "Truncated Hamiltonian only works with Fock basis."
-            )
+            assert basis == BasisTypes.fock, "Truncated Hamiltonian only works with Fock basis."
         elif hamiltonian == HamiltonianTypes.full:
             charge_basis_types = [
                 BasisTypes.charge,
@@ -39,28 +36,20 @@ class Transmon(FluxDevice):
                 BasisTypes.singlecharge_even,
                 BasisTypes.singlecharge_odd,
             ]
-            assert basis in charge_basis_types, (
-                "Full Hamiltonian only works with Cooper pair charge or single-electron charge bases."
-            )
+            assert basis in charge_basis_types, "Full Hamiltonian only works with Cooper pair charge or single-electron charge bases."
 
         # Set the gate offset charge to zero if not provided
         if "ng" not in params:
             params["ng"] = 0.0
-
-        if basis in [
-            BasisTypes.singlecharge,
-            BasisTypes.singlecharge_even,
-            BasisTypes.singlecharge_odd,
-        ]:
-            assert (N_pre_diag) % 2 == 0, (
-                "N_pre_diag must be even for single charge bases."
-            )
+        
+        if basis in [BasisTypes.singlecharge, BasisTypes.singlecharge_even, BasisTypes.singlecharge_odd]:
+            assert (N_pre_diag) % 2 == 0, "N_pre_diag must be even for single charge bases."
         else:
             assert (N_pre_diag - 1) % 2 == 0, "N_pre_diag must be odd."
 
     def common_ops(self):
-        """Written in the specified basis."""
-
+        """ Written in the specified basis. """
+        
         ops = {}
 
         N = self.N_pre_diag
@@ -81,14 +70,12 @@ class Transmon(FluxDevice):
             ops["sin(φ)"] = 0.5j * (jnp2jqt(jnp.eye(N, k=1) - jnp.eye(N, k=-1)))
             ops["cos(2φ)"] = 0.5 * (jnp2jqt(jnp.eye(N, k=2) + jnp.eye(N, k=-2)))
             ops["sin(2φ)"] = 0.5j * (jnp2jqt(jnp.eye(N, k=2) - jnp.eye(N, k=-2)))
-
+            
             n_max = (N - 1) // 2
             n_array = jnp.arange(-n_max, n_max + 1)
             ops["n"] = jnp2jqt(jnp.diag(n_array))
             n_minus_ng_array = n_array - self.params["ng"] * jnp.ones(N)
-            ops["H_charge"] = jnp2jqt(
-                jnp.diag(4 * self.params["Ec"] * n_minus_ng_array**2)
-            )
+            ops["H_charge"] = jnp2jqt(jnp.diag(4 * self.params["Ec"] * n_minus_ng_array**2))
 
         elif self.basis in [BasisTypes.singlecharge_even, BasisTypes.singlecharge_odd]:
             n_max = N
@@ -102,9 +89,7 @@ class Transmon(FluxDevice):
             ops["cos(φ)"] = 0.5 * (jnp2jqt(jnp.eye(n_max, k=1) + jnp.eye(n_max, k=-1)))
             ops["sin(φ)"] = 0.5j * (jnp2jqt(jnp.eye(n_max, k=1) - jnp.eye(n_max, k=-1)))
             ops["cos(2φ)"] = 0.5 * (jnp2jqt(jnp.eye(n_max, k=2) + jnp.eye(n_max, k=-2)))
-            ops["sin(2φ)"] = 0.5j * (
-                jnp2jqt(jnp.eye(n_max, k=2) - jnp.eye(n_max, k=-2))
-            )
+            ops["sin(2φ)"] = 0.5j * (jnp2jqt(jnp.eye(n_max, k=2) - jnp.eye(n_max, k=-2)))
 
             ops["n"] = jnp2jqt(jnp.diag(n_array))
             n_minus_ng_array = n_array - 2 * self.params["ng"] * jnp.ones(n_max)
@@ -158,18 +143,16 @@ class Transmon(FluxDevice):
         """Return full H in specified basis."""
         ops = self.original_ops
         return ops["H_charge"] - self.Ej * ops["cos(φ)"]
-
+    
     def get_H_truncated(self):
         """Return truncated H in specified basis."""
-        phi_op = self.original_ops["phi"]
-        fourth_order_term = -(1 / 24) * self.Ej * phi_op @ phi_op @ phi_op @ phi_op
-        sixth_order_term = (
-            (1 / 720) * self.Ej * phi_op @ phi_op @ phi_op @ phi_op @ phi_op @ phi_op
-        )
+        phi_op = self.original_ops["phi"]  
+        fourth_order_term =  -(1 / 24) * self.Ej * phi_op @ phi_op @ phi_op @ phi_op 
+        sixth_order_term = (1 / 720) * self.Ej * phi_op @ phi_op @ phi_op @ phi_op @ phi_op @ phi_op
         return self.get_H_linear() + fourth_order_term + sixth_order_term
-
+    
     def _get_H_in_original_basis(self):
-        """This returns the Hamiltonian in the original specified basis. This can be overridden by subclasses."""
+        """ This returns the Hamiltonian in the original specified basis. This can be overridden by subclasses."""
 
         if self.hamiltonian == HamiltonianTypes.linear:
             return self.get_H_linear()
@@ -183,26 +166,24 @@ class Transmon(FluxDevice):
         if self.hamiltonian == HamiltonianTypes.linear:
             return 0.5 * self.Ej * (2 * jnp.pi * phi) ** 2
         elif self.hamiltonian == HamiltonianTypes.full:
-            return -self.Ej * jnp.cos(2 * jnp.pi * phi)
+            return - self.Ej * jnp.cos(2 * jnp.pi * phi)
         elif self.hamiltonian == HamiltonianTypes.truncated:
             phi_scaled = 2 * jnp.pi * phi
-            second_order = 0.5 * self.Ej * phi_scaled**2
-            fourth_order = -(1 / 24) * self.Ej * phi_scaled**4
-            sixth_order = (1 / 720) * self.Ej * phi_scaled**6
+            second_order = 0.5 * self.Ej * phi_scaled ** 2
+            fourth_order =  -(1 / 24) * self.Ej * phi_scaled ** 4
+            sixth_order = (1 / 720) * self.Ej * phi_scaled ** 6
             return second_order + fourth_order + sixth_order
 
     def calculate_wavefunctions(self, phi_vals):
         """Calculate wavefunctions at phi_exts.
-
+        
         TODO: this is not currently being used for plotting... needs to be updated!
         """
 
         if self.basis == BasisTypes.fock:
             return super().calculate_wavefunctions(phi_vals)
         elif self.basis == BasisTypes.singlecharge:
-            raise NotImplementedError(
-                "Wavefunctions for single charge basis not yet implemented."
-            )
+            raise NotImplementedError("Wavefunctions for single charge basis not yet implemented.")
         elif self.basis in [
             BasisTypes.charge,
             BasisTypes.singlecharge_even,
@@ -214,7 +195,7 @@ class Transmon(FluxDevice):
                 BasisTypes.singlecharge_even,
                 BasisTypes.singlecharge_odd,
             ]:
-                n_labels = 1 / 2 * jnp.diag(ops["n"].data)
+                n_labels = 1/2 * jnp.diag(ops["n"].data)
             else:
                 n_labels = jnp.diag(ops["n"].data)
 

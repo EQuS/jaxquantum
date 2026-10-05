@@ -29,11 +29,11 @@ offset detection) were identified by studying the dynamiqs library
 
 from __future__ import annotations
 
+import numpy as np
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import jax.numpy as jnp
-import numpy as np
 from flax import struct
 from jax import Array
 
@@ -43,10 +43,10 @@ if TYPE_CHECKING:
 
 from jaxquantum.core.settings import _maybe_shard
 
+
 # ---------------------------------------------------------------------------
 # Slice helper
 # ---------------------------------------------------------------------------
-
 
 def _dia_slice(k: int) -> slice:
     """Slice selecting the valid data positions for diagonal offset k.
@@ -63,7 +63,6 @@ def _dia_slice(k: int) -> slice:
 # ---------------------------------------------------------------------------
 # Raw data container
 # ---------------------------------------------------------------------------
-
 
 @struct.dataclass
 class SparseDiaData:
@@ -141,7 +140,6 @@ class SparseDiaData:
 # Helper: dense → SparseDIA conversion
 # ---------------------------------------------------------------------------
 
-
 def _dense_to_sparsedia(arr: np.ndarray) -> tuple[tuple, np.ndarray]:
     """Extract non-zero diagonal offsets and padded values from a dense array.
 
@@ -163,9 +161,7 @@ def _dense_to_sparsedia(arr: np.ndarray) -> tuple[tuple, np.ndarray]:
     # Union non-zero diagonals across all batch elements via a single mask + nonzero call.
     arr_np = np.asarray(arr)
     flat_np = arr_np.reshape(-1, n, n)
-    union_mask = np.any(
-        flat_np != 0, axis=0
-    )  # (n, n): True where any batch elem is non-zero
+    union_mask = np.any(flat_np != 0, axis=0)   # (n, n): True where any batch elem is non-zero
     r, c = np.nonzero(union_mask)
     offsets = tuple(sorted(set((c - r).tolist()))) if len(r) > 0 else (0,)
 
@@ -184,7 +180,7 @@ def _dense_to_sparsedia(arr: np.ndarray) -> tuple[tuple, np.ndarray]:
 # SparseDiaImpl
 # ---------------------------------------------------------------------------
 
-from jaxquantum.core.qarray import DenseImpl, QarrayImpl, QarrayImplType
+from jaxquantum.core.qarray import QarrayImpl, DenseImpl, QarrayImplType  # noqa: E402
 
 
 @struct.dataclass
@@ -206,7 +202,7 @@ class SparseDiaImpl(QarrayImpl):
     _offsets: tuple = struct.field(pytree_node=False)
     _diags: Array
 
-    PROMOTION_ORDER = 0
+    PROMOTION_ORDER = 0  # noqa: RUF012 — not a struct field
 
     # ------------------------------------------------------------------
     # Construction
@@ -220,7 +216,7 @@ class SparseDiaImpl(QarrayImpl):
     # state's sharding to drive parallelism. Benchmark before committing — this
     # is a behavior change for users who want SparseDIA sharding intentionally.
     @classmethod
-    def _make(cls, offsets: tuple, diags: Array) -> SparseDiaImpl:
+    def _make(cls, offsets: tuple, diags: Array) -> "SparseDiaImpl":
         """Construct a ``SparseDiaImpl``, applying the configured default sharding.
 
         All internal construction sites route through this so every Qarray
@@ -230,7 +226,7 @@ class SparseDiaImpl(QarrayImpl):
         return cls(_offsets=offsets, _diags=_maybe_shard(diags))
 
     @classmethod
-    def from_data(cls, data) -> SparseDiaImpl:
+    def from_data(cls, data) -> "SparseDiaImpl":
         """Wrap *data* in a new ``SparseDiaImpl``.
 
         Accepts either a :class:`SparseDiaData` container (direct wrap) or
@@ -250,7 +246,7 @@ class SparseDiaImpl(QarrayImpl):
         return cls._make(offsets, jnp.array(diags_np))
 
     @classmethod
-    def from_diags(cls, offsets: tuple, diags: Array) -> SparseDiaImpl:
+    def from_diags(cls, offsets: tuple, diags: Array) -> "SparseDiaImpl":
         """Directly construct from sorted offsets and padded diagonal array.
 
         This is the preferred factory when diagonal structure is known in
@@ -291,11 +287,11 @@ class SparseDiaImpl(QarrayImpl):
     # Arithmetic
     # ------------------------------------------------------------------
 
-    def mul(self, scalar) -> SparseDiaImpl:
+    def mul(self, scalar) -> "SparseDiaImpl":
         """Scalar multiplication — scales all diagonal values."""
         return SparseDiaImpl._make(self._offsets, scalar * self._diags)
 
-    def neg(self) -> SparseDiaImpl:
+    def neg(self) -> "SparseDiaImpl":
         """Negation."""
         return SparseDiaImpl._make(self._offsets, -self._diags)
 
@@ -329,15 +325,13 @@ class SparseDiaImpl(QarrayImpl):
         * Others               → coerce then delegate
         """
         if isinstance(other, DenseImpl):
-            return DenseImpl._make(
-                _sparsedia_matmul_dense(self._offsets, self._diags, other._data)
-            )
+            return DenseImpl._make(_sparsedia_matmul_dense(
+                self._offsets, self._diags, other._data
+            ))
         if isinstance(other, SparseDiaImpl):
             offsets, diags = _sparsedia_matmul_sparsedia(
-                self._offsets,
-                self._diags,
-                other._offsets,
-                other._diags,
+                self._offsets, self._diags,
+                other._offsets, other._diags,
             )
             return SparseDiaImpl._make(offsets, diags)
         a, b = self._coerce(other)
@@ -345,7 +339,7 @@ class SparseDiaImpl(QarrayImpl):
             return a.matmul(b)
         return a.matmul(b)
 
-    def dag(self) -> SparseDiaImpl:
+    def dag(self) -> "SparseDiaImpl":
         """Conjugate transpose without densification.
 
         Negates every offset and rearranges the stored values so that the
@@ -354,7 +348,7 @@ class SparseDiaImpl(QarrayImpl):
         new_offsets = tuple(-k for k in self._offsets)
         new_diags = jnp.zeros_like(self._diags)
         for i, k in enumerate(self._offsets):
-            s = _dia_slice(k)  # valid data slice for offset k
+            s = _dia_slice(k)    # valid data slice for offset k
             sm = _dia_slice(-k)  # valid data slice for offset -k (the new position)
             new_diags = new_diags.at[..., i, sm].set(jnp.conj(self._diags[..., i, s]))
         return SparseDiaImpl._make(new_offsets, new_diags)
@@ -373,7 +367,7 @@ class SparseDiaImpl(QarrayImpl):
             return a.kron(b)
         return a.kron(b)
 
-    def tidy_up(self, atol) -> SparseDiaImpl:
+    def tidy_up(self, atol) -> "SparseDiaImpl":
         """Zero diagonal values whose magnitude is below *atol*."""
         diags = self._diags
         real_part = jnp.where(jnp.abs(jnp.real(diags)) < atol, 0.0, jnp.real(diags))
@@ -388,7 +382,7 @@ class SparseDiaImpl(QarrayImpl):
     # Conversions
     # ------------------------------------------------------------------
 
-    def to_dense(self) -> DenseImpl:
+    def to_dense(self) -> "DenseImpl":
         """Convert to a ``DenseImpl`` by summing diagonal contributions."""
         n = self._diags.shape[-1]
         batch_shape = self._diags.shape[:-2]
@@ -404,11 +398,11 @@ class SparseDiaImpl(QarrayImpl):
             result = result.at[..., row_idx, col_idx].set(vals)
         return DenseImpl._make(result)
 
-    def to_sparse_bcoo(self) -> SparseBCOOImpl:
+    def to_sparse_bcoo(self) -> "SparseBCOOImpl":
         """Convert to a ``SparseBCOOImpl`` (BCOO) via dense."""
         return self.to_dense().to_sparse_bcoo()
 
-    def to_sparse_dia(self) -> SparseDiaImpl:
+    def to_sparse_dia(self) -> "SparseDiaImpl":
         """Return self (already SparseDIA)."""
         return self
 
@@ -422,7 +416,7 @@ class SparseDiaImpl(QarrayImpl):
         return jnp.eye(n, dtype=dtype)
 
     @classmethod
-    def _scaled_identity(cls, n: int, scalar, dtype=None) -> SparseDiaImpl:
+    def _scaled_identity(cls, n: int, scalar, dtype=None) -> "SparseDiaImpl":
         """Create a batched scaled identity without dense storage."""
         scalar = jnp.ones((), dtype=dtype) * (jnp.asarray(scalar) + 0.0j)
         diags = jnp.broadcast_to(
@@ -462,25 +456,25 @@ class SparseDiaImpl(QarrayImpl):
         """Frobenius norm computed directly from stored diagonal values."""
         return jnp.sqrt(jnp.sum(jnp.abs(self._diags) ** 2))
 
-    def real(self) -> SparseDiaImpl:
+    def real(self) -> "SparseDiaImpl":
         """Element-wise real part of stored values."""
         return SparseDiaImpl._make(
             self._offsets,
             jnp.real(self._diags).astype(self._diags.dtype),
         )
 
-    def imag(self) -> SparseDiaImpl:
+    def imag(self) -> "SparseDiaImpl":
         """Element-wise imaginary part of stored values."""
         return SparseDiaImpl._make(
             self._offsets,
             jnp.imag(self._diags).astype(self._diags.dtype),
         )
 
-    def conj(self) -> SparseDiaImpl:
+    def conj(self) -> "SparseDiaImpl":
         """Element-wise complex conjugate of stored values."""
         return SparseDiaImpl._make(self._offsets, jnp.conj(self._diags))
 
-    def powm(self, n: int) -> SparseDiaImpl:
+    def powm(self, n: int) -> "SparseDiaImpl":
         """Integer matrix power staying SparseDIA via binary exponentiation.
 
         Uses O(log n) SparseDIA @ SparseDIA multiplications rather than
@@ -499,9 +493,7 @@ class SparseDiaImpl(QarrayImpl):
             raise ValueError("powm requires n >= 0")
         if n == 0:
             size = self._diags.shape[-1]
-            eye_diags = jnp.ones(
-                (*self._diags.shape[:-2], 1, size), dtype=self._diags.dtype
-            )
+            eye_diags = jnp.ones((*self._diags.shape[:-2], 1, size), dtype=self._diags.dtype)
             return SparseDiaImpl._make((0,), eye_diags)
         if n == 1:
             return self
@@ -513,7 +505,6 @@ class SparseDiaImpl(QarrayImpl):
 # ---------------------------------------------------------------------------
 # Pure-function helpers (operate on raw arrays, no QarrayImpl wrapping)
 # ---------------------------------------------------------------------------
-
 
 def _sparsedia_add(
     a: SparseDiaImpl,
@@ -574,7 +565,7 @@ def _sparsedia_matmul_dense(
         dtype=jnp.result_type(diags.dtype, B.dtype),
     )
     for i, k in enumerate(offsets):
-        s = _dia_slice(k)  # valid column slice for diagonal k
+        s = _dia_slice(k)    # valid column slice for diagonal k
         sm = _dia_slice(-k)  # corresponding row slice for the result
         result = result.at[..., sm, :].add(diags[..., i, s, None] * B[..., s, :])
     return result
@@ -608,11 +599,9 @@ def _sparsedia_rmatmul_dense(
         dtype=jnp.result_type(diags.dtype, B.dtype),
     )
     for i, k in enumerate(offsets):
-        s = _dia_slice(k)  # valid column slice for diagonal k
+        s = _dia_slice(k)    # valid column slice for diagonal k
         sm = _dia_slice(-k)  # complementary slice for B columns / result columns
-        result = result.at[..., :, s].add(
-            B[..., :, sm] * diags[..., i, s][..., None, :]
-        )
+        result = result.at[..., :, s].add(B[..., :, sm] * diags[..., i, s][..., None, :])
     return result
 
 
@@ -645,7 +634,9 @@ def _sparsedia_matmul_sparsedia(
         Tuple of (out_offsets, out_diags).
     """
     n = left_diags.shape[-1]
-    batch_shape = jnp.broadcast_shapes(left_diags.shape[:-2], right_diags.shape[:-2])
+    batch_shape = jnp.broadcast_shapes(
+        left_diags.shape[:-2], right_diags.shape[:-2]
+    )
 
     # Pre-filter output offsets: diagonal pairs where |k1+k2| >= n are zero.
     out_offset_set = sorted(
@@ -665,7 +656,7 @@ def _sparsedia_matmul_sparsedia(
             if abs(kout) >= n:
                 continue
             oi = out_offset_idx[kout]
-            s = _dia_slice(k2)  # valid column slice for right diagonal k2
+            s = _dia_slice(k2)    # valid column slice for right diagonal k2
             sm = _dia_slice(-k2)  # complementary slice for left diagonal
             contribution = left_diags[..., li, sm] * right_diags[..., ri, s]
             out_diags = out_diags.at[..., oi, s].add(contribution)
@@ -700,7 +691,7 @@ def _sparsedia_kron(a: SparseDiaImpl, b: SparseDiaImpl) -> SparseDiaImpl:
     """
     n_A = a._diags.shape[-1]
     m = b._diags.shape[-1]
-
+    
     # N = n_A * m
     # batch_shape = jnp.broadcast_shapes(a._diags.shape[:-2], b._diags.shape[:-2])
 
@@ -711,8 +702,8 @@ def _sparsedia_kron(a: SparseDiaImpl, b: SparseDiaImpl) -> SparseDiaImpl:
         for ri, kB in enumerate(b._offsets):
             kout = kA * m + kB
             # Full output diagonal (length N) via repeat/tile — fully vectorised
-            left_rep = jnp.repeat(a._diags[..., li, :], m, axis=-1)  # (*batch, N)
-            right_tiled = jnp.tile(b._diags[..., ri, :], n_A)  # (*batch, N)
+            left_rep = jnp.repeat(a._diags[..., li, :], m, axis=-1)   # (*batch, N)
+            right_tiled = jnp.tile(b._diags[..., ri, :], n_A)          # (*batch, N)
             contrib = left_rep * right_tiled
             if kout in out_accum:
                 out_accum[kout] = out_accum[kout] + contrib

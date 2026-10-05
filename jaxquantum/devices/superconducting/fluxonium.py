@@ -1,13 +1,13 @@
 """Fluxonium."""
 
-import jax.numpy as jnp
 from flax import struct
 from jax import config
+import jax.numpy as jnp
 
-from jaxquantum.core import cosm, sinm
-from jaxquantum.core.operators import create, destroy, identity
-from jaxquantum.devices.base.base import HamiltonianTypes
 from jaxquantum.devices.superconducting.flux_base import FluxDevice
+from jaxquantum.devices.base.base import HamiltonianTypes
+from jaxquantum.core.operators import identity, destroy, create
+from jaxquantum.core import cosm, sinm
 
 config.update("jax_enable_x64", True)
 
@@ -50,7 +50,10 @@ class Fluxonium(FluxDevice):
         """Return linear terms in H."""
         w = self.get_linear_frequency()
         ops = self.linear_ops
-        return w * (ops["a_dag"] @ ops["a"] + 0.5 * ops["id"])
+        return w * (
+            ops["a_dag"] @ ops["a"]
+            + 0.5 * ops["id"]
+        )
 
     def get_H_full(self):
         """Return full H in linear basis."""

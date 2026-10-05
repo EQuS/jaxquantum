@@ -1,18 +1,20 @@
 """Measurements."""
 
-from collections.abc import Callable
-from functools import partial, reduce
-from typing import NamedTuple
-
-import jax.numpy as jnp
 import optax
-from jax import Array, config, jit, lax, value_and_grad, vmap
-from jax_tqdm import scan_tqdm
+import jax.numpy as jnp
+
+from collections.abc import Callable
 from matplotlib import pyplot as plt
 from tqdm import tqdm
+from typing import Optional, NamedTuple
+from functools import partial, reduce
 
-from jaxquantum.core.operators import identity
+from jax import config, Array, jit, value_and_grad, lax, vmap
+
 from jaxquantum.core.qarray import Qarray, powm
+from jaxquantum.core.operators import identity
+
+from jax_tqdm import scan_tqdm
 
 config.update("jax_enable_x64", True)
 
@@ -52,7 +54,8 @@ def overlap(rho: Qarray, sigma: Qarray) -> Array:
         return (rho.dag() @ sigma).trace()
 
 
-def fidelity(rho: Qarray, sigma: Qarray, force_positivity: bool = False) -> jnp.ndarray:
+def fidelity(rho: Qarray, sigma: Qarray, force_positivity: bool=False) -> (
+        jnp.ndarray):
     """Fidelity between two states.
 
     Args:
@@ -68,10 +71,9 @@ def fidelity(rho: Qarray, sigma: Qarray, force_positivity: bool = False) -> jnp.
 
     sqrt_rho = powm(rho, 0.5, clip_eigvals=force_positivity)
 
-    return jnp.real(
-        ((powm(sqrt_rho @ sigma @ sqrt_rho, 0.5, clip_eigvals=force_positivity)).tr())
-        ** 2
-    )
+    return jnp.real(((powm(sqrt_rho @ sigma @ sqrt_rho, 0.5,
+                           clip_eigvals=force_positivity)).tr())
+                    ** 2)
 
 
 def _reconstruct_density_matrix(params: jnp.ndarray, dim: int) -> jnp.ndarray:
@@ -100,7 +102,8 @@ def _reconstruct_density_matrix(params: jnp.ndarray, dim: int) -> jnp.ndarray:
     return rho_unnormalized / jnp.where(trace == 0, 1.0, trace)
 
 
-def _parametrize_density_matrix(rho_data: jnp.ndarray, dim: int) -> jnp.ndarray:
+def _parametrize_density_matrix(rho_data: jnp.ndarray, dim: int) -> (
+        jnp.ndarray):
     """
     Calculates the parameter vector from a density matrix using Cholesky decomposition.
     This is the inverse of the _reconstruct_density_matrix function.
@@ -185,7 +188,8 @@ def _run_tomography_scan(
         # separate version of the code for each value of this flag.
         if compute_infidelity:
             rho = Qarray.create(_reconstruct_density_matrix(params, dim))
-            fid = fidelity(Qarray.create(true_rho_data), rho, force_positivity=True)
+            fid = fidelity(Qarray.create(true_rho_data), rho,
+                           force_positivity=True)
             infidelity = 1.0 - fid
         else:
             infidelity = jnp.nan
@@ -211,7 +215,7 @@ class MLETomographyResult(NamedTuple):
     params_history: list
     loss_history: list
     grads_history: list
-    infidelity_history: list | None
+    infidelity_history: Optional[list]
 
 
 class QuantumStateTomography:
@@ -220,8 +224,8 @@ class QuantumStateTomography:
         rho_guess: Qarray,
         measurement_basis: Qarray,
         measurement_results: jnp.ndarray,
-        complete_basis: Qarray | None = None,
-        true_rho: Qarray | None = None,
+        complete_basis: Optional[Qarray] = None,
+        true_rho: Optional[Qarray] = None,
     ):
         """
         Reconstruct a quantum state from measurement results using quantum state tomography.
@@ -231,8 +235,8 @@ class QuantumStateTomography:
             rho_guess (Qarray): The initial guess for the quantum state.
             measurement_basis (Qarray): The basis in which measurements are performed.
             measurement_results (jnp.ndarray): The results of the measurements.
-            complete_basis (Optional[Qarray]): The complete basis for state
-            reconstruction used when using direct inversion.
+            complete_basis (Optional[Qarray]): The complete basis for state 
+            reconstruction used when using direct inversion. 
             Defaults to the measurement basis if not provided.
             true_rho (Optional[Qarray]): The true quantum state, if known.
 
@@ -249,27 +253,28 @@ class QuantumStateTomography:
         self._result = None
 
     @property
-    def result(self) -> MLETomographyResult | None:
+    def result(self) -> Optional[MLETomographyResult]:
         return self._result
+
 
     def quantum_state_tomography_mle(
         self, L1_reg_strength: float = 0.0, epochs: int = 10000, lr: float = 5e-3
     ) -> MLETomographyResult:
-        """Perform quantum state tomography using maximum likelihood
+        """Perform quantum state tomography using maximum likelihood 
         estimation (MLE).
 
-        This method reconstructs the quantum state from measurement results
+        This method reconstructs the quantum state from measurement results 
         by optimizing
-        a likelihood function using gradient descent. The optimization
-        ensures the
+        a likelihood function using gradient descent. The optimization 
+        ensures the 
         resulting density matrix is positive semi-definite with trace 1.
 
         Args:
-            L1_reg_strength (float, optional): Strength of L1
+            L1_reg_strength (float, optional): Strength of L1 
             regularization. Defaults to 0.0.
-            epochs (int, optional): Number of optimization iterations.
+            epochs (int, optional): Number of optimization iterations. 
             Defaults to 10000.
-            lr (float, optional): Learning rate for the Adam optimizer.
+            lr (float, optional): Learning rate for the Adam optimizer. 
             Defaults to 5e-3.
 
         Returns:
@@ -278,7 +283,7 @@ class QuantumStateTomography:
                 - params_history: List of parameter values during optimization
                 - loss_history: List of loss values during optimization
                 - grads_history: List of gradient values during optimization
-                - infidelity_history: List of infidelities if true_rho was
+                - infidelity_history: List of infidelities if true_rho was 
                 provided, None otherwise
         """
 
@@ -329,18 +334,19 @@ class QuantumStateTomography:
     def quantum_state_tomography_direct(
         self,
     ) -> Qarray:
+
         """Perform quantum state tomography using direct inversion.
-
-        This method reconstructs the quantum state from measurement results by
+    
+        This method reconstructs the quantum state from measurement results by 
         directly solving a system of linear equations. The method assumes that
-        the measurement basis is complete and the measurement results are
+        the measurement basis is complete and the measurement results are 
         noise-free.
-
+    
         Returns:
             Qarray: Reconstructed quantum state.
         """
 
-        # Compute overlaps of measurement and complete operator bases
+    # Compute overlaps of measurement and complete operator bases
         A = jnp.einsum("ijk,ljk->il", self.complete_basis, self.measurement_basis)
         # Solve the linear system to find the coefficients
         coefficients = jnp.linalg.solve(A, self.measurement_results)
@@ -372,7 +378,6 @@ class QuantumStateTomography:
 
         plt.show()
 
-
 def tensor_basis(single_basis: Qarray, n: int) -> Qarray:
     """Construct n-fold tensor product basis from a single-system basis.
 
@@ -390,9 +395,8 @@ def tensor_basis(single_basis: Qarray, n: int) -> Qarray:
 
     single_basis = single_basis.data
     b, _, _ = single_basis.shape
-    indices = jnp.stack(
-        jnp.meshgrid(*[jnp.arange(b)] * n, indexing="ij"), axis=-1
-    ).reshape(-1, n)  # shape (b^n, n)
+    indices = jnp.stack(jnp.meshgrid(*[jnp.arange(b)] * n, indexing="ij"),
+                        axis=-1).reshape(-1, n)  # shape (b^n, n)
 
     # Select the operators based on indices: shape (b^n, n, d, d)
     selected = single_basis[indices]  # shape: (b^n, n, d, d)
@@ -409,8 +413,8 @@ def _quantum_process_tomography(
     map: Callable[[Qarray], Qarray],
     physical_state_basis: Qarray,
     physical_operator_basis: Qarray,
-    logical_state_basis: Qarray | None = None,
-    logical_operator_basis: Qarray | None = None,
+    logical_state_basis: Optional[Qarray] = None,
+    logical_operator_basis: Optional[Qarray] = None,
 ) -> Qarray:
 
     if logical_state_basis is None:
@@ -420,30 +424,30 @@ def _quantum_process_tomography(
 
     dsqr = logical_state_basis.bdims[-1]
 
-    d = int(jnp.sqrt(dsqr + 1))
+    d = int(jnp.sqrt(dsqr+1))
 
     choi = Qarray.create(jnp.zeros((d, d))) ^ Qarray.create(jnp.zeros((d, d)))
 
-    with tqdm(total=d * d) as pbar:
+    with (tqdm(total=d * d) as pbar):
         for k in range(dsqr):
-            rho_k = physical_state_basis[k] @ physical_state_basis[k].dag()
+                rho_k = physical_state_basis[k] @ physical_state_basis[k].dag()
 
-            E_rho_k = map(rho_k)
+                E_rho_k = map(rho_k)
 
-            measurement_results = jnp.real(
-                jnp.einsum("ijk,jk->i", physical_operator_basis.data, E_rho_k.data)
-            )
+                measurement_results = jnp.real(
+                    jnp.einsum('ijk,jk->i', physical_operator_basis.data,
+                               E_rho_k.data))
 
-            QST = QuantumStateTomography(
-                rho_guess=identity(d) / d,
-                measurement_results=measurement_results,
-                measurement_basis=logical_operator_basis,
-            )
-            res = QST.quantum_state_tomography_mle()
-            r = res.rho
-            print("----------------------")
-            print(logical_state_basis[k] @ logical_state_basis[k].dag())
-            print(r)
-            choi += (logical_state_basis[k] @ logical_state_basis[k].dag()) ^ r
-            pbar.update(1)
+                QST = QuantumStateTomography(rho_guess=identity(d)/d,
+                                             measurement_results=measurement_results,
+                                             measurement_basis=logical_operator_basis,
+                                             )
+                res = QST.quantum_state_tomography_mle()
+                r = res.rho
+                print("----------------------")
+                print(logical_state_basis[k] @ logical_state_basis[k].dag())
+                print(r)
+                choi += (logical_state_basis[k] @ logical_state_basis[k].dag()
+                         ) ^ r
+                pbar.update(1)
     return choi

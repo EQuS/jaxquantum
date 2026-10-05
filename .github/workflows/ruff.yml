@@ -7,11 +7,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/ruff-action@v3
         with:
-          version: "0.16.10"
-          args: check
+          args: check --fix
           src: "./jaxquantum"
       - uses: astral-sh/ruff-action@v3
         with:
-          version: "0.16.10"
-          args: format --check
+          args: format
           src: "./jaxquantum"

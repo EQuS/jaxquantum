@@ -1,11 +1,12 @@
 """Kerr Nonlinear Oscillator"""
 
-import jax.numpy as jnp
 from flax import struct
 from jax import config
 
-from jaxquantum.core.operators import create, destroy, identity
-from jaxquantum.devices.base.base import BasisTypes, Device, HamiltonianTypes
+import jax.numpy as jnp
+
+from jaxquantum.devices.base.base import Device, BasisTypes, HamiltonianTypes
+from jaxquantum.core.operators import identity, destroy, create
 
 config.update("jax_enable_x64", True)
 
@@ -59,4 +60,6 @@ class KNO(Device):
         α = self.get_anharm()
         ops = self.linear_ops
         linear = self.get_linear_frequency() * ops["a_dag"] @ ops["a"]
-        return linear + (α / 2) * (ops["a_dag"] @ ops["a_dag"] @ ops["a"] @ ops["a"])
+        return linear + (α / 2) * (
+            ops["a_dag"] @ ops["a_dag"] @ ops["a"] @ ops["a"]
+        )

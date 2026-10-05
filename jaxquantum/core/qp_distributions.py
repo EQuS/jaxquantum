@@ -1,10 +1,9 @@
-import jax
 import jax.numpy as jnp
 from jax import config, lax, vmap
 from jax.scipy.special import factorial
+import jax
 
 config.update("jax_enable_x64", True)
-
 
 def wigner(psi, xvec, yvec, method="clenshaw", g=2):
     """Wigner function for a state vector or density matrix at points
@@ -62,7 +61,10 @@ def wigner(psi, xvec, yvec, method="clenshaw", g=2):
     if method == "fft":
         raise NotImplementedError("Only the 'clenshaw' method is implemented.")
 
-    if method == "iterative" or method == "laguerre":
+    if method == "iterative":
+        raise NotImplementedError("Only the 'clenshaw' method is implemented.")
+
+    elif method == "laguerre":
         raise NotImplementedError("Only the 'clenshaw' method is implemented.")
 
     elif method == "clenshaw":
@@ -103,7 +105,7 @@ def _wigner_clenshaw(rho, xvec, yvec, g):
     M = jnp.prod(rho.shape[0])
     X, Y = jnp.meshgrid(xvec, yvec)
     A = 0.5 * g * (X + 1.0j * Y)
-    B = jnp.abs(2 * A)
+    B = jnp.abs(2*A)
 
     B *= B
 
@@ -113,7 +115,6 @@ def _wigner_clenshaw(rho, xvec, yvec, g):
     # using Horner's method
 
     rho = rho * (2 * jnp.ones((M, M)) - jnp.diag(jnp.ones(M)))
-
     def loop(i: int, w: jax.Array) -> jax.Array:
         i = M - 2 - i
         w = w * (2 * A * (i + 1) ** (-0.5))
@@ -123,9 +124,8 @@ def _wigner_clenshaw(rho, xvec, yvec, g):
 
     return w.real * jnp.exp(-B * 0.5) * (g * g * 0.5 / jnp.pi)
 
-
-def _extract_diag_element(rho: jnp.array, L: int, n: int):
-    """ "
+def _extract_diag_element(rho: jnp.array, L: int, n:int):
+    """"
     Extract element at index n from diagonal L of matrix rho.
     Heavily inspired from https://github.com/dynamiqs/dynamiqs
     """
@@ -134,7 +134,6 @@ def _extract_diag_element(rho: jnp.array, L: int, n: int):
     row = jnp.maximum(-L, 0) + n
     col = jnp.maximum(L, 0) + n
     return rho[row, col]
-
 
 def _wig_laguerre_val(L, x, rho, N):
     r"""
@@ -156,16 +155,16 @@ def _wig_laguerre_val(L, x, rho, N):
         y0 = cm2 * jnp.ones_like(x)
         y1 = cm1 * jnp.ones_like(x)
 
-        def loop(
-            j: int, args: tuple[jax.Array, jax.Array]
-        ) -> tuple[jax.Array, jax.Array]:
+        def loop(j: int, args: tuple[jax.Array, jax.Array]) -> tuple[
+            jax.Array, jax.Array]:
             def body() -> tuple[jax.Array, jax.Array]:
                 k = N + 1 - L - j
                 y0, y1 = args
                 ckm1 = _extract_diag_element(rho, L, -j)
                 y0, y1 = (
                     ckm1 - y1 * (k * (L + k) / ((L + k + 1) * (k + 1))) ** 0.5,
-                    y0 - y1 * (L + 2 * k - x + 1) * ((L + k + 1) * (k + 1)) ** -0.5,
+                    y0 - y1 * (L + 2 * k - x + 1) * (
+                                (L + k + 1) * (k + 1)) ** -0.5,
                 )
 
                 return y0, y1
@@ -176,9 +175,10 @@ def _wig_laguerre_val(L, x, rho, N):
 
         return y0 - y1 * (L + 1 - x) * (L + 1) ** (-0.5)
 
-    return jax.lax.cond(
-        N - L == 1, len_c_1, lambda: jax.lax.cond(N - L == 2, len_c_2, len_c_other)
-    )
+
+    return jax.lax.cond(N - L == 1, len_c_1, lambda: jax.lax.cond(N - L == 2,
+                                                               len_c_2,
+                                                       len_c_other))
 
 
 def qfunc(psi, xvec, yvec, g=2):
@@ -230,8 +230,12 @@ def qfunc(psi, xvec, yvec, g=2):
 
             def add_chunk(index, total):
                 start = index * chunk_size
-                chunk_values = lax.dynamic_slice_in_dim(values, start, chunk_size)
-                chunk_vectors = lax.dynamic_slice_in_dim(vectors, start, chunk_size)
+                chunk_values = lax.dynamic_slice_in_dim(
+                    values, start, chunk_size
+                )
+                chunk_vectors = lax.dynamic_slice_in_dim(
+                    vectors, start, chunk_size
+                )
                 components = vmap(
                     lambda vector: _qfunc_iterative_single(
                         vector, alpha_grid, prefactor, g

@@ -1,12 +1,13 @@
 """States."""
 
+from typing import List
+from jax import config
 from math import prod
 
 import jax.numpy as jnp
-from jax import config
 from jax.nn import one_hot
 
-from jaxquantum.core.qarray import Qarray, QarrayImplType, tensor
+from jaxquantum.core.qarray import Qarray, tensor, QarrayImplType
 from jaxquantum.core.settings import SETTINGS
 
 config.update("jax_enable_x64", True)
@@ -52,19 +53,11 @@ def sigmax(implementation=None) -> Qarray:
         # Offset -1: valid at [0:1] → diag[0] = A[1,0] = 1.0, diag[1] = 0 (trailing zero)
         # Offset +1: valid at [1:]  → diag[0] = 0 (leading zero), diag[1] = A[0,1] = 1.0
         diags = jnp.array([[1.0, 0.0], [0.0, 1.0]])
-        return _impl_from(
-            QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1, 1), diags=diags
-        )
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1, 1), diags=diags)
     if impl_type == QarrayImplType.CUQUANTUM:
-        return _impl_from(
-            QarrayImplType.CUQUANTUM,
-            "single_site",
-            jnp.array([[0.0, 1.0], [1.0, 0.0]]),
-            2,
-        )
-    return Qarray.create(
-        jnp.array([[0.0, 1.0], [1.0, 0.0]]), implementation=implementation
-    )
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site",
+                          jnp.array([[0.0, 1.0], [1.0, 0.0]]), 2)
+    return Qarray.create(jnp.array([[0.0, 1.0], [1.0, 0.0]]), implementation=implementation)
 
 
 def sigmay(implementation=None) -> Qarray:
@@ -76,19 +69,11 @@ def sigmay(implementation=None) -> Qarray:
     impl_type = _impl_type(implementation)
     if impl_type == QarrayImplType.SPARSE_DIA:
         diags = jnp.array([[1.0j, 0.0], [0.0, -1.0j]])
-        return _impl_from(
-            QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1, 1), diags=diags
-        )
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1, 1), diags=diags)
     if impl_type == QarrayImplType.CUQUANTUM:
-        return _impl_from(
-            QarrayImplType.CUQUANTUM,
-            "single_site",
-            jnp.array([[0.0, -1.0j], [1.0j, 0.0]]),
-            2,
-        )
-    return Qarray.create(
-        jnp.array([[0.0, -1.0j], [1.0j, 0.0]]), implementation=implementation
-    )
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site",
+                          jnp.array([[0.0, -1.0j], [1.0j, 0.0]]), 2)
+    return Qarray.create(jnp.array([[0.0, -1.0j], [1.0j, 0.0]]), implementation=implementation)
 
 
 def sigmaz(implementation=None) -> Qarray:
@@ -100,19 +85,11 @@ def sigmaz(implementation=None) -> Qarray:
     impl_type = _impl_type(implementation)
     if impl_type == QarrayImplType.SPARSE_DIA:
         diags = jnp.array([[1.0, -1.0]])
-        return _impl_from(
-            QarrayImplType.SPARSE_DIA, "from_diags", offsets=(0,), diags=diags
-        )
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(0,), diags=diags)
     if impl_type == QarrayImplType.CUQUANTUM:
-        return _impl_from(
-            QarrayImplType.CUQUANTUM,
-            "single_site",
-            jnp.array([[1.0, 0.0], [0.0, -1.0]]),
-            2,
-        )
-    return Qarray.create(
-        jnp.array([[1.0, 0.0], [0.0, -1.0]]), implementation=implementation
-    )
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site",
+                          jnp.array([[1.0, 0.0], [0.0, -1.0]]), 2)
+    return Qarray.create(jnp.array([[1.0, 0.0], [0.0, -1.0]]), implementation=implementation)
 
 
 def hadamard(implementation=None) -> Qarray:
@@ -128,19 +105,12 @@ def hadamard(implementation=None) -> Qarray:
         # offset  0: valid at [0:2] → diag[0]=A[0,0]=s, diag[1]=A[1,1]=-s
         # offset +1: valid at [1]   → diag[0]=0 (leading zero), diag[1]=A[0,1]=s
         diags = jnp.array([[s, 0.0], [s, -s], [0.0, s]])
-        return _impl_from(
-            QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1, 0, 1), diags=diags
-        )
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags",
+                          offsets=(-1, 0, 1), diags=diags)
     if impl_type == QarrayImplType.CUQUANTUM:
-        return _impl_from(
-            QarrayImplType.CUQUANTUM,
-            "single_site",
-            jnp.array([[1.0, 1.0], [1.0, -1.0]]) / jnp.sqrt(2),
-            2,
-        )
-    return Qarray.create(
-        jnp.array([[1, 1], [1, -1]]) / jnp.sqrt(2), implementation=implementation
-    )
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site",
+                          jnp.array([[1.0, 1.0], [1.0, -1.0]]) / jnp.sqrt(2), 2)
+    return Qarray.create(jnp.array([[1, 1], [1, -1]]) / jnp.sqrt(2), implementation=implementation)
 
 
 def sigmam(implementation=None) -> Qarray:
@@ -152,19 +122,11 @@ def sigmam(implementation=None) -> Qarray:
     impl_type = _impl_type(implementation)
     if impl_type == QarrayImplType.SPARSE_DIA:
         diags = jnp.array([[1.0, 0.0]])
-        return _impl_from(
-            QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1,), diags=diags
-        )
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1,), diags=diags)
     if impl_type == QarrayImplType.CUQUANTUM:
-        return _impl_from(
-            QarrayImplType.CUQUANTUM,
-            "single_site",
-            jnp.array([[0.0, 0.0], [1.0, 0.0]]),
-            2,
-        )
-    return Qarray.create(
-        jnp.array([[0.0, 0.0], [1.0, 0.0]]), implementation=implementation
-    )
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site",
+                          jnp.array([[0.0, 0.0], [1.0, 0.0]]), 2)
+    return Qarray.create(jnp.array([[0.0, 0.0], [1.0, 0.0]]), implementation=implementation)
 
 
 def sigmap(implementation=None) -> Qarray:
@@ -176,19 +138,11 @@ def sigmap(implementation=None) -> Qarray:
     impl_type = _impl_type(implementation)
     if impl_type == QarrayImplType.SPARSE_DIA:
         diags = jnp.array([[0.0, 1.0]])
-        return _impl_from(
-            QarrayImplType.SPARSE_DIA, "from_diags", offsets=(1,), diags=diags
-        )
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(1,), diags=diags)
     if impl_type == QarrayImplType.CUQUANTUM:
-        return _impl_from(
-            QarrayImplType.CUQUANTUM,
-            "single_site",
-            jnp.array([[0.0, 1.0], [0.0, 0.0]]),
-            2,
-        )
-    return Qarray.create(
-        jnp.array([[0.0, 1.0], [0.0, 0.0]]), implementation=implementation
-    )
+        return _impl_from(QarrayImplType.CUQUANTUM, "single_site",
+                          jnp.array([[0.0, 1.0], [0.0, 0.0]]), 2)
+    return Qarray.create(jnp.array([[0.0, 1.0], [0.0, 0.0]]), implementation=implementation)
 
 
 def qubit_rotation(theta: float, nx, ny, nz, implementation=None) -> Qarray:
@@ -213,9 +167,7 @@ def qubit_rotation(theta: float, nx, ny, nz, implementation=None) -> Qarray:
             nx * sigmax() + ny * sigmay() + nz * sigmaz()
         )
         return result.to_backend(implementation)
-    return jnp.cos(theta / 2) * identity(
-        2, implementation=implementation
-    ) - 1j * jnp.sin(theta / 2) * (
+    return jnp.cos(theta / 2) * identity(2, implementation=implementation) - 1j * jnp.sin(theta / 2) * (
         nx * sigmax(implementation=implementation)
         + ny * sigmay(implementation=implementation)
         + nz * sigmaz(implementation=implementation)
@@ -237,15 +189,11 @@ def destroy(N, implementation=None) -> Qarray:
         # Single superdiagonal at offset +1; Convention A: 1 leading zero.
         diags = jnp.zeros((1, N), dtype=jnp.float64)
         diags = diags.at[0, 1:].set(jnp.sqrt(jnp.arange(1, N, dtype=jnp.float64)))
-        return _impl_from(
-            QarrayImplType.SPARSE_DIA, "from_diags", offsets=(1,), diags=diags
-        )
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(1,), diags=diags)
     if impl_type == QarrayImplType.CUQUANTUM:
         matrix = jnp.diag(jnp.sqrt(jnp.arange(1, N, dtype=jnp.complex128)), k=1)
         return _impl_from(QarrayImplType.CUQUANTUM, "single_site", matrix, N)
-    return Qarray.create(
-        jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=1), implementation=implementation
-    )
+    return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=1), implementation=implementation)
 
 
 def create(N, implementation=None) -> Qarray:
@@ -262,16 +210,12 @@ def create(N, implementation=None) -> Qarray:
     if impl_type == QarrayImplType.SPARSE_DIA:
         # Single subdiagonal at offset -1; Convention A: 1 trailing zero.
         diags = jnp.zeros((1, N), dtype=jnp.float64)
-        diags = diags.at[0, : N - 1].set(jnp.sqrt(jnp.arange(1, N, dtype=jnp.float64)))
-        return _impl_from(
-            QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1,), diags=diags
-        )
+        diags = diags.at[0, :N - 1].set(jnp.sqrt(jnp.arange(1, N, dtype=jnp.float64)))
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(-1,), diags=diags)
     if impl_type == QarrayImplType.CUQUANTUM:
         matrix = jnp.diag(jnp.sqrt(jnp.arange(1, N, dtype=jnp.complex128)), k=-1)
         return _impl_from(QarrayImplType.CUQUANTUM, "single_site", matrix, N)
-    return Qarray.create(
-        jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=-1), implementation=implementation
-    )
+    return Qarray.create(jnp.diag(jnp.sqrt(jnp.arange(1, N)), k=-1), implementation=implementation)
 
 
 def num(N, implementation=None) -> Qarray:
@@ -288,9 +232,7 @@ def num(N, implementation=None) -> Qarray:
     if impl_type == QarrayImplType.SPARSE_DIA:
         # Main diagonal only; no leading/trailing zeros needed (offset 0).
         diags = jnp.arange(N, dtype=jnp.float64).reshape(1, N)
-        return _impl_from(
-            QarrayImplType.SPARSE_DIA, "from_diags", offsets=(0,), diags=diags
-        )
+        return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags", offsets=(0,), diags=diags)
     if impl_type == QarrayImplType.CUQUANTUM:
         matrix = jnp.diag(jnp.arange(N, dtype=jnp.complex128))
         return _impl_from(QarrayImplType.CUQUANTUM, "single_site", matrix, N)
@@ -311,9 +253,8 @@ def identity(*args, implementation=None, **kwargs) -> Qarray:
         n = args[0] if args else kwargs.get("N", kwargs.get("n", None))
         if n is not None and (len(args) <= 1) and not kwargs:
             diags = jnp.ones((1, int(n)), dtype=jnp.float64)
-            return _impl_from(
-                QarrayImplType.SPARSE_DIA, "from_diags", offsets=(0,), diags=diags
-            )
+            return _impl_from(QarrayImplType.SPARSE_DIA, "from_diags",
+                              offsets=(0,), diags=diags)
     if impl_type == QarrayImplType.CUQUANTUM:
         n = args[0] if args else kwargs.get("N", kwargs.get("n", None))
         if n is not None and (len(args) <= 1) and not kwargs:
@@ -406,8 +347,7 @@ def squeezing_linear_to_dB(z):
 
 
 def squeezing_dB_to_linear(z_dB):
-    return jnp.log(10 ** (z_dB / 20))
-
+    return jnp.log(10**(z_dB / 20))
 
 # States ---------------------------------------------------------------------
 
@@ -444,8 +384,7 @@ def basis(N: int, k: int, implementation=None):
         implementation=_ket_safe_impl(implementation),
     )
 
-
-def multi_mode_basis_set(Ns: list[int], implementation=None) -> Qarray:
+def multi_mode_basis_set(Ns: List[int], implementation=None) -> Qarray:
     """Creates a multi-mode basis set.
 
     Args:
@@ -507,7 +446,7 @@ def thermal_dm(N: int, n: float, implementation=None) -> Qarray:
     ).unit()
 
 
-def basis_like(A: Qarray, ks: list[int], implementation=None) -> Qarray:
+def basis_like(A: Qarray, ks: List[int], implementation=None) -> Qarray:
     """Creates a |k> (i.e. fock state) ket with the same space dims as A.
 
     Args:
