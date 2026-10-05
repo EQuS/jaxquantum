@@ -464,6 +464,7 @@ def _mesolve_cuquantum(
     from cuquantum.densitymat.jax import (
         ElementaryOperator,
         Operator,
+        State,
         operator_action,
     )
 
@@ -540,9 +541,8 @@ def _mesolve_cuquantum(
         if Ls_term is not None:
             liouvillian.append(Ls_term, dual=False, coeff=1.0)
         rho_shape = rho.shape
-        rho_dot = operator_action(
-            liouvillian, rho.reshape(*space_dims, *space_dims)
-        )
+        rho_state = State(rho.reshape(*space_dims, *space_dims))
+        rho_dot = operator_action(liouvillian, rho_state).get_data()[0]
         return rho_dot.reshape(rho_shape)
 
     try:
@@ -573,7 +573,7 @@ def _sesolve_cuquantum(
     dissipator is involved; the RHS reduces to a single ``-1j * H * ψ``
     application.
     """
-    from cuquantum.densitymat.jax import Operator, operator_action
+    from cuquantum.densitymat.jax import Operator, State, operator_action
 
     H_test = H if isinstance(H, Qarray) else H(0.0)
     space_dims = tuple(int(d) for d in H_test.space_dims)
@@ -595,7 +595,7 @@ def _sesolve_cuquantum(
         # ψ has shape (*batch, full_dim, 1); collapse trailing 1 for the
         # state grid then restore it after the action.
         flat = psi.reshape(*psi.shape[:-2], *space_dims)
-        psi_dot = operator_action(op, flat)
+        psi_dot = operator_action(op, State(flat)).get_data()[0]
         return psi_dot.reshape(psi_shape)
 
     sol = solve(

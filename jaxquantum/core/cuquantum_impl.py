@@ -220,12 +220,13 @@ def _cuqnt_kron(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
 
 
 def _cuqnt_dag_dense_data(data):
-    """Conjugate-transpose a dense operator data tensor of shape ``[batch, *modes, *modes]``."""
-    num_modes = (data.ndim - 1) // 2
+    """Conjugate-transpose an operator tensor, with or without a batch axis."""
+    num_modes = data.ndim // 2
+    batch_axes = data.ndim - 2 * num_modes
     perm = (
-        (0,)
-        + tuple(range(num_modes + 1, 2 * num_modes + 1))
-        + tuple(range(1, num_modes + 1))
+        tuple(range(batch_axes))
+        + tuple(range(batch_axes + num_modes, batch_axes + 2 * num_modes))
+        + tuple(range(batch_axes, batch_axes + num_modes))
     )
     return jnp.conj(jnp.transpose(data, perm))
 
@@ -476,9 +477,11 @@ class CuquantumImpl(QarrayImpl):
             mode_to_matrix = {}
             idx = 0
             for elem_op in op_prod:
-                # ElementaryOperator data is shape ``[batch=1, *mode_extents,
-                # *mode_extents]``; squeeze the batch axis for the dense case.
-                mat = jnp.squeeze(elem_op.data, axis=0)
+                # Version 0.0.7 stores an unbatched operator without a
+                # leading singleton axis; older versions retain that axis.
+                mat = elem_op.data
+                if mat.ndim == 2 * elem_op.num_modes + 1:
+                    mat = jnp.squeeze(mat, axis=0)
                 # Each elementary op may itself act on multiple modes; for our
                 # dense round-trip we only support the single-mode case (which
                 # is what the rest of jaxquantum builds anyway).

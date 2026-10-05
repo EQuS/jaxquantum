@@ -133,3 +133,4 @@ dmypy.json
 experiments/circuit/state-prep/data/*
 
 local/*
+.local/
