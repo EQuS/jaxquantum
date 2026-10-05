@@ -2,15 +2,14 @@
 Cat Code Qubit
 """
 
-from typing import ClassVar, Tuple
 import warnings
-
-from jaxquantum.codes.base import BosonicQubit
-import jaxquantum as jqt
-
-from jax import jit, lax, vmap, debug
+from typing import ClassVar
 
 import jax.numpy as jnp
+from jax import debug, jit, lax, vmap
+
+import jaxquantum as jqt
+from jaxquantum.codes.base import BosonicQubit
 
 
 class GKPQubit(BosonicQubit):
@@ -32,7 +31,9 @@ class GKPQubit(BosonicQubit):
         s_delta = jnp.sinh(self.params["delta"] ** 2)
         self.params["epsilon"] = s_delta * self.params["l"]
         self.params["squeezing"] = jnp.log(self.params["delta"])
-        self.params["squeezing_dB"] = 20*jnp.log10(jnp.exp(jnp.abs(self.params["squeezing"])))
+        self.params["squeezing_dB"] = 20 * jnp.log10(
+            jnp.exp(jnp.abs(self.params["squeezing"]))
+        )
 
     def _gen_common_gates(self) -> None:
         """
@@ -98,23 +99,22 @@ class GKPQubit(BosonicQubit):
 
         def scan_body(n, carry):
             F_0, F_1 = carry
-            F_n = (jnp.sqrt(2 / n) * lax.mul(q_points, F_1) - jnp.sqrt(
-                (n - 1) / n) * F_0)
+            F_n = jnp.sqrt(2 / n) * lax.mul(q_points, F_1) - jnp.sqrt((n - 1) / n) * F_0
 
             new_carry = (F_1, F_n)
 
             return new_carry
 
         initial_carry = (F_0_init, F_1_init)
-        final_carry = lax.fori_loop(2, jnp.max(jnp.array([n + 1, 2])),
-                                    scan_body, initial_carry)
+        final_carry = lax.fori_loop(
+            2, jnp.max(jnp.array([n + 1, 2])), scan_body, initial_carry
+        )
 
-        q_quad = lax.select(n == 0, F_0_init,
-                            lax.select(n == 1, F_1_init,
-                                       final_carry[1]))
+        q_quad = lax.select(
+            n == 0, F_0_init, lax.select(n == 1, F_1_init, final_carry[1])
+        )
 
-        q_quad = jnp.pi ** (-0.25) * lax.mul(
-            jnp.exp(-lax.pow(q_points, 2) / 2), q_quad)
+        q_quad = jnp.pi ** (-0.25) * lax.mul(jnp.exp(-lax.pow(q_points, 2) / 2), q_quad)
 
         return q_quad
 
@@ -134,13 +134,13 @@ class GKPQubit(BosonicQubit):
         # capture 6 sigmas of the envelope for a value of delta of 0.02.
         # delta * (truncat_series*2*sqrt(pi)) = 6
 
-
         q_points = jnp.sqrt(jnp.pi) * (2 * jnp.arange(series_trunc) + mu)
 
         def compute_pop(n):
             quadvals = GKPQubit._q_quadrature(q_points, n)
-            return jnp.exp(-(delta ** 2) * n) * (
-                    2 * jnp.sum(quadvals) - (1 - mu) * quadvals[0])
+            return jnp.exp(-(delta**2) * n) * (
+                2 * jnp.sum(quadvals) - (1 - mu) * quadvals[0]
+            )
 
         psi_even = vmap(compute_pop)(jnp.arange(0, dim, 2))
 
@@ -152,14 +152,14 @@ class GKPQubit(BosonicQubit):
 
         return psi.unit()
 
-
     @staticmethod
     def _check_delta_warning(d):
         if d < 0.02:
-            warnings.warn("State preparation with delta values lower than 0.02 might lead to loss of accuracy.")
+            warnings.warn(
+                "State preparation with delta values lower than 0.02 might lead to loss of accuracy."
+            )
 
-
-    def _get_basis_z(self) -> Tuple[jqt.Qarray, jqt.Qarray]:
+    def _get_basis_z(self) -> tuple[jqt.Qarray, jqt.Qarray]:
         """
         Construct basis states |+-z>.
         """
@@ -168,13 +168,14 @@ class GKPQubit(BosonicQubit):
         dim = self.params["N"]
 
         debug.callback(GKPQubit._check_delta_warning, delta)
-        
-        jitted_compute_gkp_basis_z = jit(self._compute_gkp_basis_z, 
-                                         static_argnames=("dim",))
-        
+
+        jitted_compute_gkp_basis_z = jit(
+            self._compute_gkp_basis_z, static_argnames=("dim",)
+        )
+
         plus_z = jitted_compute_gkp_basis_z(delta, dim, 0)
         minus_z = jitted_compute_gkp_basis_z(delta, dim, 1)
-        
+
         return plus_z, minus_z
 
     # utils
@@ -206,7 +207,6 @@ class GKPQubit(BosonicQubit):
 
 
 class RectangularGKPQubit(GKPQubit):
-
     PARAMETERS: ClassVar[list[str]] = ["delta", "a"]
 
     def _params_validation(self):
@@ -222,14 +222,12 @@ class RectangularGKPQubit(GKPQubit):
 
 
 class SquareGKPQubit(GKPQubit):
-
     def _params_validation(self):
         super()._params_validation()
         self.params["a"] = 1.0
 
 
 class HexagonalGKPQubit(GKPQubit):
-    
     def _get_axis(self):
         a = jnp.sqrt(2 / jnp.sqrt(3))
         x_axis = a * (

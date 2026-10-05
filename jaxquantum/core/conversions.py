@@ -3,16 +3,14 @@ Converting between different object types.
 """
 
 from numbers import Number
-from jax import config, Array
-from qutip import Qobj
-from typing import Optional, Union, List
+
 import jax.numpy as jnp
 import numpy as np
+from jax import Array, config
+from qutip import Qobj
 
-
-from jaxquantum.core.qarray import Qarray
 from jaxquantum.core.dims import DIMS_TYPE
-
+from jaxquantum.core.qarray import Qarray
 
 config.update("jax_enable_x64", True)
 
@@ -57,7 +55,7 @@ def jqt2qt(jqt_obj):
     return Qobj(np.array(jqt_obj.data), dims=dims)
 
 
-def extract_dims(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None):
+def extract_dims(arr: Array, dims: DIMS_TYPE | list[int] | None = None):
     """Extract dims from a JAX array or Qarray.
 
     Args:
@@ -78,7 +76,7 @@ def extract_dims(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None)
     return dims
 
 
-def jnp2jqt(arr: Array, dims: Optional[Union[DIMS_TYPE, List[int]]] = None):
+def jnp2jqt(arr: Array, dims: DIMS_TYPE | list[int] | None = None):
     """JAX array -> QuTiP state.
 
     Args:

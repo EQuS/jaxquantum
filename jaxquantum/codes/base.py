@@ -2,16 +2,16 @@
 Base Bosonic Qubit Class
 """
 
-from typing import ClassVar, Dict, Optional, Tuple
-from abc import abstractmethod, ABCMeta
+from abc import ABCMeta, abstractmethod
+from typing import ClassVar
 
-from jaxquantum.utils.utils import device_put_params
-import jaxquantum as jqt
-
-from jax import config
-import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+import numpy as np
+from jax import config
+
+import jaxquantum as jqt
+from jaxquantum.utils.utils import device_put_params
 
 config.update("jax_enable_x64", True)
 
@@ -33,9 +33,7 @@ class BosonicQubit(metaclass=ABCMeta):
         """
         return ["N"]
 
-    def __init__(
-        self, params: Optional[Dict[str, float]] = None, name: Optional[str] = None
-    ):
+    def __init__(self, params: dict[str, float] | None = None, name: str | None = None):
         if name is not None:
             self.name = name
 
@@ -44,7 +42,7 @@ class BosonicQubit(metaclass=ABCMeta):
 
         self.params = device_put_params(self.params, self._non_device_params)
 
-        self.common_gates: Dict[str, jqt.Qarray] = {}
+        self.common_gates: dict[str, jqt.Qarray] = {}
         self._gen_common_gates()
 
         self.wigner_pts = jnp.linspace(-4.5, 4.5, 61)
@@ -87,13 +85,13 @@ class BosonicQubit(metaclass=ABCMeta):
         self.common_gates["a"] = jqt.destroy(N)
 
     @abstractmethod
-    def _get_basis_z(self) -> Tuple[jqt.Qarray, jqt.Qarray]:
+    def _get_basis_z(self) -> tuple[jqt.Qarray, jqt.Qarray]:
         """
         Returns:
             plus_z (jqt.Qarray), minus_z (jqt.Qarray): z basis states
         """
 
-    def _get_basis_states(self) -> Dict[str, jqt.Qarray]:
+    def _get_basis_states(self) -> dict[str, jqt.Qarray]:
         """
         Construct basis states |+-x>, |+-y>, |+-z>
         """
@@ -102,11 +100,11 @@ class BosonicQubit(metaclass=ABCMeta):
 
     def _gen_basis_states_from_z(
         self, plus_z: jqt.Qarray, minus_z: jqt.Qarray
-    ) -> Dict[str, jqt.Qarray]:
+    ) -> dict[str, jqt.Qarray]:
         """
         Construct basis states |+-x>, |+-y>, |+-z> from |+-z>
         """
-        basis: Dict[str, jqt.Qarray] = {}
+        basis: dict[str, jqt.Qarray] = {}
 
         # import to make sure that each basis state is a column vec
         # otherwise, transposing a 1D vector will do nothing
@@ -139,7 +137,7 @@ class BosonicQubit(metaclass=ABCMeta):
         return self._gen_pauli_U("x")
 
     @property
-    def x_H(self) -> Optional[jqt.Qarray]:
+    def x_H(self) -> jqt.Qarray | None:
         """
         Logical X hamiltonian.
         """
@@ -153,7 +151,7 @@ class BosonicQubit(metaclass=ABCMeta):
         return self._gen_pauli_U("y")
 
     @property
-    def y_H(self) -> Optional[jqt.Qarray]:
+    def y_H(self) -> jqt.Qarray | None:
         """
         Logical Y hamiltonian.
         """
@@ -167,14 +165,14 @@ class BosonicQubit(metaclass=ABCMeta):
         return self._gen_pauli_U("z")
 
     @property
-    def z_H(self) -> Optional[jqt.Qarray]:
+    def z_H(self) -> jqt.Qarray | None:
         """
         Logical Z hamiltonian.
         """
         return None
 
     @property
-    def h_H(self) -> Optional[jqt.Qarray]:
+    def h_H(self) -> jqt.Qarray | None:
         """
         Logical Hadamard hamiltonian.
         """

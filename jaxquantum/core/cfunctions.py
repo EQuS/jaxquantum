@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 from jax import vmap
+
 import jaxquantum as jqt
 
 
@@ -34,8 +35,7 @@ def cf_wigner(psi, xvec, yvec):
     alpha = x + 1.0j * y
     displacement = jqt.displace(N, alpha)
 
-    vmapped_overlap = [vmap(vmap(jqt.overlap, in_axes=(None, 0)), in_axes=(
-        None, 0))]
+    vmapped_overlap = [vmap(vmap(jqt.overlap, in_axes=(None, 0)), in_axes=(None, 0))]
     for _ in psi.bdims:
         vmapped_overlap.append(vmap(vmapped_overlap[-1], in_axes=(0, None)))
 

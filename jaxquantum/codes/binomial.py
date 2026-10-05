@@ -2,16 +2,14 @@
 Cat Code Qubit
 """
 
-from typing import ClassVar, Tuple
+from typing import ClassVar
 
-
-from jaxquantum.utils.utils import comb
-from jaxquantum.codes.base import BosonicQubit
-import jaxquantum as jqt
-
-from jax import vmap
-from jax import config
 import jax.numpy as jnp
+from jax import config, vmap
+
+import jaxquantum as jqt
+from jaxquantum.codes.base import BosonicQubit
+from jaxquantum.utils.utils import comb
 
 config.update("jax_enable_x64", True)
 
@@ -36,7 +34,7 @@ class BinomialQubit(BosonicQubit):
         if "D" not in self.params:
             self.params["D"] = 0
 
-    def _get_basis_z(self) -> Tuple[jqt.Qarray, jqt.Qarray]:
+    def _get_basis_z(self) -> tuple[jqt.Qarray, jqt.Qarray]:
         """
         Construct basis states |+-x>, |+-y>, |+-z>
         """

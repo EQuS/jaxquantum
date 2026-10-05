@@ -62,8 +62,7 @@ def _apply_matrix_to_axes(data, matrix, target_axes, system_shape):
 
     data = jnp.transpose(
         data,
-        tuple(range(n_batch_axes))
-        + tuple(n_batch_axes + axis for axis in order),
+        tuple(range(n_batch_axes)) + tuple(n_batch_axes + axis for axis in order),
     )
     other_shape = tuple(system_shape[axis] for axis in other_axes)
     target_shape = tuple(system_shape[axis] for axis in target_axes)
@@ -76,8 +75,7 @@ def _apply_matrix_to_axes(data, matrix, target_axes, system_shape):
         data,
         tuple(range(len(out_batch_shape)))
         + tuple(
-            len(out_batch_shape) + order.index(axis)
-            for axis in range(n_system_axes)
+            len(out_batch_shape) + order.index(axis) for axis in range(n_system_axes)
         ),
     )
 
@@ -98,7 +96,7 @@ def _apply_local_unitary(state: Qarray, operation) -> Qarray:
         data = _apply_matrix_to_axes(data, unitary, operation.indices, system_shape)
         bra_axes = tuple(n_modes + index for index in operation.indices)
         data = _apply_matrix_to_axes(data, jnp.conj(unitary), bra_axes, system_shape)
-        data = data.reshape(data.shape[:-2 * n_modes] + (prod(dims), prod(dims)))
+        data = data.reshape(data.shape[: -2 * n_modes] + (prod(dims), prod(dims)))
 
     return Qarray._from_impl(DenseImpl._make(data), state._qdims)
 
@@ -125,15 +123,13 @@ def _apply_local_kraus(state: Qarray, operation) -> Qarray:
     n_batch_axes = data.ndim - 2 * n_modes
     data = jnp.transpose(
         data,
-        tuple(range(n_batch_axes))
-        + tuple(n_batch_axes + index for index in order),
+        tuple(range(n_batch_axes)) + tuple(n_batch_axes + index for index in order),
     )
     other_shape = tuple(system_shape[index] for index in other_axes)
     target_shape = tuple(dims[index] for index in operation.indices)
     target_size = prod(target_shape)
     data = data.reshape(
-        data.shape[:n_batch_axes]
-        + (prod(other_shape), target_size, target_size)
+        data.shape[:n_batch_axes] + (prod(other_shape), target_size, target_size)
     )
     if direct_apply is not None:
         data = direct_apply(data, operation.gate.params)
@@ -145,8 +141,7 @@ def _apply_local_kraus(state: Qarray, operation) -> Qarray:
         data,
         tuple(range(len(out_batch_shape)))
         + tuple(
-            len(out_batch_shape) + order.index(index)
-            for index in range(2 * n_modes)
+            len(out_batch_shape) + order.index(index) for index in range(2 * n_modes)
         ),
     )
     data = data.reshape(out_batch_shape + (prod(dims), prod(dims)))
@@ -477,7 +472,6 @@ def _simulate_layer(
         result = _single_state_batch(state)
 
     elif mode == SimulateMode.HAMILTONIAN:
-
         solver_options = kwargs.pop(
             "solver_options",
             SolverOptions(progress_meter=None),

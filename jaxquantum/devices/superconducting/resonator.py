@@ -1,11 +1,10 @@
 """Resonator."""
 
+import jax.numpy as jnp
 from flax import struct
 from jax import config
 
-import jax.numpy as jnp
-
-from jaxquantum.core.operators import identity, destroy, create
+from jaxquantum.core.operators import create, destroy, identity
 from jaxquantum.devices.superconducting.flux_base import FluxDevice
 
 config.update("jax_enable_x64", True)

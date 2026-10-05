@@ -2,13 +2,13 @@
 Visualization utils.
 """
 
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-from jaxquantum.core.qp_distributions import wigner, qfunc
 from jaxquantum.core.cfunctions import cf_wigner
-import jax.numpy as jnp
-import numpy as np
+from jaxquantum.core.qp_distributions import qfunc, wigner
 
 WIGNER = "wigner"
 HUSIMI = "husimi"
@@ -123,7 +123,7 @@ def plot_qp(
             defaults to ``pts_x``
         g: float, default 2. Scaling factor for ``a = 0.5 * g * (x + iy)``.
             The value of ``g`` is related to the value of :math:`\\hbar` in
-            the commutation relation :math:`[x,\,y] = i\\hbar` via
+            the commutation relation :math:`[x,\\,y] = i\\hbar` via
             :math:`\\hbar=2/g^2`.
         axs: matplotlib axes to plot on (created if None)
         contour: use ``contourf`` if True, otherwise ``pcolormesh``
@@ -167,7 +167,7 @@ def plot_qp(
     pts_x = jnp.array(pts_x)
     pts_y = jnp.array(pts_y)
 
-    if len(state.bdims)==1 and state.bdims[0]==1:
+    if len(state.bdims) == 1 and state.bdims[0] == 1:
         state = state[0]
 
     if gif:
@@ -240,16 +240,11 @@ def plot_qp(
         cbar_label = r"$\mathcal{Q}(\alpha)$"
         QP = scale * qfunc(state, pts_x, pts_y, g=g)
 
-
-
     for _ in range(added_baxes):
         QP = jnp.array([QP])
         axs = np.array([axs])
         if subtitles is not None:
             subtitles = np.array([subtitles])
-
-
-
 
     pts_x = pts_x * axis_scale_factor
     pts_y = pts_y * axis_scale_factor
@@ -335,9 +330,7 @@ def _plot_qp_gif(
         )
     N = bdims[batch_animation_axis]
     if ts is not None and len(ts) != N:
-        raise ValueError(
-            f"ts has length {len(ts)} but animation axis has length {N}"
-        )
+        raise ValueError(f"ts has length {len(ts)} but animation axis has length {N}")
 
     if qp_type == WIGNER:
         vmin, vmax, scale = -1, 1, np.pi / 2
@@ -393,7 +386,10 @@ def _plot_qp_gif(
 
     if axs is None:
         _, axs = plt.subplots(
-            rows, cols, figsize=(3.3 * cols, 3 * rows), dpi=200,
+            rows,
+            cols,
+            figsize=(3.3 * cols, 3 * rows),
+            dpi=200,
             layout="constrained",
         )
     axs_arr = axs
@@ -511,7 +507,7 @@ def plot_wigner(
         pts_y: y points to evaluate quasi-probability distribution at
         g: float, default 2. Scaling factor for ``a = 0.5 * g * (x + iy)``.
             The value of ``g`` is related to the value of :math:`\\hbar` in
-            the commutation relation :math:`[x,\,y] = i\\hbar` via
+            the commutation relation :math:`[x,\\,y] = i\\hbar` via
             :math:`\\hbar=2/g^2`.
         axs: matplotlib axes to plot on
         contour: make the plot use contouring
@@ -584,7 +580,7 @@ def plot_qfunc(
         pts_y: y points to evaluate quasi-probability distribution at
         g: float, default 2. Scaling factor for ``a = 0.5 * g * (x + iy)``.
             The value of ``g`` is related to the value of :math:`\\hbar` in
-            the commutation relation :math:`[x,\,y] = i\\hbar` via
+            the commutation relation :math:`[x,\\,y] = i\\hbar` via
             :math:`\\hbar=2/g^2`.
         axs: matplotlib axes to plot on
         contour: make the plot use contouring
@@ -661,11 +657,7 @@ def _render_cf_grid(
         for col in range(cols):
             for subcol in range(2):
                 ax = axs[row, 2 * col + subcol]
-                data = (
-                    jnp.real(QP[row, col])
-                    if subcol == 0
-                    else jnp.imag(QP[row, col])
-                )
+                data = jnp.real(QP[row, col]) if subcol == 0 else jnp.imag(QP[row, col])
                 if contour:
                     im = ax.contourf(
                         pts_x,
@@ -708,23 +700,23 @@ def _render_cf_grid(
 
 
 def plot_cf(
-        state,
-        pts_x,
-        pts_y=None,
-        axs=None,
-        contour=True,
-        qp_type=WIGNER,
-        cbar_label="",
-        axis_scale_factor=1,
-        plot_cbar=True,
-        plot_grid=True,
-        x_ticks=None,
-        y_ticks=None,
-        z_ticks=None,
-        subtitles=None,
-        figtitle=None,
-        gif=False,
-        gif_params=None,
+    state,
+    pts_x,
+    pts_y=None,
+    axs=None,
+    contour=True,
+    qp_type=WIGNER,
+    cbar_label="",
+    axis_scale_factor=1,
+    plot_cbar=True,
+    plot_grid=True,
+    x_ticks=None,
+    y_ticks=None,
+    z_ticks=None,
+    subtitles=None,
+    figtitle=None,
+    gif=False,
+    gif_params=None,
 ):
     """Plot a characteristic function as paired real/imag subplots.
 
@@ -821,11 +813,10 @@ def plot_cf(
     if axs is None:
         _, axs = plt.subplots(
             bdims[0],
-            bdims[1]*2,
-            figsize=(3.3 * bdims[1]*2, 3 * bdims[0]),
+            bdims[1] * 2,
+            figsize=(3.3 * bdims[1] * 2, 3 * bdims[0]),
             dpi=200,
         )
-
 
     if qp_type == WIGNER:
         vmin = -1
@@ -844,21 +835,18 @@ def plot_cf(
         if subtitles is not None:
             subtitles = np.array([subtitles])
 
-    if added_baxes==2:
-        axs = axs[0] # When the input state is zero-dimensional, remove an
-                     # axis that is automatically added due to the subcolumns
-
+    if added_baxes == 2:
+        axs = axs[0]  # When the input state is zero-dimensional, remove an
+        # axis that is automatically added due to the subcolumns
 
     pts_x = pts_x * axis_scale_factor
     pts_y = pts_y * axis_scale_factor
 
     x_ticks = (
-        jnp.linspace(jnp.min(pts_x), jnp.max(pts_x),
-                     5) if x_ticks is None else x_ticks
+        jnp.linspace(jnp.min(pts_x), jnp.max(pts_x), 5) if x_ticks is None else x_ticks
     )
     y_ticks = (
-        jnp.linspace(jnp.min(pts_y), jnp.max(pts_y),
-                     5) if y_ticks is None else y_ticks
+        jnp.linspace(jnp.min(pts_y), jnp.max(pts_y), 5) if y_ticks is None else y_ticks
     )
     z_ticks = jnp.linspace(vmin, vmax, 11) if z_ticks is None else z_ticks
 
@@ -934,9 +922,7 @@ def _plot_cf_gif(
         )
     N = bdims[batch_animation_axis]
     if ts is not None and len(ts) != N:
-        raise ValueError(
-            f"ts has length {len(ts)} but animation axis has length {N}"
-        )
+        raise ValueError(f"ts has length {len(ts)} but animation axis has length {N}")
 
     if qp_type == WIGNER:
         vmin, vmax, scale = -1, 1, 1
@@ -987,7 +973,10 @@ def _plot_cf_gif(
 
     if axs is None:
         _, axs = plt.subplots(
-            rows, 2 * cols, figsize=(3.3 * 2 * cols, 3 * rows), dpi=200,
+            rows,
+            2 * cols,
+            figsize=(3.3 * 2 * cols, 3 * rows),
+            dpi=200,
             layout="constrained",
         )
     axs_arr = np.asarray(axs)

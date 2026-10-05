@@ -1,14 +1,12 @@
 """dims."""
 
-from typing import List, Tuple
 from copy import deepcopy
+from enum import Enum
 from math import prod
+
 from jax import Array
 
-from enum import Enum
-
-
-DIMS_TYPE = List[List[int]]
+DIMS_TYPE = list[list[int]]
 
 
 def isket_dims(dims: DIMS_TYPE) -> bool:
@@ -27,7 +25,7 @@ def ket_from_op_dims(dims: DIMS_TYPE) -> DIMS_TYPE:
     return (dims[0], tuple([1 for _ in dims[1]]))
 
 
-def check_dims(dims: Tuple[Tuple[int]], bdims: Tuple[int], data_shape: Array) -> bool:
+def check_dims(dims: tuple[tuple[int]], bdims: tuple[int], data_shape: Array) -> bool:
     if len(data_shape) == 1 and data_shape[0] == 0:
         # E.g. empty list of operators
         assert bdims == (0,)
@@ -52,9 +50,7 @@ def check_dims(dims: Tuple[Tuple[int]], bdims: Tuple[int], data_shape: Array) ->
         assert bdims == data_shape[:-1], (
             "Data shape should be consistent with dimensions."
         )
-        assert data_shape[-1] == N, (
-            "Data shape should be consistent with dimensions."
-        )
+        assert data_shape[-1] == N, "Data shape should be consistent with dimensions."
 
 
 class Qdims:

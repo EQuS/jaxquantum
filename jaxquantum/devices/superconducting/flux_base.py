@@ -45,7 +45,18 @@ class FluxDevice(Device):
     def potential(self, phi):
         """Return potential energy as a function of phi."""
 
-    def plot_wavefunctions(self, phi_vals, max_n=None, which=None, ax=None, mode="abs", ylim=None, y_scale_factor=1, zero_potential=False, wavefunction_color=None):
+    def plot_wavefunctions(
+        self,
+        phi_vals,
+        max_n=None,
+        which=None,
+        ax=None,
+        mode="abs",
+        ylim=None,
+        y_scale_factor=1,
+        zero_potential=False,
+        wavefunction_color=None,
+    ):
         if self.basis == BasisTypes.fock:
             _calculate_wavefunctions = self._calculate_wavefunctions_fock
         elif self.basis == BasisTypes.charge:
@@ -101,21 +112,47 @@ class FluxDevice(Device):
                     extra_kwargs["color"] = wavefunction_color
 
             ax.plot(
-                phi_vals, (wf_vals - min_potential)*y_scale_factor, label=f"$|${n}$\\rangle$", linestyle="-", linewidth=1, **extra_kwargs
+                phi_vals,
+                (wf_vals - min_potential) * y_scale_factor,
+                label=f"$|${n}$\\rangle$",
+                linestyle="-",
+                linewidth=1,
+                **extra_kwargs,
             )
 
-            ax.fill_between(phi_vals, (energy_levels[n] - min_potential)*y_scale_factor, (wf_vals - min_potential)*y_scale_factor, alpha=0.5, **extra_kwargs)
+            ax.fill_between(
+                phi_vals,
+                (energy_levels[n] - min_potential) * y_scale_factor,
+                (wf_vals - min_potential) * y_scale_factor,
+                alpha=0.5,
+                **extra_kwargs,
+            )
 
         ax.plot(
             phi_vals,
-            (potential - min_potential)*y_scale_factor,
+            (potential - min_potential) * y_scale_factor,
             label="potential",
             color="black",
             linestyle="-",
             linewidth=1,
         )
 
-        ylim = ylim if ylim is not None else [jnp.min(jnp.array([min_val - 1 - min_potential, jnp.min(potential) - min_potential]))*y_scale_factor, (max_val + 1 - min_potential)*y_scale_factor]
+        ylim = (
+            ylim
+            if ylim is not None
+            else [
+                jnp.min(
+                    jnp.array(
+                        [
+                            min_val - 1 - min_potential,
+                            jnp.min(potential) - min_potential,
+                        ]
+                    )
+                )
+                * y_scale_factor,
+                (max_val + 1 - min_potential) * y_scale_factor,
+            ]
+        )
         ax.set_ylim(ylim)
         ax.set_xlabel(r"$\varphi/2\pi$")
         ax.set_ylabel(r"Energy [GHz]")
@@ -129,7 +166,7 @@ class FluxDevice(Device):
 
         ax.set_title(f"{title_str}")
 
-        ax.legend(fontsize='xx-small')
+        ax.legend(fontsize="xx-small")
         fig.tight_layout()
 
         return ax

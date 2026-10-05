@@ -41,8 +41,7 @@ User knobs (in :mod:`jaxquantum.utils.utils`, next to ``set_precision``):
 
 from __future__ import annotations
 
-from typing import Any, Optional
-
+from typing import Any
 
 SETTINGS: dict = {
     "auto_tidyup_atol": 1e-14,

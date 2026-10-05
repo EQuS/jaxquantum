@@ -2,15 +2,14 @@
 Qubit
 """
 
-from typing import Tuple
 import warnings
 
-from jaxquantum.codes.base import BosonicQubit
-import jaxquantum as jqt
-
-from jax import config
 import matplotlib.pyplot as plt
 import qutip as qt
+from jax import config
+
+import jaxquantum as jqt
+from jaxquantum.codes.base import BosonicQubit
 
 config.update("jax_enable_x64", True)
 
@@ -24,7 +23,7 @@ class Qubit(BosonicQubit):
         super()._params_validation()
         self.params["N"] = 2
 
-    def _get_basis_z(self) -> Tuple[jqt.Qarray, jqt.Qarray]:
+    def _get_basis_z(self) -> tuple[jqt.Qarray, jqt.Qarray]:
         """
         Construct basis states |+-x>, |+-y>, |+-z>
         """

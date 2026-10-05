@@ -3,28 +3,27 @@
 Inspired by a mix of Cirq and Qiskit circuits.
 """
 
+from copy import deepcopy
+
+import jax.numpy as jnp
 from flax import struct
 from jax import config
-from typing import List, Optional, Union
-from copy import deepcopy
 from numpy import argsort
-import jax.numpy as jnp
 
-from jaxquantum.core.operators import identity
-from jaxquantum.circuits.gates import Gate
 from jaxquantum.circuits.constants import SimulateMode
+from jaxquantum.circuits.gates import Gate
+from jaxquantum.core.operators import identity
 from jaxquantum.core.qarray import Qarray, concatenate
-
 
 config.update("jax_enable_x64", True)
 
 
 @struct.dataclass
 class Register:
-    dims: List[int] = struct.field(pytree_node=False)
+    dims: list[int] = struct.field(pytree_node=False)
 
     @classmethod
-    def create(cls, dims: List[int]):
+    def create(cls, dims: list[int]):
         return Register(dims=dims)
 
     def __eq__(self, other):
@@ -36,11 +35,11 @@ class Register:
 @struct.dataclass
 class Operation:
     gate: Gate
-    indices: List[int] = struct.field(pytree_node=False)
+    indices: list[int] = struct.field(pytree_node=False)
     register: Register
 
     @classmethod
-    def create(cls, gate: Gate, indices: Union[int, List[int]], register: Register):
+    def create(cls, gate: Gate, indices: int | list[int], register: Register):
         if isinstance(indices, int):
             indices = [indices]
 
@@ -52,13 +51,12 @@ class Operation:
         )
 
         if any(
-            (0 > ind and ind >= len(register.dims)) or not isinstance(ind, int)
+            (0 > ind >= len(register.dims)) or not isinstance(ind, int)
             for ind in indices
         ):
             raise ValueError("Indices must be integers within the register.")
 
         return Operation(gate=gate, indices=indices, register=register)
-
 
     def promote(self, op: Qarray) -> Qarray:
         indices_order = self.indices
@@ -75,21 +73,20 @@ class Operation:
 
 @struct.dataclass
 class Layer:
-    operations: List[Operation] = struct.field(pytree_node=False)
-    _unique_indices: List[int] = struct.field(pytree_node=False)
+    operations: list[Operation] = struct.field(pytree_node=False)
+    _unique_indices: list[int] = struct.field(pytree_node=False)
     _default_simulate_mode: SimulateMode = struct.field(pytree_node=False)
 
     @classmethod
     def create(
-        cls, operations: List[Operation], default_simulate_mode=SimulateMode.UNITARY
+        cls, operations: list[Operation], default_simulate_mode=SimulateMode.UNITARY
     ):
         all_indices = [ind for op in operations for ind in op.indices]
         unique_indices = list(set(all_indices))
 
-        if (
-            default_simulate_mode != SimulateMode.HAMILTONIAN
-            and len(all_indices) != len(unique_indices)
-        ):
+        if default_simulate_mode != SimulateMode.HAMILTONIAN and len(
+            all_indices
+        ) != len(unique_indices):
             raise ValueError("Operations must not have overlapping indices.")
 
         return Layer(
@@ -111,7 +108,7 @@ class Layer:
 
         if len(self.operations) == 0:
             return None
-            
+
         indices_order = []
         for operation in self.operations:
             indices_order += operation.indices
@@ -140,11 +137,12 @@ class Layer:
 
         if len(self.operations) == 0:
             return Ht
-        
+
         for operation in self.operations:
+
             def Ht(t, prev_Ht=Ht, prev_operation=operation):
                 return prev_Ht(t) + prev_operation.promote(prev_operation.gate.Ht(t))
-        
+
         return Ht
 
     def gen_KM(self):
@@ -210,14 +208,15 @@ class Layer:
                         "All operations in a layer must have the same specified time steps, but not all operations need to have time steps."
                     )
         return ts
-        
+
+
 @struct.dataclass
 class Circuit:
     register: Register
-    layers: List[Layer] = struct.field(pytree_node=False)
+    layers: list[Layer] = struct.field(pytree_node=False)
 
     @classmethod
-    def create(cls, register: Register, layers: Optional[List[Layer]] = None):
+    def create(cls, register: Register, layers: list[Layer] | None = None):
         if layers is None:
             layers = []
 
@@ -230,7 +229,10 @@ class Circuit:
         self.layers.append(layer)
 
     def append_operation(
-        self, operation: Operation, default_simulate_mode: Optional[SimulateMode] = None, new_layer: bool =True
+        self,
+        operation: Operation,
+        default_simulate_mode: SimulateMode | None = None,
+        new_layer: bool = True,
     ):
         assert operation.register == self.register, (
             f"Mismatch in operation register {operation.register} and circuit register {self.register}."
@@ -239,7 +241,11 @@ class Circuit:
         new_layer = new_layer or len(self.layers) == 0
 
         if new_layer:
-            default_simulate_mode = default_simulate_mode if default_simulate_mode is not None else SimulateMode.UNITARY
+            default_simulate_mode = (
+                default_simulate_mode
+                if default_simulate_mode is not None
+                else SimulateMode.UNITARY
+            )
             self.append_layer(
                 Layer.create([operation], default_simulate_mode=default_simulate_mode)
             )
@@ -247,16 +253,20 @@ class Circuit:
             if default_simulate_mode is not None:
                 assert (
                     self.layers[-1]._default_simulate_mode == default_simulate_mode
-                ), "Cannot append operation to last layer with different default simulate mode."
+                ), (
+                    "Cannot append operation to last layer with different default simulate mode."
+                )
 
             self.layers[-1].add(operation)
 
     def append(
         self,
         gate: Gate,
-        indices: Union[int, List[int]],
-        default_simulate_mode: Optional[SimulateMode] = None,
+        indices: int | list[int],
+        default_simulate_mode: SimulateMode | None = None,
         new_layer: bool = True,
     ):
         operation = Operation.create(gate, indices, self.register)
-        self.append_operation(operation, default_simulate_mode=default_simulate_mode, new_layer=new_layer)
+        self.append_operation(
+            operation, default_simulate_mode=default_simulate_mode, new_layer=new_layer
+        )

@@ -1,14 +1,13 @@
 """Transmon."""
 
+import jax.numpy as jnp
 from flax import struct
 from jax import config
 
-import jax.numpy as jnp
-
+from jaxquantum.core.conversions import jnp2jqt
+from jaxquantum.core.operators import create, destroy, identity
 from jaxquantum.devices.base.base import BasisTypes, HamiltonianTypes
 from jaxquantum.devices.superconducting.flux_base import FluxDevice
-from jaxquantum.core.operators import identity, destroy, create
-from jaxquantum.core.conversions import jnp2jqt
 
 config.update("jax_enable_x64", True)
 
@@ -30,24 +29,30 @@ class SNAIL(FluxDevice):
         assert params["m"] >= 2, "m must be greater than or equal to 2."
 
         if hamiltonian == HamiltonianTypes.linear:
-            assert basis == BasisTypes.fock, "Linear Hamiltonian only works with Fock basis."
+            assert basis == BasisTypes.fock, (
+                "Linear Hamiltonian only works with Fock basis."
+            )
         elif hamiltonian == HamiltonianTypes.truncated:
-            assert basis == BasisTypes.fock, "Truncated Hamiltonian only works with Fock basis."
+            assert basis == BasisTypes.fock, (
+                "Truncated Hamiltonian only works with Fock basis."
+            )
         elif hamiltonian == HamiltonianTypes.full:
-            charge_basis_types = [
-                BasisTypes.charge
-            ]
-            assert basis in charge_basis_types, "Full Hamiltonian only works with Cooper pair charge or single-electron charge bases."
+            charge_basis_types = [BasisTypes.charge]
+            assert basis in charge_basis_types, (
+                "Full Hamiltonian only works with Cooper pair charge or single-electron charge bases."
+            )
 
-            assert (N_pre_diag - 1) % 2 * (params["m"]) == 0, "(N_pre_diag - 1)/2 must be divisible by m."
+            assert (N_pre_diag - 1) % 2 * (params["m"]) == 0, (
+                "(N_pre_diag - 1)/2 must be divisible by m."
+            )
 
         # Set the gate offset charge to zero if not provided
         if "ng" not in params:
             params["ng"] = 0.0
 
     def common_ops(self):
-        """ Written in the specified basis. """
-        
+        """Written in the specified basis."""
+
         ops = {}
 
         N = self.N_pre_diag
@@ -73,9 +78,11 @@ class SNAIL(FluxDevice):
             n_max = (N - 1) // 2
             n_array = jnp.arange(-n_max, n_max + 1) / self.params["m"]
             ops["n"] = jnp2jqt(jnp.diag(n_array))
-            
+
             n_minus_ng_array = n_array - self.params["ng"] * jnp.ones(N)
-            ops["H_charge"] = jnp2jqt(jnp.diag(4 * self.params["Ec"] * n_minus_ng_array**2))
+            ops["H_charge"] = jnp2jqt(
+                jnp.diag(4 * self.params["Ec"] * n_minus_ng_array**2)
+            )
 
         return ops
 
@@ -111,22 +118,22 @@ class SNAIL(FluxDevice):
 
         ops = self.original_ops
         H_charge = ops["H_charge"]
-        H_inductive = - α * Ej * ops["cos(φ)"] - m * Ej * (
+        H_inductive = -α * Ej * ops["cos(φ)"] - m * Ej * (
             jnp.cos(2 * jnp.pi * phi_ext / m) * ops["cos(φ/m)"]
             + jnp.sin(2 * jnp.pi * phi_ext / m) * ops["sin(φ/m)"]
         )
         return H_charge + H_inductive
-    
+
     def get_H_truncated(self):
         """Return truncated H in specified basis."""
         raise NotImplementedError("Truncated Hamiltonian not implemented for SNAIL.")
-        # phi_op = self.original_ops["phi"]  
-        # fourth_order_term =  -(1 / 24) * self.Ej * phi_op @ phi_op @ phi_op @ phi_op 
+        # phi_op = self.original_ops["phi"]
+        # fourth_order_term =  -(1 / 24) * self.Ej * phi_op @ phi_op @ phi_op @ phi_op
         # sixth_order_term = (1 / 720) * self.Ej * phi_op @ phi_op @ phi_op @ phi_op @ phi_op @ phi_op
         # return self.get_H_linear() + fourth_order_term + sixth_order_term
-    
+
     def _get_H_in_original_basis(self):
-        """ This returns the Hamiltonian in the original specified basis. This can be overridden by subclasses."""
+        """This returns the Hamiltonian in the original specified basis. This can be overridden by subclasses."""
 
         if self.hamiltonian == HamiltonianTypes.linear:
             return self.get_H_linear()
@@ -140,12 +147,11 @@ class SNAIL(FluxDevice):
         if self.hamiltonian == HamiltonianTypes.linear:
             return 0.5 * self.Ej * (2 * jnp.pi * phi) ** 2
         elif self.hamiltonian == HamiltonianTypes.full:
-
             α = self.params["alpha"]
             m = self.params["m"]
             phi_ext = self.params["phi_ext"]
 
-            return - α * self.Ej * jnp.cos(2 * jnp.pi * phi) - (
+            return -α * self.Ej * jnp.cos(2 * jnp.pi * phi) - (
                 m * self.Ej * jnp.cos(2 * jnp.pi * (phi_ext - phi) / m)
             )
 

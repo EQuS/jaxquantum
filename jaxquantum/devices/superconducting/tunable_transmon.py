@@ -1,8 +1,8 @@
 """Tunable Transmon."""
 
+import jax.numpy as jnp
 from flax import struct
 from jax import config
-import jax.numpy as jnp
 
 from jaxquantum.devices.superconducting.transmon import Transmon
 

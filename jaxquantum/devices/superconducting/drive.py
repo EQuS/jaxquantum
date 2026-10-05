@@ -1,14 +1,13 @@
 """Base Drive."""
 
 from abc import ABC
-from typing import Dict
 
+import jax.numpy as jnp
 from flax import struct
 from jax import config
-import jax.numpy as jnp
 
-from jaxquantum.core.qarray import Qarray
 from jaxquantum.core.conversions import jnp2jqt
+from jaxquantum.core.qarray import Qarray
 
 config.update("jax_enable_x64", True)
 
@@ -33,7 +32,7 @@ class Drive(ABC):
     def ops(self):
         return self.common_ops()
 
-    def common_ops(self) -> Dict[str, Qarray]:
+    def common_ops(self) -> dict[str, Qarray]:
         ops = {}
 
         M_max = self.M_max

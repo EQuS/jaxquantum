@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import jax
 import jax.numpy as jnp
@@ -24,29 +24,29 @@ from .core import (
 from .parameters import GKP_JULY30
 
 __all__ = (
-    "ERROR_CHANNELS",
-    "DeviceParameters",
     "CAT_DEVICE",
     "CAT_MEASURED_DEVICE",
+    "ERROR_CHANNELS",
     "GKP_DEVICE",
     "GKP_JULY30_DEVICE",
     "GKP_LEGACY_DEVICE",
     "DecayResult",
+    "DeviceParameters",
     "ErrorBudget",
-    "round_time",
-    "cat_protocol",
-    "gkp_protocol",
-    "gkp_displacements",
-    "prepare_gkp_protocol",
-    "prepare_cat_protocol",
+    "cat_error_budget",
     "cat_problem",
-    "gkp_problem",
+    "cat_protocol",
+    "compute_error_budget",
     "fit_decay",
+    "gkp_displacements",
+    "gkp_error_budget",
+    "gkp_problem",
+    "gkp_protocol",
+    "prepare_cat_protocol",
+    "prepare_gkp_protocol",
+    "round_time",
     "simulate_decay",
     "simulate_decay_variants",
-    "compute_error_budget",
-    "gkp_error_budget",
-    "cat_error_budget",
 )
 
 
@@ -335,9 +335,7 @@ def gkp_protocol(
             cd_geometry=geometry,
         )
         if final_storage_rotation:
-            phase = jnp.exp(
-                -1j * final_storage_rotation * jnp.arange(dimension)
-            )
+            phase = jnp.exp(-1j * final_storage_rotation * jnp.arange(dimension))
             phase_factor = phase[:, None] * phase.conj()[None, :]
             half_round = half_round._replace(
                 reset=half_round.reset._replace(

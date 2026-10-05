@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import partial
-from typing import NamedTuple, Sequence
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -21,17 +22,17 @@ from jaxquantum.circuits.library.qubit import Rx
 from jaxquantum.core.operators import basis, displace, sigmam, sigmap
 
 __all__ = (
-    "SBSNoise",
-    "SBSNoiseOps",
     "SBSCDGeometry",
     "SBSCDOps",
-    "SBSResetOps",
     "SBSHalfRound",
+    "SBSNoise",
+    "SBSNoiseOps",
     "SBSProtocol",
-    "noisy_cd_kraus",
+    "SBSResetOps",
+    "apply_sbs_half_round",
     "build_sbs_cd_geometry",
     "build_sbs_half_round",
-    "apply_sbs_half_round",
+    "noisy_cd_kraus",
     "oscillator_state",
     "simulate_sbs",
 )
@@ -215,10 +216,12 @@ def build_sbs_cd_geometry(
         beta = beta / (2 * microsteps)
         displacement = displace(dimension, beta / 2).data
         jumps = jax.vmap(
-            lambda time: displace(
-                dimension,
-                beta * (2 * time - 1) / 2,
-            ).data
+            lambda time: (
+                displace(
+                    dimension,
+                    beta * (2 * time - 1) / 2,
+                ).data
+            )
         )(times)
         return displacement, jumps
 

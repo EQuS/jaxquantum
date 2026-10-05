@@ -1,23 +1,25 @@
 """Oscillator gates."""
 
-from jaxquantum.core.operators import (displace, basis, destroy, create, num)
-from jaxquantum.circuits.gates import Gate
+from functools import partial
+
+import jax
+import jax.numpy as jnp
+from jax.scipy.special import gammaln
+
+from jaxquantum import Qarray
 from jaxquantum.circuits.channels import (
     apply_elementwise_channel,
     apply_shifted_channel,
 )
-from jax.scipy.special import gammaln
-import jax.numpy as jnp
-from jaxquantum import Qarray
+from jaxquantum.circuits.gates import Gate
+from jaxquantum.core.operators import basis, create, destroy, displace, num
 from jaxquantum.utils import hermgauss
-from functools import partial
-import jax
+
 
 def diag_expm(diag_matrix):
     """Computes expm of a diagonal matrix efficiently (O(N) instead of O(N^3))."""
     # Extract diagonal, exponentiate elements, put back on diagonal
     return jnp.diag(jnp.exp(jnp.diagonal(diag_matrix)))
-
 
 
 def D(N, alpha, ts=None, c_ops=None):
@@ -37,7 +39,7 @@ def D(N, alpha, ts=None, c_ops=None):
         delta_t = ts[-1] - ts[0]
         amp = 1j * alpha / delta_t
         a = destroy(N)
-        gen_Ht = lambda params: (lambda t: jnp.conj(amp) * a + amp * a.dag())
+        gen_Ht = lambda params: lambda t: jnp.conj(amp) * a + amp * a.dag()
 
     return Gate.create(
         N,
@@ -64,8 +66,9 @@ def _conditional_displacement(N, beta, echoed=False):
     else:
         blocks = blocks.at[..., 0, :, 0, :].set(displacement)
         blocks = blocks.at[..., 1, :, 1, :].set(inverse)
-    return Qarray.create(blocks.reshape(blocks.shape[:-4] + (2 * N, 2 * N)),
-                         dims=[[2, N], [2, N]])
+    return Qarray.create(
+        blocks.reshape(blocks.shape[:-4] + (2 * N, 2 * N)), dims=[[2, N], [2, N]]
+    )
 
 
 def CD(N, beta, ts=None):
@@ -88,10 +91,12 @@ def CD(N, beta, ts=None):
         delta_t = ts[-1] - ts[0]
         amp = 1j * beta / delta_t / 2
         a = destroy(N)
-        gen_Ht = lambda params: lambda t: (
-            gg
-            ^ (jnp.conj(amp) * a + amp * a.dag()) + ee
-            ^ (jnp.conj(-amp) * a + (-amp) * a.dag())
+        gen_Ht = lambda params: (
+            lambda t: (
+                gg
+                ^ (jnp.conj(amp) * a + amp * a.dag()) + ee
+                ^ (jnp.conj(-amp) * a + (-amp) * a.dag())
+            )
         )
 
     return Gate.create(
@@ -130,6 +135,7 @@ def ECD(N, beta, ts=None):
         num_modes=2,
     )
 
+
 def CR(N, theta):
     """Conditional rotation gate.
 
@@ -146,18 +152,20 @@ def CR(N, theta):
     gg = g @ g.dag()
     ee = e @ e.dag()
 
-
     return Gate.create(
         [2, N],
         name="CR",
         params={"theta": theta},
-        gen_U=lambda params: (gg ^ (-1.j*theta/2*create(N)@destroy(N)).expm())
-        + (ee ^ (1.j*theta/2*create(N)@destroy(N)).expm()),
+        gen_U=lambda params: (
+            (gg ^ (-1.0j * theta / 2 * create(N) @ destroy(N)).expm())
+            + (ee ^ (1.0j * theta / 2 * create(N) @ destroy(N)).expm())
+        ),
         num_modes=2,
     )
 
 
 # --- 2. Optimized Kernels (Using diag_expm) ---
+
 
 @partial(jax.jit, static_argnames=["N", "max_l"])
 def _Amp_Damp_Kraus_Map_JIT(N, err_prob, max_l):
@@ -209,8 +217,10 @@ def _shifted_kraus_maps(coefficients, sources):
 
     def build(coefficient, source):
         shape = coefficient.shape[:-1] + (coefficient.shape[-1],) * 2
-        return jnp.zeros(shape, coefficient.dtype).at[..., indices, source].set(
-            coefficient
+        return (
+            jnp.zeros(shape, coefficient.dtype)
+            .at[..., indices, source]
+            .set(coefficient)
         )
 
     return jax.vmap(build)(coefficients, sources)
@@ -370,18 +380,14 @@ def _thermal_coefficients(
 ):
     probability = jnp.asarray(probability)
     n_bar = jnp.asarray(n_bar)
-    order = (
-        min(max_l, dimension - 1) + 1
-        if truncate
-        else max_l + 1
-    )
+    order = min(max_l, dimension - 1) + 1 if truncate else max_l + 1
     pair_indices = jnp.arange(order**2)
     gains = pair_indices // order
     losses = pair_indices % order
     output = jnp.arange(dimension)
     source = output + losses[:, None] - gains[:, None]
-    valid = (source >= 0) & (source < dimension) & (
-        output + losses[:, None] < dimension
+    valid = (
+        (source >= 0) & (source < dimension) & (output + losses[:, None] < dimension)
     )
     source_safe = jnp.clip(source, 0, dimension - 1)
     prefactor = jnp.sqrt(
@@ -393,18 +399,11 @@ def _thermal_coefficients(
             probability[..., None, None] * n_bar[..., None, None],
             gains[:, None],
         )
-        / (
-            jnp.exp(gammaln(losses[:, None] + 1))
-            * jnp.exp(gammaln(gains[:, None] + 1))
-        )
+        / (jnp.exp(gammaln(losses[:, None] + 1)) * jnp.exp(gammaln(gains[:, None] + 1)))
     )
     ratio = jnp.exp(
         gammaln(output + losses[:, None] + 1)
-        - 0.5
-        * (
-            gammaln(source_safe + 1)
-            + gammaln(output + 1)
-        )
+        - 0.5 * (gammaln(source_safe + 1) + gammaln(output + 1))
     )
     coefficients = (
         prefactor
@@ -471,6 +470,7 @@ def _Dephasing_Ch_Kraus_Map_JIT(N, ws, phis, max_l):
     def compute_op(w, phi):
         diagonal = jnp.exp(1.0j * phi[..., None] * jnp.arange(N))
         return jnp.sqrt(w) * diagonal[..., None, :] * jnp.eye(N)
+
     return jax.vmap(compute_op)(ws, phis)
 
 
@@ -479,8 +479,7 @@ def _dephasing_factor(dimension, probability, nodes, weights):
     delta = indices[:, None] - indices[None, :]
     phases = jnp.sqrt(2 * jnp.asarray(probability)[..., None]) * nodes
     return jnp.sum(
-        weights[:, None, None]
-        * jnp.exp(1.0j * phases[..., :, None, None] * delta),
+        weights[:, None, None] * jnp.exp(1.0j * phases[..., :, None, None] * delta),
         axis=-3,
     )
 
@@ -503,13 +502,10 @@ def Dephasing_Ch(N, err_prob, max_l):
     if max_l < 1:
         raise ValueError("max_l must be positive")
     xs, ws_raw = hermgauss(max_l)
-    ws = 1/jnp.sqrt(jnp.pi)*ws_raw
+    ws = 1 / jnp.sqrt(jnp.pi) * ws_raw
 
     def kmap(params):
-        phases = (
-            jnp.sqrt(2 * params["err_prob"])[..., None]
-            * params["_nodes"]
-        )
+        phases = jnp.sqrt(2 * params["err_prob"])[..., None] * params["_nodes"]
         data = _Dephasing_Ch_Kraus_Map_JIT(
             params["N"],
             params["_weights"],
@@ -561,9 +557,7 @@ def _Dephasing_Reset_Kraus_Map_JIT(N, p, t_rst, chi, max_l):
     exponents = jnp.arange(max_l - 1) / (max_l - 1)
     raw_weights = jnp.power(p[..., None], exponents)
     weights = (
-        (1 - p[..., None])
-        * raw_weights
-        / jnp.sum(raw_weights, axis=-1, keepdims=True)
+        (1 - p[..., None]) * raw_weights / jnp.sum(raw_weights, axis=-1, keepdims=True)
     )
 
     def compute_op(l):
@@ -578,19 +572,16 @@ def _Dephasing_Reset_Kraus_Map_JIT(N, p, t_rst, chi, max_l):
         def branch_rest(_):
             exponent = -1.0j * chi * t_rst * (l - 2) / (max_l - 1)
             op_osc = diag_expm(exponent * n_op)
-            return (
-                jnp.sqrt(weights[..., l - 2])[..., None, None]
-                * jnp.kron(ge, op_osc)
-            )
+            return jnp.sqrt(weights[..., l - 2])[..., None, None] * jnp.kron(ge, op_osc)
 
         return jax.lax.cond(
             l == 0,
             branch_0,
             lambda _: jax.lax.cond(l == 1, branch_1, branch_rest, operand=None),
-            operand=None
+            operand=None,
         )
 
-    ls = jnp.arange(max_l+1)
+    ls = jnp.arange(max_l + 1)
     return jax.vmap(compute_op)(ls)
 
 
@@ -604,14 +595,11 @@ def _dephasing_reset_factors(N, p, t_rst, chi, max_l):
         (transfer_indices - 2) / (max_l - 1),
     )
     weights = (
-        (1 - p[..., None])
-        * raw_weights
-        / jnp.sum(raw_weights, axis=-1, keepdims=True)
+        (1 - p[..., None]) * raw_weights / jnp.sum(raw_weights, axis=-1, keepdims=True)
     )
     angles = chi * t_rst * (transfer_indices - 2) / (max_l - 1)
     transfer = jnp.sum(
-        weights[..., :, None, None]
-        * jnp.exp(-1.0j * angles[:, None, None] * delta),
+        weights[..., :, None, None] * jnp.exp(-1.0j * angles[:, None, None] * delta),
         axis=-3,
     )
     excited = p[..., None, None] * jnp.exp(-1.0j * chi * t_rst * delta)

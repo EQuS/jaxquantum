@@ -1,18 +1,16 @@
 """System."""
 
-from typing import List, Optional, Dict, Any, Union
 import math
-
-from flax import struct
-from jax import vmap, Array
-from jax import config
+from typing import Any
 
 import jax.numpy as jnp
+from flax import struct
+from jax import Array, config, vmap
 
+from jaxquantum.core.operators import identity
+from jaxquantum.core.qarray import Qarray, tensor
 from jaxquantum.devices.base.base import Device
 from jaxquantum.devices.superconducting.drive import Drive
-from jaxquantum.core.qarray import Qarray, tensor
-from jaxquantum.core.operators import identity
 
 config.update("jax_enable_x64", True)
 
@@ -55,17 +53,17 @@ def promote(op: Qarray, device_num, Ns):
 
 @struct.dataclass
 class System:
-    Ns: List[int] = struct.field(pytree_node=False)
-    devices: List[Union[Device, Drive]]
-    couplings: List[Array]
-    params: Dict[str, Any]
+    Ns: list[int] = struct.field(pytree_node=False)
+    devices: list[Device | Drive]
+    couplings: list[Array]
+    params: dict[str, Any]
 
     @classmethod
     def create(
         cls,
-        devices: List[Union[Device, Drive]],
-        couplings: Optional[List[Array]] = None,
-        params: Optional[Dict[str, Any]] = None,
+        devices: list[Device | Drive],
+        couplings: list[Array] | None = None,
+        params: dict[str, Any] | None = None,
     ):
         labels = [device.label for device in devices]
         unique_labels = set(labels)

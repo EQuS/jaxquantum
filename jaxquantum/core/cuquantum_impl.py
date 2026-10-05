@@ -31,33 +31,28 @@ on the jaxquantum side only — ``OperatorTerm`` itself keeps its mathematical
 
 from __future__ import annotations
 
-from copy import deepcopy
 from math import prod
 
 import jax.numpy as jnp
-from flax import struct
 
 # This import is what gates the entire backend — it raises ImportError when
 # cuquantum is not installed; ``core/__init__.py`` catches that.
-from cuquantum.densitymat.jax import (  # noqa: E402
+from cuquantum.densitymat.jax import (
     ElementaryOperator,
     MatrixOperator,
 )
+from flax import struct
 
 from jaxquantum.utils.cuquantum_util import OperatorTerm
 
 # True when the installed cuquantum exposes native dunder arithmetic on OperatorTerm.
 _HAS_NATIVE_OPS = hasattr(OperatorTerm, "__add__")
 
-from jaxquantum.core.qarray import (  # noqa: E402
+from jaxquantum.core.qarray import (
     DenseImpl,
     QarrayImpl,
     QarrayImplType,
 )
-
-
-
-
 
 # ---------------------------------------------------------------------------
 # Free-function arithmetic on ``OperatorTerm``
@@ -69,6 +64,7 @@ from jaxquantum.core.qarray import (  # noqa: E402
 # ``OperatorTerm`` surface (``dims``, ``op_prods``, ``modes``, ``conjs``,
 # ``duals``, ``coeffs``, ``append``) lets jaxquantum work with any cuquantum
 # release that ships a basic ``OperatorTerm``.
+
 
 def _cuqnt_copy_base_op(op):
     """Return a fresh ``ElementaryOperator`` / ``MatrixOperator`` wrapping the same data.
@@ -108,7 +104,11 @@ def _cuqnt_add(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
     out = OperatorTerm(left.dims)
     for op_term in (left, right):
         for op_prod, modes, conjs, duals, coeff in zip(
-            op_term.op_prods, op_term.modes, op_term.conjs, op_term.duals, op_term.coeffs
+            op_term.op_prods,
+            op_term.modes,
+            op_term.conjs,
+            op_term.duals,
+            op_term.coeffs,
         ):
             _cuqnt_append_copied_product(out, op_prod, modes, conjs, duals, coeff)
     return out
@@ -120,16 +120,22 @@ def _cuqnt_sub(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
     out = OperatorTerm(left.dims)
     for op_term, sign in ((left, 1), (right, -1)):
         for op_prod, modes, conjs, duals, coeff in zip(
-            op_term.op_prods, op_term.modes, op_term.conjs, op_term.duals, op_term.coeffs
+            op_term.op_prods,
+            op_term.modes,
+            op_term.conjs,
+            op_term.duals,
+            op_term.coeffs,
         ):
-            _cuqnt_append_copied_product(out, op_prod, modes, conjs, duals, sign * coeff)
+            _cuqnt_append_copied_product(
+                out, op_prod, modes, conjs, duals, sign * coeff
+            )
     return out
 
 
 def _cuqnt_scalar_mul(scalar, ot: OperatorTerm) -> OperatorTerm:
     """Scale every product's coefficient by ``scalar`` (Python or JAX scalar)."""
     out = OperatorTerm(ot.dims)
-    
+
     for op_prod, modes, conjs, duals, coeff in zip(
         ot.op_prods, ot.modes, ot.conjs, ot.duals, ot.coeffs
     ):
@@ -193,7 +199,9 @@ def _cuqnt_kron(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
         left.op_prods, left.modes, left.conjs, left.duals, left.coeffs
     ):
         if not isinstance(op_prod[0], ElementaryOperator):
-            raise NotImplementedError("kron is not supported for MatrixOperator products.")
+            raise NotImplementedError(
+                "kron is not supported for MatrixOperator products."
+            )
         left_padded.append(
             tuple(_cuqnt_copy_base_op(op) for op in op_prod),
             modes=modes,
@@ -206,7 +214,9 @@ def _cuqnt_kron(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
         right.op_prods, right.modes, right.conjs, right.duals, right.coeffs
     ):
         if not isinstance(op_prod[0], ElementaryOperator):
-            raise NotImplementedError("kron is not supported for MatrixOperator products.")
+            raise NotImplementedError(
+                "kron is not supported for MatrixOperator products."
+            )
         right_padded.append(
             tuple(_cuqnt_copy_base_op(op) for op in op_prod),
             modes=tuple(m + n_left for m in modes),
@@ -250,12 +260,14 @@ def _cuqnt_dag(ot: OperatorTerm) -> OperatorTerm:
                         "_cuqnt_dag is not supported for multidiagonal ElementaryOperator."
                     )
             dagged = tuple(
-                ElementaryOperator(_cuqnt_dag_dense_data(base_op.data)) for base_op in op_prod
+                ElementaryOperator(_cuqnt_dag_dense_data(base_op.data))
+                for base_op in op_prod
             )
             out.append(dagged, modes=modes, duals=duals, coeff=coeff.conj())
         else:  # MatrixOperator: sequential, must reverse
             dagged = tuple(
-                MatrixOperator(_cuqnt_dag_dense_data(mat_op.data)) for mat_op in reversed(op_prod)
+                MatrixOperator(_cuqnt_dag_dense_data(mat_op.data))
+                for mat_op in reversed(op_prod)
             )
             out.append(
                 dagged,
@@ -269,6 +281,7 @@ def _cuqnt_dag(ot: OperatorTerm) -> OperatorTerm:
 # ---------------------------------------------------------------------------
 # Local helpers used by ``CuquantumImpl``
 # ---------------------------------------------------------------------------
+
 
 def _materialize_if_empty(ot: OperatorTerm, modes=None, dtype=None) -> OperatorTerm:
     """Replace an identity-encoded (empty) ``OperatorTerm`` with an explicit eye factor.
@@ -285,7 +298,9 @@ def _materialize_if_empty(ot: OperatorTerm, modes=None, dtype=None) -> OperatorT
     if modes is None:
         modes = tuple(range(len(ot.dims)))
     mode_dims = tuple(ot.dims[m] for m in modes)
-    identity_data = jnp.eye(prod(mode_dims), dtype=dtype or jnp.complex128).reshape(*mode_dims, *mode_dims)
+    identity_data = jnp.eye(prod(mode_dims), dtype=dtype or jnp.complex128).reshape(
+        *mode_dims, *mode_dims
+    )
     out = OperatorTerm(ot.dims)
     out.append([ElementaryOperator(identity_data)], modes=modes, coeff=1.0)
     return out
@@ -299,7 +314,9 @@ def _lift_with_mode_shift(ot: OperatorTerm, shift: int, combined_dims) -> Operat
     ):
         copied = tuple(_cuqnt_copy_base_op(op) for op in op_prod)
         if isinstance(op_prod[0], ElementaryOperator):
-            out.append(copied, modes=tuple(m + shift for m in modes), duals=duals, coeff=coeff)
+            out.append(
+                copied, modes=tuple(m + shift for m in modes), duals=duals, coeff=coeff
+            )
         else:
             out.append(copied, conjs=conjs, duals=duals, coeff=coeff)
     return out
@@ -308,6 +325,7 @@ def _lift_with_mode_shift(ot: OperatorTerm, shift: int, combined_dims) -> Operat
 # ---------------------------------------------------------------------------
 # CuquantumImpl
 # ---------------------------------------------------------------------------
+
 
 @struct.dataclass
 class CuquantumImpl(QarrayImpl):
@@ -322,14 +340,14 @@ class CuquantumImpl(QarrayImpl):
 
     _data: OperatorTerm = struct.field(pytree_node=False)
 
-    PROMOTION_ORDER = 3  # noqa: RUF012 — class attribute, not a struct field
+    PROMOTION_ORDER = 3
 
     # ------------------------------------------------------------------
     # Construction
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_data(cls, data) -> "CuquantumImpl":
+    def from_data(cls, data) -> CuquantumImpl:
         """Wrap *data* in a new ``CuquantumImpl``.
 
         Accepts:
@@ -355,12 +373,12 @@ class CuquantumImpl(QarrayImpl):
         return cls(_data=ot)
 
     @classmethod
-    def identity_term(cls, n: int, dtype=None) -> "CuquantumImpl":
+    def identity_term(cls, n: int, dtype=None) -> CuquantumImpl:
         """Identity on a single mode of size ``n`` — encoded as an empty ``OperatorTerm``."""
         return cls(_data=OperatorTerm((int(n),)))
 
     @classmethod
-    def single_site(cls, matrix, n: int) -> "CuquantumImpl":
+    def single_site(cls, matrix, n: int) -> CuquantumImpl:
         """Wrap a single-site ``(n, n)`` matrix as a one-mode ``OperatorTerm``."""
         return cls.from_data(jnp.asarray(matrix))
 
@@ -386,7 +404,7 @@ class CuquantumImpl(QarrayImpl):
     # cuquantum boundary
     # ------------------------------------------------------------------
 
-    def to_operator_term(self) -> "OperatorTerm":
+    def to_operator_term(self) -> OperatorTerm:
         """Return the underlying ``OperatorTerm`` directly — no rebuild needed."""
         return self._data
 
@@ -402,7 +420,9 @@ class CuquantumImpl(QarrayImpl):
         a_modes = a._data.modes[0] if a._data.op_prods else None
         a_data = _materialize_if_empty(a._data, modes=b_modes, dtype=a.dtype())
         b_data = _materialize_if_empty(b._data, modes=a_modes, dtype=b.dtype())
-        return CuquantumImpl(_data=a_data + b_data if _HAS_NATIVE_OPS else _cuqnt_add(a_data, b_data))
+        return CuquantumImpl(
+            _data=a_data + b_data if _HAS_NATIVE_OPS else _cuqnt_add(a_data, b_data)
+        )
 
     def sub(self, other: QarrayImpl) -> QarrayImpl:
         a, b = self._coerce(other)
@@ -412,11 +432,15 @@ class CuquantumImpl(QarrayImpl):
         a_modes = a._data.modes[0] if a._data.op_prods else None
         a_data = _materialize_if_empty(a._data, modes=b_modes, dtype=a.dtype())
         b_data = _materialize_if_empty(b._data, modes=a_modes, dtype=b.dtype())
-        return CuquantumImpl(_data=a_data - b_data if _HAS_NATIVE_OPS else _cuqnt_sub(a_data, b_data))
+        return CuquantumImpl(
+            _data=a_data - b_data if _HAS_NATIVE_OPS else _cuqnt_sub(a_data, b_data)
+        )
 
     def mul(self, scalar) -> QarrayImpl:
         data = _materialize_if_empty(self._data, dtype=self.dtype())
-        return CuquantumImpl(_data=data * scalar if _HAS_NATIVE_OPS else _cuqnt_scalar_mul(scalar, data))
+        return CuquantumImpl(
+            _data=data * scalar if _HAS_NATIVE_OPS else _cuqnt_scalar_mul(scalar, data)
+        )
 
     def matmul(self, other: QarrayImpl) -> QarrayImpl:
         a, b = self._coerce(other)
@@ -426,7 +450,11 @@ class CuquantumImpl(QarrayImpl):
             return CuquantumImpl(_data=_lift_with_mode_shift(b._data, 0, b._data.dims))
         if not b._data.op_prods:  # A @ I = A
             return CuquantumImpl(_data=_lift_with_mode_shift(a._data, 0, a._data.dims))
-        return CuquantumImpl(_data=a._data @ b._data if _HAS_NATIVE_OPS else _cuqnt_matmul(a._data, b._data))
+        return CuquantumImpl(
+            _data=a._data @ b._data
+            if _HAS_NATIVE_OPS
+            else _cuqnt_matmul(a._data, b._data)
+        )
 
     def kron(self, other: QarrayImpl) -> QarrayImpl:
         a, b = self._coerce(other)
@@ -439,17 +467,23 @@ class CuquantumImpl(QarrayImpl):
             )
         if not b._data.op_prods:  # A ⊗ I_b: lift A keeping modes
             return CuquantumImpl(_data=_lift_with_mode_shift(a._data, 0, combined_dims))
-        return CuquantumImpl(_data=a._data & b._data if _HAS_NATIVE_OPS else _cuqnt_kron(a._data, b._data))
+        return CuquantumImpl(
+            _data=a._data & b._data
+            if _HAS_NATIVE_OPS
+            else _cuqnt_kron(a._data, b._data)
+        )
 
     def dag(self) -> QarrayImpl:
         # Empty OperatorTerm stays empty under dag(), which matches I† = I.
-        return CuquantumImpl(_data=self._data.dag() if _HAS_NATIVE_OPS else _cuqnt_dag(self._data))
+        return CuquantumImpl(
+            _data=self._data.dag() if _HAS_NATIVE_OPS else _cuqnt_dag(self._data)
+        )
 
     # ------------------------------------------------------------------
     # Conversions
     # ------------------------------------------------------------------
 
-    def to_dense(self) -> "DenseImpl":
+    def to_dense(self) -> DenseImpl:
         """Build the dense matrix term-by-term.
 
         Used for testing / debugging.  Defeats the backend's purpose — emit
@@ -472,8 +506,7 @@ class CuquantumImpl(QarrayImpl):
             # cuDensityMat applies factors in tuple order: [A, B] is B @ A.
             # Pre-compose each new factor on the left of earlier factors.
             mode_to_matrix = {}
-            idx = 0
-            for elem_op in op_prod:
+            for idx, elem_op in enumerate(op_prod):
                 # Version 0.0.7 stores an unbatched operator without a
                 # leading singleton axis; older versions retain that axis.
                 mat = elem_op.data
@@ -491,15 +524,13 @@ class CuquantumImpl(QarrayImpl):
                     mode_to_matrix[m] = mat @ mode_to_matrix[m]
                 else:
                     mode_to_matrix[m] = mat
-                idx += 1
 
             # Build Kronecker product over all modes (identity where unused).
             term_matrix = None
             for i, dim in enumerate(self._data.dims):
                 factor = mode_to_matrix.get(i, jnp.eye(dim, dtype=dtype))
                 term_matrix = (
-                    factor if term_matrix is None
-                    else jnp.kron(term_matrix, factor)
+                    factor if term_matrix is None else jnp.kron(term_matrix, factor)
                 )
             if term_matrix is None:  # zero-mode degenerate case
                 term_matrix = jnp.eye(1, dtype=dtype)
@@ -512,10 +543,12 @@ class CuquantumImpl(QarrayImpl):
 
     def to_sparse_bcoo(self):
         from jaxquantum.core.sparse_bcoo import SparseBCOOImpl
+
         return SparseBCOOImpl.from_data(self.to_dense()._data)
 
     def to_sparse_dia(self):
         from jaxquantum.core.sparse_dia import SparseDiaImpl
+
         return SparseDiaImpl.from_data(self.to_dense()._data)
 
     # ------------------------------------------------------------------
@@ -536,16 +569,18 @@ class CuquantumImpl(QarrayImpl):
         return self
 
     @classmethod
-    def _eye_data(cls, n: int, dtype=None) -> "OperatorTerm":
+    def _eye_data(cls, n: int, dtype=None) -> OperatorTerm:
         """Identity-on-mode-of-size-``n`` data: an empty ``OperatorTerm((n,))``."""
         return OperatorTerm((int(n),))
 
     @classmethod
     def can_handle_data(cls, arr) -> bool:
-        return isinstance(arr, OperatorTerm) # or getattr(arr, "_is_cuquantum_op", False)
+        return isinstance(
+            arr, OperatorTerm
+        )  # or getattr(arr, "_is_cuquantum_op", False)
 
     @classmethod
-    def dag_data(cls, arr) -> "OperatorTerm":
+    def dag_data(cls, arr) -> OperatorTerm:
         """Conjugate transpose of a raw ``OperatorTerm``.
 
         Defensive — the cuquantum solver path doesn't go through ``dag_data``

@@ -1,18 +1,19 @@
 """qubit gates."""
 
+import jax.numpy as jnp
+
+from jaxquantum.circuits.channels import apply_elementwise_channel
+from jaxquantum.circuits.gates import Gate
 from jaxquantum.core.operators import (
+    basis,
+    hadamard,
     identity,
+    qubit_rotation,
     sigmax,
     sigmay,
     sigmaz,
-    basis,
-    hadamard,
-    qubit_rotation,
 )
-from jaxquantum.circuits.gates import Gate
-from jaxquantum.circuits.channels import apply_elementwise_channel
 from jaxquantum.core.qarray import Qarray
-import jax.numpy as jnp
 
 
 def _reset_apply(rho, params):
@@ -102,7 +103,7 @@ def Rx(theta, ts=None):
     if ts is not None:
         delta_t = ts[-1] - ts[0]
         amp = theta / delta_t
-        gen_Ht = lambda params: (lambda t: amp / 2 * sigmax())
+        gen_Ht = lambda params: lambda t: amp / 2 * sigmax()
 
     return Gate.create(
         2,
@@ -120,7 +121,7 @@ def Ry(theta, ts=None):
     if ts is not None:
         delta_t = ts[-1] - ts[0]
         amp = theta / delta_t
-        gen_Ht = lambda params: (lambda t: amp / 2 * sigmay())
+        gen_Ht = lambda params: lambda t: amp / 2 * sigmay()
     return Gate.create(
         2,
         name="Ry",
@@ -137,7 +138,7 @@ def Rz(theta, ts=None):
     if ts is not None:
         delta_t = ts[-1] - ts[0]
         amp = theta / delta_t
-        gen_Ht = lambda params: (lambda t: amp / 2 * sigmaz())
+        gen_Ht = lambda params: lambda t: amp / 2 * sigmaz()
     return Gate.create(
         2,
         name="Rz",

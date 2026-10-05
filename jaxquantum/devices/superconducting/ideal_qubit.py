@@ -3,9 +3,8 @@
 from flax import struct
 from jax import config
 
-
-from jaxquantum.devices.base.base import Device, BasisTypes, HamiltonianTypes
-from jaxquantum.core.operators import identity, sigmaz, sigmax, sigmay, sigmam, sigmap
+from jaxquantum.core.operators import identity, sigmam, sigmap, sigmax, sigmay, sigmaz
+from jaxquantum.devices.base.base import BasisTypes, Device, HamiltonianTypes
 
 config.update("jax_enable_x64", True)
 
@@ -29,7 +28,7 @@ class IdealQubit(Device):
         assert "f" in params, "IdealQubit requires a frequency parameter 'f'."
 
         params["Δ"] = params.get("Δ", 0.0)
-        
+
     def common_ops(self):
         """Written in the linear basis."""
         ops = {}
