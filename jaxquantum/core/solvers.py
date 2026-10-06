@@ -618,7 +618,7 @@ def _mesolve_cuquantum_result(
 
     def rhs(t, rho, _):
         h_term = h_at(t)._impl.to_operator_term()
-        liouvillian = Operator(space_dims)
+        liouvillian = Operator(space_dims, simplify=True)
         liouvillian.append(h_term, dual=False, coeff=-1j)
         liouvillian.append(h_term, dual=True, coeff=1j)
         if dissipator is not None:
@@ -652,7 +652,7 @@ def _sesolve_cuquantum_result(
 
     def rhs(t, psi, _):
         h_term = h_at(t)._impl.to_operator_term()
-        op = Operator(space_dims)
+        op = Operator(space_dims, simplify=True)
         op.append(h_term, dual=False, coeff=-1j)
         psi_shape = psi.shape
         state = State(psi.reshape(*psi.shape[:-1], *space_dims))
