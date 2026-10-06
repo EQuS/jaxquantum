@@ -558,7 +558,7 @@ def _mesolve_cuquantum_result(
 ) -> diffrax.Solution:
     """Solve a master equation using cuDensityMat operator actions."""
     from cuquantum.densitymat.jax import Operator, State, operator_action
-    from jaxquantum.core.cuquantum_impl import _cuqnt_dag
+    from jaxquantum.core.cuquantum_impl import _cuqnt_dag, _reverse_elementary_product
     from jaxquantum.utils.cuquantum_util import OperatorTerm
 
     h_test = H if isinstance(H, Qarray) else H(tlist[0])
@@ -588,19 +588,30 @@ def _mesolve_cuquantum_result(
                 raise ValueError("Only a single term is supported in a collapse operator")
             left_factors = left[0]
             right_factors = right[0]
-            modes = left.modes[0]
+            left_modes = left.modes[0]
+            right_modes = right.modes[0]
+            ket_duals = (False,) * len(left_modes)
+            bra_duals = (True,) * len(right_modes)
+            bra_jump_factors, bra_jump_modes, _ = _reverse_elementary_product(
+                right_factors, right_modes, bra_duals
+            )
+            bra_anti_factors, bra_anti_modes, _ = _reverse_elementary_product(
+                (*left_factors, *right_factors),
+                left_modes + right_modes,
+                bra_duals + bra_duals,
+            )
             coeff = left.coeffs[0] * jnp.conj(left.coeffs[0])
             dissipator.append(
-                [*left_factors, *right_factors], modes=modes + modes,
-                duals=[False, True], coeff=coeff,
+                [*left_factors, *bra_jump_factors], modes=left_modes + bra_jump_modes,
+                duals=ket_duals + bra_duals, coeff=coeff,
             )
             dissipator.append(
-                [*right_factors, *left_factors], modes=modes + modes,
-                duals=[True, True], coeff=-0.5 * coeff,
+                bra_anti_factors, modes=bra_anti_modes,
+                duals=bra_duals + bra_duals, coeff=-0.5 * coeff,
             )
             dissipator.append(
-                [*left_factors, *right_factors], modes=modes + modes,
-                duals=[False, False], coeff=-0.5 * coeff,
+                [*left_factors, *right_factors], modes=left_modes + right_modes,
+                duals=ket_duals + ket_duals, coeff=-0.5 * coeff,
             )
 
     h_at = (lambda t: H) if isinstance(H, Qarray) else H

@@ -31,7 +31,6 @@ on the jaxquantum side only — ``OperatorTerm`` itself keeps its mathematical
 
 from __future__ import annotations
 
-from copy import deepcopy
 from math import prod
 
 import jax.numpy as jnp
@@ -229,15 +228,32 @@ def _cuqnt_dag_dense_data(data):
     return jnp.conj(jnp.transpose(data, perm))
 
 
+def _reverse_elementary_product(op_prod, modes, duals):
+    """Reverse sequential factors while preserving each factor's mode order."""
+    groups = []
+    offset = 0
+    for base_op in op_prod:
+        next_offset = offset + base_op.num_modes
+        groups.append(
+            (base_op, modes[offset:next_offset], duals[offset:next_offset])
+        )
+        offset = next_offset
+    if offset != len(modes) or offset != len(duals):
+        raise ValueError("Elementary operator factors, modes, and duals do not align.")
+    return (
+        tuple(base_op for base_op, _, _ in reversed(groups)),
+        tuple(mode for _, group, _ in reversed(groups) for mode in group),
+        tuple(dual for _, _, group in reversed(groups) for dual in group),
+    )
+
+
 def _cuqnt_dag(ot: OperatorTerm) -> OperatorTerm:
     """Hermitian conjugate of an ``OperatorTerm``.
 
-    For ``ElementaryOperator`` products the operator order is preserved
-    (elementary products are tensor products on disjoint modes — or commuting
-    ket/bra placements via ``duals`` — so they commute).  For
-    ``MatrixOperator`` products the order is reversed (matrix products are
-    sequential).  Multidiagonal ``ElementaryOperator`` products raise
-    ``NotImplementedError``.
+    Reverse the factors of each product, preserving the mode order within a
+    factor.  Elementary factors can act sequentially on the same mode, so
+    they do not generally commute.  Multidiagonal ``ElementaryOperator``
+    products raise ``NotImplementedError``.
     """
     out = OperatorTerm(ot.dims)
     for op_prod, modes, conjs, duals, coeff in zip(
@@ -249,10 +265,19 @@ def _cuqnt_dag(ot: OperatorTerm) -> OperatorTerm:
                     raise NotImplementedError(
                         "_cuqnt_dag is not supported for multidiagonal ElementaryOperator."
                     )
-            dagged = tuple(
-                ElementaryOperator(_cuqnt_dag_dense_data(base_op.data)) for base_op in op_prod
+            reversed_ops, reversed_modes, reversed_duals = _reverse_elementary_product(
+                op_prod, modes, duals
             )
-            out.append(dagged, modes=modes, duals=duals, coeff=coeff.conj())
+            dagged = tuple(
+                ElementaryOperator(_cuqnt_dag_dense_data(base_op.data))
+                for base_op in reversed_ops
+            )
+            out.append(
+                dagged,
+                modes=reversed_modes,
+                duals=reversed_duals,
+                coeff=coeff.conj(),
+            )
         else:  # MatrixOperator: sequential, must reverse
             dagged = tuple(
                 MatrixOperator(_cuqnt_dag_dense_data(mat_op.data)) for mat_op in reversed(op_prod)

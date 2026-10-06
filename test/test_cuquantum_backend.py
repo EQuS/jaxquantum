@@ -50,7 +50,7 @@ import jax.numpy as jnp
 import jaxquantum as jqt
 from cuquantum.densitymat.jax import OperatorTerm
 from jaxquantum.core.qarray import QarrayImplType
-from jaxquantum.core.cuquantum_impl import CuquantumImpl
+from jaxquantum.core.cuquantum_impl import CuquantumImpl, _cuqnt_dag
 
 # Mark every test in this module so CI's `-m "not cuquantum"` excludes them.
 pytestmark = pytest.mark.cuquantum
@@ -185,6 +185,18 @@ class TestArithmetic:
         # Double-dag should restore the original.
         assert jnp.allclose(self.a.dag().dag().to_dense().data, self.a_mat)
 
+    def test_composed_adjoint_reverses_factors_and_modes(self):
+        a = jqt.destroy(3, implementation="cuquantum")
+        n = jqt.num(3, implementation="cuquantum")
+        y = jqt.sigmay(implementation="cuquantum")
+        product = jqt.tensor(a @ n, y)
+        dagged = CuquantumImpl.from_data(_cuqnt_dag(product._impl.to_operator_term()))
+
+        assert jnp.allclose(
+            dagged.to_dense()._data,
+            product.to_dense().data.conj().T,
+        )
+
 
 # ===========================================================================
 # Kronecker / tensor product with mode bookkeeping
@@ -278,6 +290,49 @@ class TestSolverParity:
 
         assert jnp.allclose(cu.data, ref.data, atol=1e-5)
 
+    def test_mesolve_two_mode_collapse(self):
+        h_dense = jqt.tensor(jqt.sigmaz(), jqt.sigmaz())
+        h_cu = jqt.tensor(
+            jqt.sigmaz(implementation="cuquantum"),
+            jqt.sigmaz(implementation="cuquantum"),
+        )
+        l_dense = jqt.tensor(jqt.sigmam(), jqt.sigmaz())
+        l_cu = jqt.tensor(
+            jqt.sigmam(implementation="cuquantum"),
+            jqt.sigmaz(implementation="cuquantum"),
+        )
+        rho0 = jqt.tensor(jqt.basis(2, 1), jqt.basis(2, 0)).to_dm()
+        tlist = jnp.linspace(0, 0.2, 5)
+        opts = jqt.SolverOptions.create(progress_meter=False)
+
+        ref = jqt.mesolve(
+            h_dense, rho0, tlist,
+            c_ops=jqt.Qarray.from_list([l_dense]), solver_options=opts,
+        )
+        cu = jqt.mesolve(h_cu, rho0, tlist, c_ops=[l_cu], solver_options=opts)
+
+        assert jnp.allclose(cu.data, ref.data, atol=1e-5)
+
+    def test_mesolve_composed_single_mode_collapse(self):
+        h_dense = jqt.num(3)
+        h_cu = jqt.num(3, implementation="cuquantum")
+        l_dense = jqt.destroy(3) @ jqt.num(3)
+        l_cu = (
+            jqt.destroy(3, implementation="cuquantum")
+            @ jqt.num(3, implementation="cuquantum")
+        )
+        rho0 = jqt.basis(3, 2).to_dm()
+        tlist = jnp.linspace(0, 0.2, 5)
+        opts = jqt.SolverOptions.create(progress_meter=False)
+
+        ref = jqt.mesolve(
+            h_dense, rho0, tlist,
+            c_ops=jqt.Qarray.from_list([l_dense]), solver_options=opts,
+        )
+        cu = jqt.mesolve(h_cu, rho0, tlist, c_ops=[l_cu], solver_options=opts)
+
+        assert jnp.allclose(cu.data, ref.data, atol=1e-5)
+
     def test_mesolve_amplitude_decay_complex_H_real_L(self):
         # Single-qubit amplitude damping with σx drive.
         gamma = 0.05
@@ -292,7 +347,7 @@ class TestSolverParity:
         tlist = jnp.linspace(0, 1.0, 11)
         opts = jqt.SolverOptions.create(progress_meter=False)
 
-        ref = jqt.mesolve(
+        jqt.mesolve(
             H_dense, rho0, tlist,
             c_ops=jqt.Qarray.from_list([L_dense]),
             solver_options=opts,
@@ -304,7 +359,7 @@ class TestSolverParity:
 
 
         with pytest.raises(ValueError, match="please make sure the Hamiltonian and collapse operators are of the same dtype"):
-            cu = jqt.mesolve(
+            jqt.mesolve(
                 H_cu, rho0, tlist,
                 c_ops=[L_cu],
                 solver_options=opts,
