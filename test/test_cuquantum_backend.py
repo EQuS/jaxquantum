@@ -333,37 +333,63 @@ class TestSolverParity:
 
         assert jnp.allclose(cu.data, ref.data, atol=1e-5)
 
-    def test_mesolve_amplitude_decay_complex_H_real_L(self):
-        # Single-qubit amplitude damping with σx drive.
+    def test_mesolve_complex_h_real_collapse_matches_dense(self):
         gamma = 0.05
-
-        L_dense = (jnp.sqrt(gamma)) * jqt.sigmam()
-        L_cu = (jnp.sqrt(gamma) ) * jqt.sigmam(implementation="cuquantum")
-
+        L_dense = jnp.sqrt(gamma) * jqt.sigmam()
+        L_cu = jnp.sqrt(gamma) * jqt.sigmam(implementation="cuquantum")
         H_dense = 0.5 * jqt.sigmay()
         H_cu = 0.5 * jqt.sigmay(implementation="cuquantum")
-
         rho0 = jqt.basis(2, 0).to_dm()
         tlist = jnp.linspace(0, 1.0, 11)
         opts = jqt.SolverOptions.create(progress_meter=False)
 
-        jqt.mesolve(
+        ref = jqt.mesolve(
             H_dense, rho0, tlist,
             c_ops=jqt.Qarray.from_list([L_dense]),
             solver_options=opts,
         )
+        cu = jqt.mesolve(H_cu, rho0, tlist, c_ops=[L_cu], solver_options=opts)
 
-        # cuquantum c_ops must be passed as a Python list — Qarray.from_list
-        # densifies cuquantum impls (no batched OperatorTerm exists).
-        # should raise ValueError
+        assert jnp.allclose(cu.data, ref.data, atol=1e-5)
 
+    def test_mesolve_real_h_complex_collapse_matches_dense(self):
+        H_dense = 0.5 * jqt.sigmax()
+        H_cu = 0.5 * jqt.sigmax(implementation="cuquantum")
+        L_dense = 0.2 * jqt.sigmay()
+        L_cu = 0.2 * jqt.sigmay(implementation="cuquantum")
+        rho0 = jqt.basis(2, 0).to_dm()
+        tlist = jnp.linspace(0, 0.5, 7)
+        opts = jqt.SolverOptions.create(progress_meter=False)
 
-        with pytest.raises(ValueError, match="please make sure the Hamiltonian and collapse operators are of the same dtype"):
-            jqt.mesolve(
-                H_cu, rho0, tlist,
-                c_ops=[L_cu],
-                solver_options=opts,
-            )
+        ref = jqt.mesolve(
+            H_dense, rho0, tlist,
+            c_ops=jqt.Qarray.from_list([L_dense]), solver_options=opts,
+        )
+        cu = jqt.mesolve(H_cu, rho0, tlist, c_ops=[L_cu], solver_options=opts)
+
+        assert jnp.allclose(cu.data, ref.data, atol=1e-5)
+
+    def test_mesolve_summed_collapse_keeps_cross_terms(self):
+        H_dense = jqt.sigmax()
+        H_cu = jqt.sigmax(implementation="cuquantum")
+        L_dense = jqt.sigmam() + 0.2 * jqt.sigmaz()
+        L_cu = (
+            jqt.sigmam(implementation="cuquantum")
+            + 0.2 * jqt.sigmaz(implementation="cuquantum")
+        )
+        rho0 = jqt.Qarray.create(
+            jnp.array([[0.6, 0.2 + 0.1j], [0.2 - 0.1j, 0.4]], dtype=jnp.complex128)
+        )
+        tlist = jnp.linspace(0, 0.2, 5)
+        opts = jqt.SolverOptions.create(progress_meter=False)
+
+        ref = jqt.mesolve(
+            H_dense, rho0, tlist,
+            c_ops=jqt.Qarray.from_list([L_dense]), solver_options=opts,
+        )
+        cu = jqt.mesolve(H_cu, rho0, tlist, c_ops=[L_cu], solver_options=opts)
+
+        assert jnp.allclose(cu.data, ref.data, atol=1e-5)
 
 
 # ===========================================================================

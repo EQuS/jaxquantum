@@ -69,7 +69,7 @@ from jaxquantum.core.qarray import (  # noqa: E402
 # ``duals``, ``coeffs``, ``append``) lets jaxquantum work with any cuquantum
 # release that ships a basic ``OperatorTerm``.
 
-def _cuqnt_copy_base_op(op):
+def _cuqnt_copy_base_op(op, dtype=None):
     """Return a fresh ``ElementaryOperator`` / ``MatrixOperator`` wrapping the same data.
 
     The original instance may have an associated cuDensityMat ``_ptr`` (after
@@ -79,9 +79,10 @@ def _cuqnt_copy_base_op(op):
     ``_ptr=None``.  Underlying JAX array storage is shared (immutable), which
     is fine.
     """
+    data = op.data if dtype is None else jnp.asarray(op.data, dtype=dtype)
     if isinstance(op, ElementaryOperator):
-        return ElementaryOperator(op.data, diag_offsets=op.diag_offsets)
-    return MatrixOperator(op.data)
+        return ElementaryOperator(data, diag_offsets=op.diag_offsets)
+    return MatrixOperator(data)
 
 
 def _cuqnt_check_dims(left: OperatorTerm, right: OperatorTerm, op_name: str) -> None:
@@ -92,13 +93,28 @@ def _cuqnt_check_dims(left: OperatorTerm, right: OperatorTerm, op_name: str) -> 
         )
 
 
-def _cuqnt_append_copied_product(out, op_prod, modes, conjs, duals, coeff):
+def _cuqnt_append_copied_product(out, op_prod, modes, conjs, duals, coeff, dtype=None):
     """Helper: dispatch on Elementary vs Matrix and append a copy of ``op_prod`` to ``out``."""
-    copied = tuple(_cuqnt_copy_base_op(op) for op in op_prod)
+    copied = tuple(_cuqnt_copy_base_op(op, dtype=dtype) for op in op_prod)
     if isinstance(op_prod[0], ElementaryOperator):
         out.append(copied, modes=modes, duals=duals, coeff=coeff)
     else:
         out.append(copied, conjs=conjs, duals=duals, coeff=coeff)
+
+
+def _cuqnt_cast_dtype(ot: OperatorTerm, dtype) -> OperatorTerm:
+    """Promote base-operator data without materializing the full matrix."""
+    dtype = jnp.dtype(dtype)
+    if not ot.op_prods or ot.dtype == dtype:
+        return ot
+    out = OperatorTerm(ot.dims)
+    for op_prod, modes, conjs, duals, coeff in zip(
+        ot.op_prods, ot.modes, ot.conjs, ot.duals, ot.coeffs
+    ):
+        _cuqnt_append_copied_product(
+            out, op_prod, modes, conjs, duals, coeff, dtype=dtype
+        )
+    return out
 
 
 def _cuqnt_add(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:

@@ -558,7 +558,12 @@ def _mesolve_cuquantum_result(
 ) -> diffrax.Solution:
     """Solve a master equation using cuDensityMat operator actions."""
     from cuquantum.densitymat.jax import Operator, State, operator_action
-    from jaxquantum.core.cuquantum_impl import _cuqnt_dag, _reverse_elementary_product
+
+    from jaxquantum.core.cuquantum_impl import (
+        _cuqnt_cast_dtype,
+        _cuqnt_dag,
+        _reverse_elementary_product,
+    )
     from jaxquantum.utils.cuquantum_util import OperatorTerm
 
     h_test = H if isinstance(H, Qarray) else H(tlist[0])
@@ -576,66 +581,79 @@ def _mesolve_cuquantum_result(
             "cuquantum mesolve requires a list of cuquantum-backed collapse operators"
         )
 
+    for collapse_op in collapse_ops:
+        if not isinstance(collapse_op, Qarray) or collapse_op.impl_type != QarrayImplType.CUQUANTUM:
+            raise TypeError("Every collapse operator must use the cuquantum backend")
+
+    operator_terms = [
+        h_test._impl.to_operator_term(),
+        *(collapse_op._impl.to_operator_term() for collapse_op in collapse_ops),
+    ]
+    data_dtypes = [term.dtype for term in operator_terms if term.op_prods]
+    target_dtype = jnp.result_type(*data_dtypes) if data_dtypes else jnp.complex128
+
     dissipator = None
     if collapse_ops:
         dissipator = OperatorTerm(space_dims)
         for collapse_op in collapse_ops:
-            if not isinstance(collapse_op, Qarray) or collapse_op.impl_type != QarrayImplType.CUQUANTUM:
-                raise TypeError("Every collapse operator must use the cuquantum backend")
-            left = collapse_op._impl._data
+            left = _cuqnt_cast_dtype(collapse_op._impl._data, target_dtype)
             right = _cuqnt_dag(left)
-            if len(left.op_prods) != 1:
-                raise ValueError("Only a single term is supported in a collapse operator")
-            left_factors = left[0]
-            right_factors = right[0]
-            left_modes = left.modes[0]
-            right_modes = right.modes[0]
-            ket_duals = (False,) * len(left_modes)
-            bra_duals = (True,) * len(right_modes)
-            bra_jump_factors, bra_jump_modes, _ = _reverse_elementary_product(
-                right_factors, right_modes, bra_duals
-            )
-            bra_anti_factors, bra_anti_modes, _ = _reverse_elementary_product(
-                (*left_factors, *right_factors),
-                left_modes + right_modes,
-                bra_duals + bra_duals,
-            )
-            coeff = left.coeffs[0] * jnp.conj(left.coeffs[0])
-            dissipator.append(
-                [*left_factors, *bra_jump_factors], modes=left_modes + bra_jump_modes,
-                duals=ket_duals + bra_duals, coeff=coeff,
-            )
-            dissipator.append(
-                bra_anti_factors, modes=bra_anti_modes,
-                duals=bra_duals + bra_duals, coeff=-0.5 * coeff,
-            )
-            dissipator.append(
-                [*left_factors, *right_factors], modes=left_modes + right_modes,
-                duals=ket_duals + ket_duals, coeff=-0.5 * coeff,
-            )
+            for left_factors, left_modes, left_coeff in zip(
+                left.op_prods, left.modes, left.coeffs
+            ):
+                for right_factors, right_modes, right_coeff in zip(
+                    right.op_prods, right.modes, right.coeffs
+                ):
+                    ket_duals = (False,) * len(left_modes)
+                    bra_duals = (True,) * len(right_modes)
+                    bra_jump_factors, bra_jump_modes, _ = _reverse_elementary_product(
+                        right_factors, right_modes, bra_duals
+                    )
+                    bra_anti_factors, bra_anti_modes, _ = _reverse_elementary_product(
+                        (*left_factors, *right_factors),
+                        left_modes + right_modes,
+                        bra_duals + bra_duals,
+                    )
+                    coeff = left_coeff * right_coeff
+                    dissipator.append(
+                        [*left_factors, *bra_jump_factors],
+                        modes=left_modes + bra_jump_modes,
+                        duals=ket_duals + bra_duals,
+                        coeff=coeff,
+                    )
+                    dissipator.append(
+                        bra_anti_factors,
+                        modes=bra_anti_modes,
+                        duals=bra_duals + bra_duals,
+                        coeff=-0.5 * coeff,
+                    )
+                    dissipator.append(
+                        [*left_factors, *right_factors],
+                        modes=left_modes + right_modes,
+                        duals=ket_duals + ket_duals,
+                        coeff=-0.5 * coeff,
+                    )
 
     h_at = (lambda t: H) if isinstance(H, Qarray) else H
 
     def rhs(t, rho, _):
         h_term = h_at(t)._impl.to_operator_term()
+        rhs_dtype = jnp.result_type(target_dtype, h_term.dtype) if h_term.op_prods else target_dtype
+        h_term = _cuqnt_cast_dtype(h_term, rhs_dtype)
+        rhs_dissipator = (
+            _cuqnt_cast_dtype(dissipator, rhs_dtype) if dissipator is not None else None
+        )
         liouvillian = Operator(space_dims, simplify=True)
         liouvillian.append(h_term, dual=False, coeff=-1j)
         liouvillian.append(h_term, dual=True, coeff=1j)
-        if dissipator is not None:
-            liouvillian.append(dissipator, dual=False, coeff=1.0)
+        if rhs_dissipator is not None:
+            liouvillian.append(rhs_dissipator, dual=False, coeff=1.0)
         rho_shape = rho.shape
         state = State(rho.reshape(*rho.shape[:-2], *space_dims, *space_dims))
         derivative = operator_action(liouvillian, state).get_data()[0]
         return derivative.reshape(rho_shape)
 
-    try:
-        return solve(rhs, rho0_arr, tlist, saveat_tlist, solver_options=solver_options)
-    except ValueError as exc:
-        if "operator terms" in str(exc):
-            raise ValueError(
-                "please make sure the Hamiltonian and collapse operators are of the same dtype"
-            ) from exc
-        raise
+    return solve(rhs, rho0_arr, tlist, saveat_tlist, solver_options=solver_options)
 
 
 def _sesolve_cuquantum_result(
