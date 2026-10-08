@@ -100,3 +100,4 @@ markers = [
     "cuquantum: tests that require the cuquantum.densitymat.jax extension (GPU)",
 ]
 addopts = "-m 'not cuquantum'"
+norecursedirs = ["manual_multi_gpu"]

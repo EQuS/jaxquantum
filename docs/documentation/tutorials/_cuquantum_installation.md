@@ -48,3 +48,5 @@ export CUDENSITYMAT_COMM_LIB=/private/path/libcudensitymat_distributed_interface
 ```
 
 With an interactive two-GPU allocation (`salloc -p mit_normal_gpu -N 1 -c 2 --mem=4G --gres=gpu:l40s:2 --time=00:10:00`), the sample passed using `mpirun --oversubscribe -n 2 --mca pml ucx python /private/path/cuquantum_python_jax_cu13-0.0.7/samples/densitymat/example9a_sharding_init.py`. Open MPI sees one slot in this interactive allocation, hence `--oversubscribe` for the two ranks.
+
+For jaxquantum's single-process physical-GPU checks, run `pytest -q test/manual_multi_gpu/test_two_gpu_sharding.py` inside a two-GPU allocation. This directory is excluded from default pytest discovery and CI.
