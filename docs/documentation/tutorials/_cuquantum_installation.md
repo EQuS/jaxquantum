@@ -34,19 +34,23 @@ python -m pip check
 
 For later sessions, load `miniforge` and `cuda`, then activate `cqt-env` on an allocated GPU node. CMake is needed only while building the PID.
 
-For the two-GPU `example9a_sharding_init.py` test, also build the cuDensityMat MPI interface against ORCD's Open MPI (keep the output outside Git):
+To execute the tutorial with `jupyter nbconvert`, also install `nbconvert ipykernel` in `cqt-env`.
+
+For physical multi-GPU runs, install a CUDA-aware MPI. ORCD's `openmpi/5.0.8` module is built without CUDA buffer support and crashes on the larger Bose-Hubbard workload. The conda-forge build below reports `mpi_built_with_cuda_support:value:true`. Keep the MPI interface outside Git:
 
 ```bash
-module load openmpi/5.0.8
+conda install -c conda-forge openmpi=5.0.8
 MPICC=mpicc python -m pip install --no-binary=mpi4py mpi4py
 tar -xzf /private/path/cuquantum_python_jax_cu13-0.0.7.tar.gz -C /private/path
 pkg="$CONDA_PREFIX/lib/python3.11/site-packages/cuquantum"
-mpicc -shared -std=c99 -fPIC -I"$CUDA_HOME/include" -I"$pkg/include" \
+gcc -shared -std=c99 -fPIC -I"$CUDA_HOME/include" -I"$pkg/include" \
+  -I"$CONDA_PREFIX/include" \
   "$pkg/distributed_interfaces/cudensitymat_distributed_interface_mpi.c" \
+  -L"$CONDA_PREFIX/lib" -Wl,-rpath,"$CONDA_PREFIX/lib" -lmpi \
   -o /private/path/libcudensitymat_distributed_interface_mpi.so
 export CUDENSITYMAT_COMM_LIB=/private/path/libcudensitymat_distributed_interface_mpi.so
 ```
 
-With an interactive two-GPU allocation (`salloc -p mit_normal_gpu -N 1 -c 2 --mem=4G --gres=gpu:l40s:2 --time=00:10:00`), the sample passed using `mpirun --oversubscribe -n 2 --mca pml ucx python /private/path/cuquantum_python_jax_cu13-0.0.7/samples/densitymat/example9a_sharding_init.py`. Open MPI sees one slot in this interactive allocation, hence `--oversubscribe` for the two ranks.
+With an interactive two-GPU allocation (`salloc -p mit_normal_gpu -N 1 -c 4 --mem=16G --gres=gpu:l40s:2 --time=00:45:00`), run `mpirun --oversubscribe -n 2 --mca pml ucx python /private/path/cuquantum_python_jax_cu13-0.0.7/samples/densitymat/example9a_sharding_init.py`. Open MPI sees one slot in this interactive allocation, hence `--oversubscribe`. The tutorial's optional one-versus-two GPU sweep also needs this MPI setup.
 
 For jaxquantum's single-process physical-GPU checks, run `pytest -q test/manual_multi_gpu/test_two_gpu_sharding.py` inside a two-GPU allocation. This directory is excluded from default pytest discovery and CI.
