@@ -51,6 +51,6 @@ gcc -shared -std=c99 -fPIC -I"$CUDA_HOME/include" -I"$pkg/include" \
 export CUDENSITYMAT_COMM_LIB=/private/path/libcudensitymat_distributed_interface_mpi.so
 ```
 
-With an interactive two-GPU allocation (`salloc -p mit_normal_gpu -N 1 -c 4 --mem=16G --gres=gpu:l40s:2 --time=00:45:00`), run `mpirun --oversubscribe -n 2 --mca pml ucx python /private/path/cuquantum_python_jax_cu13-0.0.7/samples/densitymat/example9a_sharding_init.py`. Open MPI sees one slot in this interactive allocation, hence `--oversubscribe`. The tutorial's optional one-versus-two GPU sweep also needs this MPI setup.
+With an interactive two-GPU allocation (`salloc -p mit_normal_gpu -N 1 -c 4 --mem=16G --gres=gpu:l40s:2 --time=00:45:00`), run `mpirun --oversubscribe -n 2 --mca pml ucx python /private/path/cuquantum_python_jax_cu13-0.0.7/samples/densitymat/example9a_sharding_init.py`. Open MPI sees one slot in this interactive allocation, hence `--oversubscribe`. The tutorial's optional multi-GPU sweep also needs this MPI setup. For cuQuantum pure-state actions that cross GPU shards, set `UCX_MEMTYPE_CACHE=n` before `mpirun --mca pml ucx`; without it, PID 0.0.7 on ORCD segfaulted in `MPI_Isend`. `mit_normal_gpu` permits at most two GPUs per user; request four under `mit_preemptable` and expect possible preemption.
 
 For jaxquantum's single-process physical-GPU checks, run `pytest -q test/manual_multi_gpu/test_two_gpu_sharding.py` inside a two-GPU allocation. This directory is excluded from default pytest discovery and CI.
