@@ -124,6 +124,12 @@ class QarrayImplType(Enum):
         for cls_key, member in _IMPL_REGISTRY.items():
             if member is self:
                 return cls_key
+        if self is QarrayImplType.CUQUANTUM:
+            raise ImportError(
+                "The cuquantum backend is unavailable. Install cuquantum-python-cu13 "
+                "and the cuquantum JAX 0.0.7 PID to use it; see "
+                "docs/documentation/tutorials/_cuquantum_installation.md."
+            )
         raise ValueError(f"No impl class registered for {self}")
 
 
