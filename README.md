@@ -32,8 +32,8 @@ Paste this prompt into your agent:
 > Get started with jaxquantum by reading https://jaxquantum.org/AGENTS.md.
 
 The site publishes the root [AGENTS.md](https://jaxquantum.org/AGENTS.md) from
-this repository. For an unreleased branch, point the agent to
-[AGENTS.md in that branch](AGENTS.md) so it reads the matching guide.
+this repository. For an unreleased branch, point the agent to the root
+`AGENTS.md` in that branch so it reads the matching guide.
 
 ### Install manually
 

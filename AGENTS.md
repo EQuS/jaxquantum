@@ -6,13 +6,13 @@ If someone provides only a GitHub repository link, read this file at the same
 branch or commit before choosing commands. Ask these questions in one short
 message, omitting anything the user has already answered:
 
-1. Do you want to **use** jaxquantum in your own code, or **develop** it and
+1. Do you want to **use** jaxquantum in your own code, or also **develop** it and
    prepare pull requests?
 2. What OS will run Python (Windows, Linux, macOS, or WSL), and what hardware
    should JAX use (CPU, NVIDIA GPU, or TPU)? For a GPU, how many devices?
 3. Do you want the optional cuQuantum backend? If yes, do you have access to
    Shantanu's private `cuquantum_python_jax_cu13-0.0.7.tar.gz` PID, and where
-   is it stored? Do not request the archive's contents or credentials.
+   is it stored?
 4. Do you have an environment to reuse, or should I create an isolated one?
 
 Use the answers to select one track below. For NVIDIA GPUs on Windows, use
