@@ -25,6 +25,18 @@
 
 ## Installation
 
+### With an AI coding agent
+
+Paste this prompt into your agent:
+
+> Get started with jaxquantum by reading https://jaxquantum.org/AGENTS.md.
+
+The site publishes the root [AGENTS.md](https://jaxquantum.org/AGENTS.md) from
+this repository. For an unreleased branch, point the agent to
+[AGENTS.md in that branch](AGENTS.md) so it reads the matching guide.
+
+### Install manually
+
 ```bash
 pip install jaxquantum
 ```
@@ -35,7 +47,10 @@ For GPU (NVIDIA, CUDA13) or TPU, use the `[gpu]` or `[tpu]` extras. For the late
 pip install git+https://github.com/EQuS/jaxquantum.git
 ```
 
-For development (editable + dev/docs extras): `pip install -e ".[dev,docs]"`. See the [installation guide](https://jaxquantum.org/documentation/getting_started/installation.html) for full details, hardware checks, and troubleshooting.
+For development, clone the repository and install it editable with
+`pip install -e ".[dev,docs,tests]"`. See the
+[installation guide](https://jaxquantum.org/documentation/getting_started/installation.html)
+for hardware checks and troubleshooting.
 
 
 ## Quick Start
