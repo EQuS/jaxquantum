@@ -1,31 +1,6 @@
-"""Tests for the cuQuantum backend.
+"""cuQuantum backend parity tests; run with ``pytest -o addopts=`` on a GPU host."""
 
-These tests are tagged with the ``cuquantum`` pytest marker and additionally
-guarded with ``pytest.importorskip`` at module load.  The default CI flow
-selects ``-m "not cuquantum"`` (configured in ``pyproject.toml``) so they
-never run there.
-
-Run them locally on a machine with cuquantum + CUDA::
-
-    pytest test/test_cuquantum_backend.py
-    pytest -m cuquantum
-
-Skip them everywhere else::
-
-    pytest -m "not cuquantum"
-
-The tests fall into two groups:
-
-- **Construction / arithmetic** (no GPU needed).  These exercise
-  ``CuquantumImpl`` arithmetic via ``to_dense()`` round-trips, comparing
-  against the reference dense backend.  They run on any box where
-  ``cuquantum`` imports cleanly.
-- **Solver / operator_action** (GPU needed).  ``mesolve``/``sesolve`` on a
-  cuquantum-backed Hamiltonian go through ``cuquantum.densitymat.jax``'s
-  ``operator_action``, which requires a CUDA device.  These tests are
-  individually marked ``cuquantum_gpu`` so they can be deselected on
-  cuquantum-but-no-GPU hosts.
-"""
+# ruff: noqa: E402 -- JAX x64 must be enabled before importing cuQuantum.
 
 import sys
 import os
@@ -100,6 +75,17 @@ class TestFromData:
         assert isinstance(d, OperatorTerm)
         assert d.dims == (N,)
 
+    def test_operator_term_preserves_mode_dims(self):
+        structured = jqt.tensor(
+            jqt.destroy(N, implementation="cuquantum"),
+            jqt.sigmax(implementation="cuquantum"),
+        )
+        restored = jqt.Qarray.create(
+            structured._impl.get_data(), implementation="cuquantum"
+        )
+        assert restored.dims == structured.dims
+        assert jnp.allclose(restored.to_dense().data, structured.to_dense().data)
+
 
 # ===========================================================================
 # Operator constructors
@@ -136,6 +122,15 @@ class TestOperatorConstructors:
         assert I_like.shape == (4, 4)
         assert jnp.allclose(I_like.to_dense().data, jnp.eye(4))
 
+    def test_scaled_multimode_identity_stays_local(self):
+        H = jqt.tensor(
+            jqt.destroy(N, implementation="cuquantum"),
+            jqt.destroy(N, implementation="cuquantum"),
+        )
+        scaled = 2 * jqt.identity_like(H, implementation="cuquantum")
+        assert scaled._impl.get_data().op_prods[0][0].num_modes == 1
+        assert jnp.allclose(scaled.to_dense().data, 2 * jnp.eye(N * N))
+
 
 # ===========================================================================
 # Arithmetic vs dense reference
@@ -163,6 +158,22 @@ class TestArithmetic:
     def test_mul_complex(self):
         scaled = self.a * (1.0 + 2.0j)
         assert jnp.allclose(scaled.to_dense().data, self.a_mat * (1.0 + 2.0j))
+
+    def test_mixed_real_complex_arithmetic(self):
+        x = jqt.sigmax(implementation="cuquantum")
+        y = jqt.sigmay(implementation="cuquantum")
+        x_ref, y_ref = jqt.sigmax().data, jqt.sigmay().data
+        for actual, expected in (
+            (x + y, x_ref + y_ref),
+            (x - y, x_ref - y_ref),
+            (x @ y, x_ref @ y_ref),
+            (jqt.tensor(x, y), jnp.kron(x_ref, y_ref)),
+        ):
+            assert jnp.allclose(actual.to_dense().data, expected)
+
+    def test_operator_times_dense_ket(self):
+        ket = jqt.basis(N, 1)
+        assert jnp.allclose((self.a @ ket).data, self.a_mat @ ket.data)
 
     def test_matmul_same_mode(self):
         # ad @ a on a 3-level system equals number operator
@@ -238,17 +249,33 @@ class TestKron:
 # Solver parity (requires GPU)
 # ===========================================================================
 
-cuquantum_gpu = pytest.mark.cuquantum  # alias; run via pytest -m cuquantum
-
-
-@cuquantum_gpu
 class TestSolverParity:
     """Compare cuquantum mesolve/sesolve against the dense backend.
 
-    These need a CUDA device; they will fail with a clear FFI error message
-    on cuquantum-but-no-GPU hosts.  Mark `not cuquantum_gpu` (or just
-    `not cuquantum`) to deselect them in that case.
+    These need a CUDA device and are excluded from the default test run.
     """
+
+    def test_time_dependent_hamiltonian(self):
+        tlist = jnp.linspace(0, 0.5, 7)
+        psi0 = jqt.basis(2, 0)
+        options = jqt.SolverOptions(progress_meter=None)
+        def dense_h(t):
+            return jnp.sin(t) * jqt.sigmax()
+
+        def cu_h(t):
+            return jnp.sin(t) * jqt.sigmax(implementation="cuquantum")
+
+        for solve, initial, dense_kwargs, cu_kwargs in (
+            (jqt.sesolve, psi0, {}, {}),
+            (
+                jqt.mesolve, psi0.to_dm(),
+                {"c_ops": jqt.Qarray.from_list([0.1 * jqt.sigmam()])},
+                {"c_ops": [0.1 * jqt.sigmam(implementation="cuquantum")]},
+            ),
+        ):
+            expected = solve(dense_h, initial, tlist, solver_options=options, **dense_kwargs)
+            actual = solve(cu_h, initial, tlist, solver_options=options, **cu_kwargs)
+            assert jnp.allclose(actual.data, expected.data, atol=1e-6)
 
     def test_sesolve_single_qubit_drive(self):
         # σx-driven qubit: ψ̇ = -i σx ψ, ψ(0) = |0>
@@ -256,7 +283,7 @@ class TestSolverParity:
         H_cu = 0.5 * jqt.sigmax(implementation="cuquantum")
         psi0 = jqt.basis(2, 0)
         tlist = jnp.linspace(0, 1.0, 11)
-        opts = jqt.SolverOptions.create(progress_meter=False)
+        opts = jqt.SolverOptions(progress_meter=None)
 
         ref = jqt.sesolve(H_dense, psi0, tlist, solver_options=opts)
         cu = jqt.sesolve(H_cu, psi0, tlist, solver_options=opts)
@@ -273,7 +300,7 @@ class TestSolverParity:
 
         rho0 = jqt.basis(2, 0).to_dm()
         tlist = jnp.linspace(0, 1.0, 11)
-        opts = jqt.SolverOptions.create(progress_meter=False)
+        opts = jqt.SolverOptions(progress_meter=None)
 
         ref = jqt.mesolve(
             H_dense, rho0, tlist,
@@ -303,7 +330,7 @@ class TestSolverParity:
         )
         rho0 = jqt.tensor(jqt.basis(2, 1), jqt.basis(2, 0)).to_dm()
         tlist = jnp.linspace(0, 0.2, 5)
-        opts = jqt.SolverOptions.create(progress_meter=False)
+        opts = jqt.SolverOptions(progress_meter=None)
 
         ref = jqt.mesolve(
             h_dense, rho0, tlist,
@@ -323,7 +350,7 @@ class TestSolverParity:
         )
         rho0 = jqt.basis(3, 2).to_dm()
         tlist = jnp.linspace(0, 0.2, 5)
-        opts = jqt.SolverOptions.create(progress_meter=False)
+        opts = jqt.SolverOptions(progress_meter=None)
 
         ref = jqt.mesolve(
             h_dense, rho0, tlist,
@@ -341,7 +368,7 @@ class TestSolverParity:
         H_cu = 0.5 * jqt.sigmay(implementation="cuquantum")
         rho0 = jqt.basis(2, 0).to_dm()
         tlist = jnp.linspace(0, 1.0, 11)
-        opts = jqt.SolverOptions.create(progress_meter=False)
+        opts = jqt.SolverOptions(progress_meter=None)
 
         ref = jqt.mesolve(
             H_dense, rho0, tlist,
@@ -359,7 +386,7 @@ class TestSolverParity:
         L_cu = 0.2 * jqt.sigmay(implementation="cuquantum")
         rho0 = jqt.basis(2, 0).to_dm()
         tlist = jnp.linspace(0, 0.5, 7)
-        opts = jqt.SolverOptions.create(progress_meter=False)
+        opts = jqt.SolverOptions(progress_meter=None)
 
         ref = jqt.mesolve(
             H_dense, rho0, tlist,
@@ -381,7 +408,7 @@ class TestSolverParity:
             jnp.array([[0.6, 0.2 + 0.1j], [0.2 - 0.1j, 0.4]], dtype=jnp.complex128)
         )
         tlist = jnp.linspace(0, 0.2, 5)
-        opts = jqt.SolverOptions.create(progress_meter=False)
+        opts = jqt.SolverOptions(progress_meter=None)
 
         ref = jqt.mesolve(
             H_dense, rho0, tlist,
@@ -398,29 +425,7 @@ class TestSolverParity:
 
 
 class TestOperatorImplementationFlagCuquantum:
-    """All primitives expose ``implementation="cuquantum"`` and produce
-    CUQUANTUM-backed Qarrays whose dense form matches the reference."""
-
-    @pytest.mark.parametrize(
-        "op_factory, ref_factory",
-        [
-            (lambda: jqt.sigmax(implementation="cuquantum"), lambda: jqt.sigmax()),
-            (lambda: jqt.sigmay(implementation="cuquantum"), lambda: jqt.sigmay()),
-            (lambda: jqt.sigmaz(implementation="cuquantum"), lambda: jqt.sigmaz()),
-            (lambda: jqt.hadamard(implementation="cuquantum"), lambda: jqt.hadamard()),
-            (lambda: jqt.sigmam(implementation="cuquantum"), lambda: jqt.sigmam()),
-            (lambda: jqt.sigmap(implementation="cuquantum"), lambda: jqt.sigmap()),
-            (lambda: jqt.destroy(N, implementation="cuquantum"), lambda: jqt.destroy(N)),
-            (lambda: jqt.create(N, implementation="cuquantum"), lambda: jqt.create(N)),
-            (lambda: jqt.num(N, implementation="cuquantum"), lambda: jqt.num(N)),
-            (lambda: jqt.identity(N, implementation="cuquantum"), lambda: jqt.identity(N)),
-        ],
-    )
-    def test_primitive_matches_dense(self, op_factory, ref_factory):
-        op = op_factory()
-        ref = ref_factory()
-        assert op.impl_type == QarrayImplType.CUQUANTUM
-        assert jnp.allclose(op.to_dense().data, ref.to_dense().data)
+    """Composite constructors preserve the requested backend."""
 
     def test_displace_round_trips_to_cuquantum(self):
         # ``expm`` densifies internally; the result must still come back as
@@ -465,6 +470,19 @@ class TestOperatorImplementationFlagCuquantum:
         assert eye.impl_type == QarrayImplType.CUQUANTUM
         assert jnp.allclose(eye.to_dense().data, jnp.eye(N * N))
 
+    def test_default_backend_uses_structured_constructor(self):
+        previous = jqt.SETTINGS["default_backend"]
+        rotation_dense = jqt.qubit_rotation(0.7, 1, 0, 0, implementation="dense")
+        try:
+            jqt.SETTINGS["default_backend"] = "cuquantum"
+            assert len(jqt.identity(N)._impl.get_data().op_prods) == 0
+            assert jqt.displace(N, 0.4).impl_type == QarrayImplType.CUQUANTUM
+            rotation = jqt.qubit_rotation(0.7, 1, 0, 0)
+            assert rotation.impl_type == QarrayImplType.CUQUANTUM
+            assert jnp.allclose(rotation.to_dense().data, rotation_dense.data)
+        finally:
+            jqt.SETTINGS["default_backend"] = previous
+
 
 class TestToBackendCuquantum:
     """``to_backend('cuquantum')`` from non-cuquantum sources goes through
@@ -491,3 +509,10 @@ class TestToBackendCuquantum:
     def test_noop_when_already_cuquantum(self):
         q = jqt.destroy(N, implementation="cuquantum")
         assert q.to_backend("cuquantum") is q
+
+    def test_multimode_dense_conversion_fails_clearly(self):
+        dense = jqt.tensor(jqt.destroy(2), jqt.sigmax())
+        with pytest.raises(ValueError, match="build local operators first"):
+            dense.to_backend("cuquantum")
+        with pytest.raises(ValueError, match="build local operators first"):
+            jqt.Qarray.create(dense.data, dims=dense.dims, implementation="cuquantum")

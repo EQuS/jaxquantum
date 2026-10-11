@@ -766,6 +766,9 @@ class Qarray(Generic[ImplT]):
             implementation = SETTINGS.get("default_backend", QarrayImplType.DENSE)
 
         data = robust_asarray(data)
+        is_cuquantum_term = type(data).__name__ == "OperatorTerm"
+        if is_cuquantum_term and dims is None:
+            dims = (tuple(data.dims), tuple(data.dims))
 
         # Whether the caller explicitly requested a qtype (vs. it being derived
         # from a full ``dims`` tuple). An explicit qtype is authoritative and
@@ -829,6 +832,18 @@ class Qarray(Generic[ImplT]):
             data = data.reshape(*target_shape)
 
         check_dims(dims, bdims, data.shape)
+
+        if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+            if bdims:
+                raise ValueError("The cuquantum backend does not support batched operators")
+            if is_cuquantum_term:
+                if tuple(data.dims) != tuple(dims[0]):
+                    raise ValueError("OperatorTerm dims do not match Qarray dims")
+            elif len(dims[0]) != 1:
+                raise ValueError(
+                    "A dense multi-mode operator cannot be converted to cuquantum "
+                    "without losing its site structure; build local operators first"
+                )
 
         # NOTE: Constantly tidying up on Qarray creation might be a bit overkill.
         # It increases the compilation time, but only very slightly
@@ -1289,6 +1304,11 @@ class Qarray(Generic[ImplT]):
         target_type = QarrayImplType(implementation)
         if self.impl_type == target_type:
             return self
+        if target_type == QarrayImplType.CUQUANTUM and len(self.space_dims) != 1:
+            raise ValueError(
+                "A dense multi-mode operator cannot be converted to cuquantum "
+                "without losing its site structure; build local operators first"
+            )
         target_class = target_type.get_impl_class()
         method_name = f"to_{target_type.value}"
         if hasattr(self._impl, method_name):
@@ -1465,8 +1485,10 @@ class Qarray(Generic[ImplT]):
         # never reshaped to (N,1) for storage.
         if st == Qtypes.oper and ot == Qtypes.ket:
             vec = other.to_dense().data  # (..., N)
-            if self.is_dense:
-                out = jnp.einsum("...ij,...j->...i", self.data, vec)
+            if self.is_dense or self.impl_type == QarrayImplType.CUQUANTUM:
+                # cuQuantum stores operators, not kets. Its solver uses
+                # operator_action; a standalone @ falls back to a dense matrix.
+                out = jnp.einsum("...ij,...j->...i", self.to_dense().data, vec)
             else:
                 # Transient column only inside the sparse kernel; never stored.
                 rhs = vec[..., None]  # (..., N, 1)
@@ -1492,7 +1514,6 @@ class Qarray(Generic[ImplT]):
         if isinstance(other, Qarray):
             return self.__matmul__(other)
 
-        # other = other + 0.0j
         if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
             # Broadcast per-batch scalars against the stored data: vectors carry
             # a single trailing space axis, operators carry two.

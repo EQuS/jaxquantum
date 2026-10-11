@@ -144,14 +144,13 @@ def _cuqnt_sub(left: OperatorTerm, right: OperatorTerm) -> OperatorTerm:
 def _cuqnt_scalar_mul(scalar, ot: OperatorTerm) -> OperatorTerm:
     """Scale every product's coefficient by ``scalar`` (Python or JAX scalar)."""
     out = OperatorTerm(ot.dims)
-
+    dtype = jnp.result_type(ot.dtype, scalar)
     for op_prod, modes, conjs, duals, coeff in zip(
         ot.op_prods, ot.modes, ot.conjs, ot.duals, ot.coeffs
     ):
-        if jnp.iscomplexobj(scalar):
-            op_prod = [ElementaryOperator(op.data + 0.0j) for op in op_prod]
-
-        _cuqnt_append_copied_product(out, op_prod, modes, conjs, duals, scalar * coeff)
+        _cuqnt_append_copied_product(
+            out, op_prod, modes, conjs, duals, scalar * coeff, dtype=dtype
+        )
     return out
 
 
@@ -315,20 +314,20 @@ def _materialize_if_empty(ot: OperatorTerm, modes=None, dtype=None) -> OperatorT
     """Replace an identity-encoded (empty) ``OperatorTerm`` with an explicit eye factor.
 
     ``OperatorTerm.append`` rejects an empty ``op_prod`` tuple, so the empty
-    ``OperatorTerm`` cannot be scaled or added to anything via the native
-    arithmetic.  This helper materialises it as a single-factor identity product
-    on ``modes``.  When ``modes`` is ``None`` all modes are used.  Callers
-    should pass the modes of the other operand so the identity acts on the same
-    subspace.
+    ``OperatorTerm`` cannot be scaled or added to anything via native
+    arithmetic. One local eye factor acts as identity on all other modes.
+    When ``modes`` is supplied, its first mode is used.
     """
     if ot.op_prods:
         return ot
     if modes is None:
         modes = tuple(range(len(ot.dims)))
-    mode_dims = tuple(ot.dims[m] for m in modes)
-    identity_data = jnp.eye(prod(mode_dims), dtype=dtype or jnp.complex128).reshape(*mode_dims, *mode_dims)
+    # One local eye acts as identity on every mode. A multi-mode eye would
+    # allocate exponentially more data and cannot be round-tripped by to_dense.
+    mode = modes[0] if modes else 0
+    identity_data = jnp.eye(ot.dims[mode], dtype=dtype or jnp.complex128)
     out = OperatorTerm(ot.dims)
-    out.append([ElementaryOperator(identity_data)], modes=modes, coeff=1.0)
+    out.append([ElementaryOperator(identity_data)], modes=(mode,), coeff=1.0)
     return out
 
 
@@ -375,20 +374,17 @@ class CuquantumImpl(QarrayImpl):
 
         Accepts:
             - ``OperatorTerm`` — used as-is.
-            - 2-D dense JAX array of shape ``(n, n)`` — wrapped as a
-              single-mode ``OperatorTerm`` on dims ``(n,)``.
-            - Higher-rank dense input — wrapped as a single virtual mode of
-              size ``n`` (the matrix dimension).  This loses mode structure
-              and defeats the purpose of the backend; user code should
-              build operators via ``destroy`` / ``tensor`` instead.
+            - Square 2-D dense JAX array — wrapped as a single-mode
+              ``OperatorTerm``. Multi-mode operators must be built from
+              local factors via ``tensor``.
         """
         if isinstance(data, OperatorTerm):
             return cls(_data=data)
 
         arr = jnp.asarray(data)
-        if arr.ndim < 2:
+        if arr.ndim != 2 or arr.shape[0] != arr.shape[1]:
             raise ValueError(
-                f"CuquantumImpl.from_data expects at least 2D data, got shape {arr.shape}"
+                f"CuquantumImpl.from_data expects a square 2D matrix, got shape {arr.shape}"
             )
         n = int(arr.shape[-1])
         ot = OperatorTerm((n,))
@@ -396,14 +392,18 @@ class CuquantumImpl(QarrayImpl):
         return cls(_data=ot)
 
     @classmethod
-    def identity_term(cls, n: int, dtype=None) -> "CuquantumImpl":
-        """Identity on a single mode of size ``n`` — encoded as an empty ``OperatorTerm``."""
-        return cls(_data=OperatorTerm((int(n),)))
+    def identity_term(cls, dims, dtype=None) -> "CuquantumImpl":
+        """Identity on one or more modes, encoded as an empty ``OperatorTerm``."""
+        dims = (int(dims),) if isinstance(dims, int) else tuple(int(d) for d in dims)
+        return cls(_data=OperatorTerm(dims))
 
     @classmethod
     def single_site(cls, matrix, n: int) -> "CuquantumImpl":
         """Wrap a single-site ``(n, n)`` matrix as a one-mode ``OperatorTerm``."""
-        return cls.from_data(jnp.asarray(matrix))
+        matrix = jnp.asarray(matrix)
+        if matrix.shape != (n, n):
+            raise ValueError(f"Expected a ({n}, {n}) single-site matrix, got {matrix.shape}")
+        return cls.from_data(matrix)
 
     # ------------------------------------------------------------------
     # Accessors
@@ -443,6 +443,9 @@ class CuquantumImpl(QarrayImpl):
         a_modes = a._data.modes[0] if a._data.op_prods else None
         a_data = _materialize_if_empty(a._data, modes=b_modes, dtype=a.dtype())
         b_data = _materialize_if_empty(b._data, modes=a_modes, dtype=b.dtype())
+        dtype = jnp.result_type(a_data.dtype, b_data.dtype)
+        a_data = _cuqnt_cast_dtype(a_data, dtype)
+        b_data = _cuqnt_cast_dtype(b_data, dtype)
         return CuquantumImpl(_data=a_data + b_data if _HAS_NATIVE_OPS else _cuqnt_add(a_data, b_data))
 
     def sub(self, other: QarrayImpl) -> QarrayImpl:
@@ -453,11 +456,17 @@ class CuquantumImpl(QarrayImpl):
         a_modes = a._data.modes[0] if a._data.op_prods else None
         a_data = _materialize_if_empty(a._data, modes=b_modes, dtype=a.dtype())
         b_data = _materialize_if_empty(b._data, modes=a_modes, dtype=b.dtype())
+        dtype = jnp.result_type(a_data.dtype, b_data.dtype)
+        a_data = _cuqnt_cast_dtype(a_data, dtype)
+        b_data = _cuqnt_cast_dtype(b_data, dtype)
         return CuquantumImpl(_data=a_data - b_data if _HAS_NATIVE_OPS else _cuqnt_sub(a_data, b_data))
 
     def mul(self, scalar) -> QarrayImpl:
         data = _materialize_if_empty(self._data, dtype=self.dtype())
-        return CuquantumImpl(_data=data * scalar if _HAS_NATIVE_OPS else _cuqnt_scalar_mul(scalar, data))
+        if _HAS_NATIVE_OPS:
+            data = _cuqnt_cast_dtype(data, jnp.result_type(data.dtype, scalar))
+            return CuquantumImpl(_data=data * scalar)
+        return CuquantumImpl(_data=_cuqnt_scalar_mul(scalar, data))
 
     def matmul(self, other: QarrayImpl) -> QarrayImpl:
         a, b = self._coerce(other)
@@ -467,7 +476,10 @@ class CuquantumImpl(QarrayImpl):
             return CuquantumImpl(_data=_lift_with_mode_shift(b._data, 0, b._data.dims))
         if not b._data.op_prods:  # A @ I = A
             return CuquantumImpl(_data=_lift_with_mode_shift(a._data, 0, a._data.dims))
-        return CuquantumImpl(_data=a._data @ b._data if _HAS_NATIVE_OPS else _cuqnt_matmul(a._data, b._data))
+        dtype = jnp.result_type(a._data.dtype, b._data.dtype)
+        left = _cuqnt_cast_dtype(a._data, dtype)
+        right = _cuqnt_cast_dtype(b._data, dtype)
+        return CuquantumImpl(_data=left @ right if _HAS_NATIVE_OPS else _cuqnt_matmul(left, right))
 
     def kron(self, other: QarrayImpl) -> QarrayImpl:
         a, b = self._coerce(other)
@@ -480,7 +492,10 @@ class CuquantumImpl(QarrayImpl):
             )
         if not b._data.op_prods:  # A ⊗ I_b: lift A keeping modes
             return CuquantumImpl(_data=_lift_with_mode_shift(a._data, 0, combined_dims))
-        return CuquantumImpl(_data=a._data & b._data if _HAS_NATIVE_OPS else _cuqnt_kron(a._data, b._data))
+        dtype = jnp.result_type(a._data.dtype, b._data.dtype)
+        left = _cuqnt_cast_dtype(a._data, dtype)
+        right = _cuqnt_cast_dtype(b._data, dtype)
+        return CuquantumImpl(_data=left & right if _HAS_NATIVE_OPS else _cuqnt_kron(left, right))
 
     def dag(self) -> QarrayImpl:
         # Empty OperatorTerm stays empty under dag(), which matches I† = I.
@@ -597,16 +612,7 @@ class CuquantumImpl(QarrayImpl):
         return _cuqnt_dag(arr)
 
     def _promote_to(self, target_cls):
-        """Refuse silent promotion *into* ``CuquantumImpl`` from a bare matrix.
-
-        Promoting a dense or sparse impl into cuquantum without ``dims``
-        information would wrap a potentially huge matrix as a single-mode
-        ``ElementaryOperator``, which defeats the backend's purpose.  We
-        densify on the way out (so cuquantum results can be consumed by
-        dense/sparse callers) but rely on user code to build cuquantum
-        operators via ``destroy(d, implementation="cuquantum")`` + ``tensor``
-        when they want the structured representation.
-        """
+        """Convert out of cuQuantum through dense when another backend wins."""
         if isinstance(self, target_cls):
             return self
         if target_cls is CuquantumImpl:

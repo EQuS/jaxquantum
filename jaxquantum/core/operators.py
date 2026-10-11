@@ -31,9 +31,9 @@ def _impl_from(impl_type: QarrayImplType, factory: str, *args, **kwargs) -> Qarr
 
 
 def _impl_type(implementation):
-    """Coerce ``implementation`` to a ``QarrayImplType`` member, or ``None``."""
+    """Resolve an explicit backend or the current default backend."""
     if implementation is None:
-        return None
+        implementation = SETTINGS.get("default_backend", QarrayImplType.DENSE)
     return QarrayImplType(implementation)
 
 
@@ -163,10 +163,12 @@ def qubit_rotation(theta: float, nx, ny, nz, implementation=None) -> Qarray:
         # ``CuquantumImpl.identity_term`` carries no dtype, so adding it to a
         # complex single-site op fails in cuquantum's OperatorTerm arithmetic.
         # Build dense and convert at the end.
-        result = jnp.cos(theta / 2) * identity(2) - 1j * jnp.sin(theta / 2) * (
-            nx * sigmax() + ny * sigmay() + nz * sigmaz()
+        result = jnp.cos(theta / 2) * identity(2, implementation="dense") - 1j * jnp.sin(theta / 2) * (
+            nx * sigmax(implementation="dense")
+            + ny * sigmay(implementation="dense")
+            + nz * sigmaz(implementation="dense")
         )
-        return result.to_backend(implementation)
+        return result.to_backend(impl_type)
     return jnp.cos(theta / 2) * identity(2, implementation=implementation) - 1j * jnp.sin(theta / 2) * (
         nx * sigmax(implementation=implementation)
         + ny * sigmay(implementation=implementation)
@@ -279,20 +281,9 @@ def identity_like(A, implementation=None) -> Qarray:
     total_dim = prod(space_dims)
     impl_type = _impl_type(implementation)
     if impl_type == QarrayImplType.CUQUANTUM:
-        # Build a multi-mode identity by kron'ing single-mode identities.
-        # Each one is an empty-product OperatorTerm on its mode.
-        identities = [
-            _impl_from(QarrayImplType.CUQUANTUM, "identity_term", int(d))
-            for d in space_dims
-        ]
-        result = identities[0]
-        for next_id in identities[1:]:
-            result = tensor(result, next_id)
-        # Re-tag dims to the (space_dims, space_dims) operator form.
-        return Qarray.create(
-            result._impl.get_data(),
-            dims=[space_dims, space_dims],
-            implementation=QarrayImplType.CUQUANTUM,
+        return Qarray.from_impl(
+            impl_type.get_impl_class().identity_term(space_dims),
+            dims=(space_dims, space_dims),
         )
     return Qarray.create(
         jnp.eye(total_dim, total_dim),
@@ -314,11 +305,10 @@ def displace(N, α, implementation=None) -> Qarray:
     Returns:
         Displace operator D(α)
     """
-    a = destroy(N, implementation=implementation)
+    impl_type = _impl_type(implementation)
+    a = destroy(N, implementation=impl_type)
     result = (α * a.dag() - jnp.conj(α) * a).expm()
-    if implementation is None:
-        return result
-    return result.to_backend(implementation)
+    return result.to_backend(impl_type)
 
 
 def squeeze(N, z, implementation=None) -> Qarray:
@@ -334,12 +324,11 @@ def squeeze(N, z, implementation=None) -> Qarray:
     Returns:
         Squeezing operator
     """
-    a = destroy(N, implementation=implementation)
+    impl_type = _impl_type(implementation)
+    a = destroy(N, implementation=impl_type)
     op = (1 / 2.0) * jnp.conj(z) * (a @ a) - (1 / 2.0) * z * (a.dag() @ a.dag())
     result = op.expm()
-    if implementation is None:
-        return result
-    return result.to_backend(implementation)
+    return result.to_backend(impl_type)
 
 
 def squeezing_linear_to_dB(z):

@@ -13,8 +13,9 @@ from .cfunctions import *  # noqa
 from .sparse_bcoo import *  # noqa — registers SparseBCOOImpl with QarrayImplType
 from .sparse_dia import *  # noqa — registers SparseDiaImpl with QarrayImplType
 
-# cuquantum is GPU-only and not a hard dependency; load it if present.
+# cuquantum is optional; let errors in an installed backend surface normally.
 try:
     from .cuquantum_impl import *  # noqa — registers CuquantumImpl
-except ImportError:
-    pass
+except ModuleNotFoundError as exc:
+    if exc.name not in {"cuquantum", "cuquantum.densitymat", "cuquantum.densitymat.jax"}:
+        raise
