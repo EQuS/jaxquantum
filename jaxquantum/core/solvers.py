@@ -663,13 +663,20 @@ def _sesolve_cuquantum_result(
     """Solve a Schrödinger equation using cuDensityMat operator actions."""
     from cuquantum.densitymat.jax import Operator, State, operator_action
 
+    from jaxquantum.core.cuquantum_impl import _cuqnt_cast_dtype
+
     h_test = H if isinstance(H, Qarray) else H(tlist[0])
     space_dims = tuple(int(d) for d in h_test.space_dims)
     psi0_arr = psi0.to_ket().to_dense().data
     h_at = (lambda t: H) if isinstance(H, Qarray) else H
 
+    # Promote dtype and use complex64 as a floor.
+    h_term_test = h_test._impl.to_operator_term()
+    data_dtypes = [h_term_test.dtype] if h_term_test.op_prods else []
+    target_dtype = jnp.result_type(*data_dtypes, psi0_arr.dtype, jnp.complex64)
+
     def rhs(t, psi, _):
-        h_term = h_at(t)._impl.to_operator_term()
+        h_term = _cuqnt_cast_dtype(h_at(t)._impl.to_operator_term(), target_dtype)
         op = Operator(space_dims, simplify=True)
         op.append(h_term, dual=False, coeff=-1j)
         psi_shape = psi.shape
