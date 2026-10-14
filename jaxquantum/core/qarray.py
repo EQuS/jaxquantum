@@ -48,11 +48,13 @@ class QarrayImplType(Enum):
         DENSE: Standard JAX dense array (``jnp.ndarray``).
         SPARSE_BCOO: JAX experimental BCOO sparse array.
         SPARSE_DIA: Diagonal sparse array.
+        CUQUANTUM: cuQuantum ``OperatorTerm`` (mode-structured, GPU-only).
     """
 
     DENSE = "dense"
     SPARSE_BCOO = "sparse_bcoo"
     SPARSE_DIA = "sparse_dia"
+    CUQUANTUM = "cuquantum"
 
     @classmethod
     def register(cls, impl_class, member):
@@ -122,23 +124,36 @@ class QarrayImplType(Enum):
         for cls_key, member in _IMPL_REGISTRY.items():
             if member is self:
                 return cls_key
+        if self is QarrayImplType.CUQUANTUM:
+            raise ImportError(
+                "The cuquantum backend is unavailable. Install cuquantum-python-cu13 "
+                "and the cuquantum JAX 0.0.7 PID to use it; see "
+                "docs/documentation/tutorials/_cuquantum_installation.md."
+            )
         raise ValueError(f"No impl class registered for {self}")
 
 
 def robust_asarray(data) -> Union[Array, sparse.BCOO]:
-    """Convert *data* to a JAX array, leaving sparse BCOO and SparseDiaData untouched.
+    """Convert *data* to a JAX array, leaving sparse / cuquantum containers untouched.
 
     Args:
-        data: Input data — any array-like, ``sparse.BCOO``, or ``SparseDiaData``.
+        data: Input data — any array-like, ``sparse.BCOO``, ``SparseDiaData``,
+            or ``CuquantumOpData``.
 
     Returns:
-        A ``jax.Array``, ``sparse.BCOO``, or ``SparseDiaData``.
+        A ``jax.Array``, ``sparse.BCOO``, ``SparseDiaData``, or
+        ``CuquantumOpData``.
     """
     if isinstance(data, sparse.BCOO):
         return data
     # SparseDiaData has a ``_is_sparse_dia`` marker; pass it through unchanged
     if getattr(data, "_is_sparse_dia", False):
         return data
+
+    # cuquantum backend
+    if type(data).__name__ == "OperatorTerm":
+        return data
+
     return jnp.asarray(data)
 
 
@@ -625,18 +640,24 @@ class DenseImpl(QarrayImpl):
 
     @classmethod
     def can_handle_data(cls, arr) -> bool:
-        """Return True for any non-BCOO, non-SparseDIA array.
+        """Return True for any non-BCOO, non-SparseDIA, non-cuquantum array.
 
-        ``SparseDiaData`` objects carry a ``_is_sparse_dia`` marker so we can
-        exclude them without a direct type import (which would be circular).
+        ``SparseDiaData`` and ``CuquantumOpData`` objects carry marker
+        attributes so we can exclude them without direct type imports (which
+        would be circular).
 
         Args:
             arr: Raw array.
 
         Returns:
-            True when *arr* is a plain dense array (not BCOO, not SparseDiaData).
+            True when *arr* is a plain dense array (not BCOO, not
+            SparseDiaData, not CuquantumOpData).
         """
-        return not isinstance(arr, sparse.BCOO) and not getattr(arr, "_is_sparse_dia", False)
+        return (
+            not isinstance(arr, sparse.BCOO)
+            and not getattr(arr, "_is_sparse_dia", False)
+            and type(arr).__name__ != "OperatorTerm"
+        )
 
     @classmethod
     def dag_data(cls, arr) -> Array:
@@ -713,7 +734,7 @@ class Qarray(Generic[ImplT]):
         ...
 
     @classmethod
-    def create(cls, data, dims=None, bdims=None, qtype=None, implementation=QarrayImplType.DENSE):
+    def create(cls, data, dims=None, bdims=None, qtype=None, implementation=None):
         """Create a ``Qarray`` from raw data.
 
         Handles shape normalisation, dimension inference, and tidying of small
@@ -741,14 +762,19 @@ class Qarray(Generic[ImplT]):
                 a :class:`Qtypes` member).  When given it is authoritative and
                 resolves shape ambiguity (e.g. a bare ``(N,)`` array with
                 ``qtype="ket"`` behaves like a legacy ``(N,1)`` input).
-            implementation: Storage backend — ``QarrayImplType.DENSE``
-                (default) or ``QarrayImplType.SPARSE_BCOO``, or the equivalent
-                string ``"dense"`` / ``"sparse_bcoo"``.
+            implementation: Storage backend, including ``"cuquantum"``.
+                ``None`` uses ``SETTINGS["default_backend"]``.
 
         Returns:
             A new ``Qarray`` backed by the requested implementation.
         """
+        if implementation is None:
+            implementation = SETTINGS.get("default_backend", QarrayImplType.DENSE)
+
         data = robust_asarray(data)
+        is_cuquantum_term = type(data).__name__ == "OperatorTerm"
+        if is_cuquantum_term and dims is None:
+            dims = (tuple(data.dims), tuple(data.dims))
 
         # Whether the caller explicitly requested a qtype (vs. it being derived
         # from a full ``dims`` tuple). An explicit qtype is authoritative and
@@ -812,6 +838,18 @@ class Qarray(Generic[ImplT]):
             data = data.reshape(*target_shape)
 
         check_dims(dims, bdims, data.shape)
+
+        if QarrayImplType(implementation) == QarrayImplType.CUQUANTUM:
+            if bdims:
+                raise ValueError("The cuquantum backend does not support batched operators")
+            if is_cuquantum_term:
+                if tuple(data.dims) != tuple(dims[0]):
+                    raise ValueError("OperatorTerm dims do not match Qarray dims")
+            elif len(dims[0]) != 1:
+                raise ValueError(
+                    "A dense multi-mode operator cannot be converted to cuquantum "
+                    "without losing its site structure; build local operators first"
+                )
 
         # NOTE: Constantly tidying up on Qarray creation might be a bit overkill.
         # It increases the compilation time, but only very slightly
@@ -960,6 +998,46 @@ class Qarray(Generic[ImplT]):
             A ``Qarray`` backed by ``SparseDiaImpl``.
         """
         return cls.create(data, dims=dims, bdims=bdims, implementation=QarrayImplType.SPARSE_DIA)
+
+    @classmethod
+    def from_impl(cls, impl: "QarrayImpl", dims=None, bdims=None) -> "Qarray":
+        """Wrap an already-constructed impl in a ``Qarray``.
+
+        Use when a smart constructor (e.g. ``SparseDiaImpl.from_diags`` or
+        ``CuquantumImpl.single_site``) has already built the impl and the
+        raw-data normalisation in :meth:`create` would be wasted work.
+
+        Args:
+            impl: A constructed :class:`QarrayImpl` instance.
+            dims: Quantum dimensions ``((row_dims...), (col_dims...))``.
+                Inferred from ``impl.shape()`` when ``None``.
+            bdims: Batch dimension sizes. Inferred from ``impl.shape()`` when
+                ``None``.
+
+        Returns:
+            A ``Qarray`` wrapping ``impl``.
+        """
+        shape = impl.shape()
+
+        if bdims is None:
+            bdims = tuple(shape[:-2])
+
+        if dims is None:
+            dims = ((shape[-2],), (shape[-1],))
+        elif not isinstance(dims[0], (list, tuple)):
+            if shape[-1] == 1:
+                dims = (tuple(dims), tuple([1 for _ in dims]))
+            elif shape[-2] == 1:
+                dims = (tuple([1 for _ in dims]), tuple(dims))
+            else:
+                dims = (tuple(dims), tuple(dims))
+        else:
+            dims = (tuple(dims[0]), tuple(dims[1]))
+
+        check_dims(dims, bdims, shape)
+        qdims = Qdims(dims)
+        impl = impl.tidy_up(SETTINGS["auto_tidyup_atol"])
+        return cls(impl, qdims, bdims)
 
     @classmethod
     @overload
@@ -1216,6 +1294,36 @@ class Qarray(Generic[ImplT]):
         new_impl = self._impl.to_dense()
         return Qarray(new_impl, self._qdims, self._bdims)
 
+    def to_backend(self, implementation) -> "Qarray":
+        """Return a ``Qarray`` with the same data on a different impl backend.
+
+        Tries a direct ``to_<name>`` method on the current impl when available,
+        otherwise routes through dense. No-op when already on the target.
+
+        Args:
+            implementation: The target backend — a ``QarrayImplType`` member
+                or its string equivalent.
+
+        Returns:
+            A ``Qarray`` whose ``impl_type`` matches the requested backend.
+        """
+        target_type = QarrayImplType(implementation)
+        if self.impl_type == target_type:
+            return self
+        if target_type == QarrayImplType.CUQUANTUM and len(self.space_dims) != 1:
+            raise ValueError(
+                "A dense multi-mode operator cannot be converted to cuquantum "
+                "without losing its site structure; build local operators first"
+            )
+        target_class = target_type.get_impl_class()
+        method_name = f"to_{target_type.value}"
+        if hasattr(self._impl, method_name):
+            new_impl = getattr(self._impl, method_name)()
+        else:
+            # No direct path (e.g. anything → cuquantum) — densify first.
+            new_impl = target_class.from_data(self._impl.to_dense().data)
+        return Qarray(new_impl, self._qdims, self._bdims)
+
     def __getitem__(self, index):
         if len(self.bdims) > 0:
             impl = type(self._impl).from_data(self.data[index])
@@ -1383,8 +1491,10 @@ class Qarray(Generic[ImplT]):
         # never reshaped to (N,1) for storage.
         if st == Qtypes.oper and ot == Qtypes.ket:
             vec = other.to_dense().data  # (..., N)
-            if self.is_dense:
-                out = jnp.einsum("...ij,...j->...i", self.data, vec)
+            if self.is_dense or self.impl_type == QarrayImplType.CUQUANTUM:
+                # cuQuantum stores operators, not kets. Its solver uses
+                # operator_action; a standalone @ falls back to a dense matrix.
+                out = jnp.einsum("...ij,...j->...i", self.to_dense().data, vec)
             else:
                 # Transient column only inside the sparse kernel; never stored.
                 rhs = vec[..., None]  # (..., N, 1)
@@ -1410,7 +1520,6 @@ class Qarray(Generic[ImplT]):
         if isinstance(other, Qarray):
             return self.__matmul__(other)
 
-        other = other + 0.0j
         if not robust_isscalar(other) and len(other.shape) > 0:  # not a scalar
             # Broadcast per-batch scalars against the stored data: vectors carry
             # a single trailing space axis, operators carry two.

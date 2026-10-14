@@ -48,6 +48,7 @@ SETTINGS: dict = {
     "auto_tidyup_atol": 1e-14,
     # Optional[jax.sharding.Sharding | Callable[[Array], jax.sharding.Sharding]]
     "default_sharding": None,
+    "default_backend": "dense",
 }
 
 

@@ -12,7 +12,7 @@ from jax.experimental import sparse as _sparse
 
 from jaxquantum.core.dims import Qdims
 from jaxquantum.core.operators import identity_like, multi_mode_basis_set
-from jaxquantum.core.qarray import DenseImpl, Qarray, Qtypes, dag_data
+from jaxquantum.core.qarray import DenseImpl, Qarray, QarrayImplType, Qtypes, dag_data
 from jaxquantum.utils.utils import robust_isscalar
 
 
@@ -339,6 +339,11 @@ def mesolve_result(
             "initial state is not a density matrix."
         )
 
+    h_test = H if isinstance(H, Qarray) else H(tlist[0]) if callable(H) else None
+    if isinstance(h_test, Qarray) and h_test.impl_type == QarrayImplType.CUQUANTUM:
+        return _mesolve_cuquantum_result(
+            H, rho0, tlist, saveat_tlist, collapse_ops, solver_options
+        )
     rho_data = rho0.to_dm().to_dense()
 
     if robust_isscalar(H):
@@ -486,6 +491,9 @@ def sesolve_result(
     if rho0.qtype == Qtypes.oper:
         raise ValueError("Use mesolve() for an initial density matrix.")
 
+    h_test = H if isinstance(H, Qarray) else H(tlist[0]) if callable(H) else None
+    if isinstance(h_test, Qarray) and h_test.impl_type == QarrayImplType.CUQUANTUM:
+        return _sesolve_cuquantum_result(H, rho0, tlist, saveat_tlist, solver_options)
     state = rho0.to_ket().to_dense()
 
     if robust_isscalar(H):
@@ -540,6 +548,139 @@ def _sesolve_result_data(
         solver_options=solver_options,
     )
 
+
+# cuQuantum solver path ------------------------------------------------------
+
+
+def _mesolve_cuquantum_result(
+    H, rho0: Qarray, tlist: Array, saveat_tlist: Array | None,
+    c_ops, solver_options: SolverOptions | None,
+) -> diffrax.Solution:
+    """Solve a master equation using cuDensityMat operator actions."""
+    from cuquantum.densitymat.jax import Operator, State, operator_action
+
+    from jaxquantum.core.cuquantum_impl import (
+        _cuqnt_cast_dtype,
+        _cuqnt_dag,
+        _reverse_elementary_product,
+    )
+    from jaxquantum.utils.cuquantum_util import OperatorTerm
+
+    h_test = H if isinstance(H, Qarray) else H(tlist[0])
+    space_dims = tuple(int(d) for d in h_test.space_dims)
+    rho0_arr = rho0.to_dm().to_dense().data
+
+    if c_ops is None or len(c_ops) == 0:
+        collapse_ops = []
+    elif isinstance(c_ops, (list, tuple)):
+        collapse_ops = list(c_ops)
+    elif isinstance(c_ops, Qarray) and c_ops.impl_type == QarrayImplType.CUQUANTUM:
+        collapse_ops = [c_ops[k] for k in range(len(c_ops))]
+    else:
+        raise TypeError(
+            "cuquantum mesolve requires a list of cuquantum-backed collapse operators"
+        )
+
+    for collapse_op in collapse_ops:
+        if not isinstance(collapse_op, Qarray) or collapse_op.impl_type != QarrayImplType.CUQUANTUM:
+            raise TypeError("Every collapse operator must use the cuquantum backend")
+
+    operator_terms = [
+        h_test._impl.to_operator_term(),
+        *(collapse_op._impl.to_operator_term() for collapse_op in collapse_ops),
+    ]
+    data_dtypes = [term.dtype for term in operator_terms if term.op_prods]
+    # Promote dtype and use complex64 as a floor.
+    target_dtype = jnp.result_type(*data_dtypes, rho0_arr.dtype, jnp.complex64)
+
+    dissipator = None
+    if collapse_ops:
+        dissipator = OperatorTerm(space_dims)
+        for collapse_op in collapse_ops:
+            left = _cuqnt_cast_dtype(collapse_op._impl._data, target_dtype)
+            right = _cuqnt_dag(left)
+            for left_factors, left_modes, left_coeff in zip(
+                left.op_prods, left.modes, left.coeffs
+            ):
+                for right_factors, right_modes, right_coeff in zip(
+                    right.op_prods, right.modes, right.coeffs
+                ):
+                    ket_duals = (False,) * len(left_modes)
+                    bra_duals = (True,) * len(right_modes)
+                    bra_jump_factors, bra_jump_modes, _ = _reverse_elementary_product(
+                        right_factors, right_modes, bra_duals
+                    )
+                    bra_anti_factors, bra_anti_modes, _ = _reverse_elementary_product(
+                        (*left_factors, *right_factors),
+                        left_modes + right_modes,
+                        bra_duals + bra_duals,
+                    )
+                    coeff = left_coeff * right_coeff
+                    dissipator.append(
+                        [*left_factors, *bra_jump_factors],
+                        modes=left_modes + bra_jump_modes,
+                        duals=ket_duals + bra_duals,
+                        coeff=coeff,
+                    )
+                    dissipator.append(
+                        bra_anti_factors,
+                        modes=bra_anti_modes,
+                        duals=bra_duals + bra_duals,
+                        coeff=-0.5 * coeff,
+                    )
+                    dissipator.append(
+                        [*left_factors, *right_factors],
+                        modes=left_modes + right_modes,
+                        duals=ket_duals + ket_duals,
+                        coeff=-0.5 * coeff,
+                    )
+
+    h_at = (lambda t: H) if isinstance(H, Qarray) else H
+
+    def rhs(t, rho, _):
+        h_term = _cuqnt_cast_dtype(h_at(t)._impl.to_operator_term(), target_dtype)
+        liouvillian = Operator(space_dims, simplify=True)
+        liouvillian.append(h_term, dual=False, coeff=-1j)
+        liouvillian.append(h_term, dual=True, coeff=1j)
+        if dissipator is not None:
+            liouvillian.append(dissipator, dual=False, coeff=1.0)
+        rho_shape = rho.shape
+        state = State(rho.reshape(*rho.shape[:-2], *space_dims, *space_dims))
+        derivative = operator_action(liouvillian, state).get_data()[0]
+        return derivative.reshape(rho_shape)
+
+    return solve(rhs, rho0_arr, tlist, saveat_tlist, solver_options=solver_options)
+
+
+def _sesolve_cuquantum_result(
+    H, psi0: Qarray, tlist: Array, saveat_tlist: Array | None,
+    solver_options: SolverOptions | None,
+) -> diffrax.Solution:
+    """Solve a Schrödinger equation using cuDensityMat operator actions."""
+    from cuquantum.densitymat.jax import Operator, State, operator_action
+
+    from jaxquantum.core.cuquantum_impl import _cuqnt_cast_dtype
+
+    h_test = H if isinstance(H, Qarray) else H(tlist[0])
+    space_dims = tuple(int(d) for d in h_test.space_dims)
+    psi0_arr = psi0.to_ket().to_dense().data
+    h_at = (lambda t: H) if isinstance(H, Qarray) else H
+
+    # Promote dtype and use complex64 as a floor.
+    h_term_test = h_test._impl.to_operator_term()
+    data_dtypes = [h_term_test.dtype] if h_term_test.op_prods else []
+    target_dtype = jnp.result_type(*data_dtypes, psi0_arr.dtype, jnp.complex64)
+
+    def rhs(t, psi, _):
+        h_term = _cuqnt_cast_dtype(h_at(t)._impl.to_operator_term(), target_dtype)
+        op = Operator(space_dims, simplify=True)
+        op.append(h_term, dual=False, coeff=-1j)
+        psi_shape = psi.shape
+        state = State(psi.reshape(*psi.shape[:-1], *space_dims))
+        derivative = operator_action(op, state).get_data()[0]
+        return derivative.reshape(psi_shape)
+
+    return solve(rhs, psi0_arr, tlist, saveat_tlist, solver_options=solver_options)
 
 # propagators
 

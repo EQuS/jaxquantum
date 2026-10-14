@@ -49,10 +49,15 @@ extra:
 watch:
   - docs
   - jaxquantum
+  - AGENTS.md
+hooks:
+  - docs/scripts/publish_agents.py
 plugins:
   - search
   - mkdocs-jupyter:
       execute: true
+      execute_ignore:
+        - cuquantum.ipynb  # Requires the optional cuQuantum package and CUDA.
       include: ["*.ipynb"]
   - gen-files:
       scripts:
@@ -114,5 +119,6 @@ nav:
       - Bosonic Codes: documentation/tutorials/bosonic_codes.ipynb
       - Circuits: documentation/tutorials/circuits.ipynb
       - Sparse Backends: documentation/tutorials/sparse_backends.ipynb
+      - cuQuantum Backend: documentation/tutorials/cuquantum.ipynb
       - Sharding: documentation/tutorials/sharding.ipynb
   - Code Reference: reference/
