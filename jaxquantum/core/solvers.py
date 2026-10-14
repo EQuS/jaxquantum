@@ -590,7 +590,8 @@ def _mesolve_cuquantum_result(
         *(collapse_op._impl.to_operator_term() for collapse_op in collapse_ops),
     ]
     data_dtypes = [term.dtype for term in operator_terms if term.op_prods]
-    target_dtype = jnp.result_type(*data_dtypes) if data_dtypes else jnp.complex128
+    # Promote dtype and use complex64 as a floor.
+    target_dtype = jnp.result_type(*data_dtypes, rho0_arr.dtype, jnp.complex64)
 
     dissipator = None
     if collapse_ops:
@@ -637,17 +638,12 @@ def _mesolve_cuquantum_result(
     h_at = (lambda t: H) if isinstance(H, Qarray) else H
 
     def rhs(t, rho, _):
-        h_term = h_at(t)._impl.to_operator_term()
-        rhs_dtype = jnp.result_type(target_dtype, h_term.dtype) if h_term.op_prods else target_dtype
-        h_term = _cuqnt_cast_dtype(h_term, rhs_dtype)
-        rhs_dissipator = (
-            _cuqnt_cast_dtype(dissipator, rhs_dtype) if dissipator is not None else None
-        )
+        h_term = _cuqnt_cast_dtype(h_at(t)._impl.to_operator_term(), target_dtype)
         liouvillian = Operator(space_dims, simplify=True)
         liouvillian.append(h_term, dual=False, coeff=-1j)
         liouvillian.append(h_term, dual=True, coeff=1j)
-        if rhs_dissipator is not None:
-            liouvillian.append(rhs_dissipator, dual=False, coeff=1.0)
+        if dissipator is not None:
+            liouvillian.append(dissipator, dual=False, coeff=1.0)
         rho_shape = rho.shape
         state = State(rho.reshape(*rho.shape[:-2], *space_dims, *space_dims))
         derivative = operator_action(liouvillian, state).get_data()[0]
