@@ -134,3 +134,4 @@ experiments/circuit/state-prep/data/*
 benchmarks/results/*.json
 
 local/*
+.local/

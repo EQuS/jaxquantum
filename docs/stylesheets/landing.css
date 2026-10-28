@@ -78,6 +78,17 @@
     margin: 0;
 }
 
+.hero-agent {
+    max-width: 440px;
+    margin: 0 0 1.5rem;
+    font-size: 0.85rem;
+}
+
+.hero-agent .highlight,
+.hero-agent pre {
+    margin: 0;
+}
+
 .hero-buttons {
     display: flex;
     flex-wrap: wrap;

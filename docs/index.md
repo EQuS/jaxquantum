@@ -20,6 +20,14 @@ pip install jaxquantum # Py 3.11+
 ```
 </div>
 
+<div class="hero-agent" markdown>
+Using an AI agent? Paste this prompt:
+
+```text
+Get started with jaxquantum by reading https://jaxquantum.org/AGENTS.md.
+```
+</div>
+
 <div class="hero-buttons" markdown>
 [Get Started :material-arrow-right:](documentation/index.md){ .md-button .md-button--primary }
 [Tutorials](documentation/tutorials/index.md){ .md-button }

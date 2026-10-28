@@ -49,13 +49,15 @@ pip install -e ".[dev,docs,tests]"
 ```
 This installs the `dev` , `tests` and `docs` extras as well, which are useful when developing the package. Since it is installed in editable mode, the package will automatically pick up new changes pulled in the repository. Add the `gpu` or `tpu` extra if needed.
 
-Before submitting changes, run the complete test suite from the repository root:
+Before submitting changes, run the PR checks from the repository root:
 
 ```bash
-bash test.sh --docs
+bash test.sh
 ```
 
-This runs ordinary tests, isolated virtual-CPU sharding tests, and every documentation notebook. Omit `--docs` for code tests only.
+This checks Ruff without changing files, runs ordinary tests and isolated
+virtual-CPU sharding tests, executes the documentation notebooks, and builds
+the docs site. Use `--no-docs` for a faster code-only check.
 
 ## Check Hardware
 

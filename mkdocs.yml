@@ -49,6 +49,9 @@ extra:
 watch:
   - docs
   - jaxquantum
+  - AGENTS.md
+hooks:
+  - docs/scripts/publish_agents.py
 plugins:
   - search
   - mkdocs-jupyter:
