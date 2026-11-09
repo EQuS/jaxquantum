@@ -245,3 +245,64 @@ def test_callable_rejects_incompatible_hilbert_space():
             0.0, _initial_density(), jnp.array([0.0, 1.0]),
             c_ops=lambda t: jqt.Qarray.from_list([jqt.destroy(3)]),
         )
+
+
+def test_callable_time_dependent_hamiltonian_and_dephasing():
+    """Both time-dependent terms contribute the correct integrated phase and decay.
+
+    A nonzero integration start time also checks that the rates are integrated
+    over the requested interval, rather than implicitly starting at zero.
+    """
+    times = jnp.linspace(0.4, 2.4, 41)
+    t0 = times[0]
+    ground, excited = jqt.basis(2, 0), jqt.basis(2, 1)
+    rho0 = (ground + excited).unit().to_dm()
+    tau = 1.3
+
+    def hamiltonian(t):
+        return (0.13 + 0.06 * t) * jqt.sigmaz()
+
+    def collapse(t):
+        gamma_phi = 0.11 + 0.05 * jnp.exp(-t / tau)
+        return jqt.Qarray.from_list(
+            [jnp.sqrt(gamma_phi / 2.0) * jqt.sigmaz()]
+        )
+
+    result = jqt.mesolve(
+        hamiltonian,
+        rho0,
+        times,
+        c_ops=collapse,
+        solver_options=jqt.SolverOptions(progress_meter=None),
+    ).to_dense().data
+
+    integral_phi = (
+        0.11 * (times - t0)
+        + 0.05 * tau * (jnp.exp(-t0 / tau) - jnp.exp(-times / tau))
+    )
+    # H(t) = h(t) Z, so the |0><1| coherence acquires phase -2 ∫ h(t) dt.
+    integrated_phase = (
+        0.26 * (times - t0)
+        + 0.06 * (times**2 - t0**2)
+    )
+    expected_coherence = (
+        0.5 * jnp.exp(-integral_phi - 1j * integrated_phase)
+    )
+    np.testing.assert_allclose(
+        result[..., 0, 1],
+        expected_coherence,
+        rtol=3e-5,
+        atol=3e-5,
+    )
+    np.testing.assert_allclose(
+        jnp.real(result[..., 1, 1]),
+        0.5,
+        rtol=2e-5,
+        atol=2e-5,
+    )
+    np.testing.assert_allclose(
+        jnp.trace(result, axis1=-2, axis2=-1),
+        jnp.ones(len(times)),
+        rtol=2e-5,
+        atol=2e-5,
+    )
