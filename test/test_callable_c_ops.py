@@ -203,6 +203,10 @@ def test_callable_sparse_operator_matches_dense():
     times = jnp.linspace(0.0, 2.0, 21)
     dense_lowering = jqt.destroy(2)
     sparse_lowering = dense_lowering.to_sparse_bcoo()
+    # Pre-stack the BCOO operator before JAX traces the time-dependent callback.
+    # Qarray.from_list() densifies and re-sparsifies BCOO inputs, which needs
+    # a concrete nse (number of stored elements) and is not trace-safe.
+    sparse_stack = jqt.Qarray.from_list([sparse_lowering])
     options = jqt.SolverOptions(progress_meter=None)
 
     def dense_c_ops(t):
@@ -211,7 +215,8 @@ def test_callable_sparse_operator_matches_dense():
 
     def sparse_c_ops(t):
         rate = 0.15 + 0.22 * jnp.exp(-t / 1.1)
-        return jqt.Qarray.from_list([jnp.sqrt(rate) * sparse_lowering])
+        # Scalar multiplication updates stored values without changing indices.
+        return jnp.sqrt(rate) * sparse_stack
 
     dense = jqt.mesolve(
         0.0, _initial_density(), times,
