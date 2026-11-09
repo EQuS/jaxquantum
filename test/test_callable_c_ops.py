@@ -85,3 +85,79 @@ def test_callable_jit_grad_and_batch():
     np.testing.assert_allclose(
         grad, target_grad, atol=3e-5, rtol=2e-4
     )
+
+
+def test_callable_pure_dephasing():
+    """Nonstationary Z dephasing must suppress only the coherence."""
+    ts = jnp.linspace(0.0, 4.0, 41)
+    ground, excited = jqt.basis(2, 0), jqt.basis(2, 1)
+    rho0 = (ground + excited).unit().to_dm()
+    gamma0, amp, tau = 0.12, 0.22, 1.7
+
+    def collapse(t):
+        rate = gamma0 + amp * jnp.exp(-t / tau)
+        return jqt.Qarray.from_list(
+            [jnp.sqrt(rate / 2.0) * jqt.sigmaz()]
+        )
+
+    result = jqt.mesolve(
+        0.0,
+        rho0,
+        ts,
+        c_ops=collapse,
+        solver_options=jqt.SolverOptions(progress_meter=None),
+    ).to_dense().data
+    integrated = gamma0 * ts + amp * tau * (1 - jnp.exp(-ts / tau))
+    np.testing.assert_allclose(
+        jnp.real(result[..., 0, 1]),
+        0.5 * jnp.exp(-integrated),
+        rtol=2e-5,
+        atol=2e-5,
+    )
+    np.testing.assert_allclose(
+        jnp.real(result[..., 1, 1]),
+        0.5,
+        rtol=2e-5,
+        atol=2e-5,
+    )
+
+
+def test_callable_multiple_relaxation_and_dephasing():
+    """Two dynamic collapse operators must combine their dissipators."""
+    ts = jnp.linspace(0.0, 4.0, 41)
+    ground, excited = jqt.basis(2, 0), jqt.basis(2, 1)
+    rho0 = (ground + excited).unit().to_dm()
+    t1, tp = 1.25, 2.0
+
+    def collapse(t):
+        gamma_1 = 0.12 + 0.20 * jnp.exp(-t / t1)
+        gamma_phi = 0.06 + 0.10 * jnp.exp(-t / tp)
+        return jqt.Qarray.from_list(
+            [
+                jnp.sqrt(gamma_1) * jqt.destroy(2),
+                jnp.sqrt(gamma_phi / 2.0) * jqt.sigmaz(),
+            ]
+        )
+
+    result = jqt.mesolve(
+        0.0,
+        rho0,
+        ts,
+        c_ops=collapse,
+        solver_options=jqt.SolverOptions(progress_meter=None),
+    ).to_dense().data
+
+    integrated_1 = 0.12 * ts + 0.20 * t1 * (1 - jnp.exp(-ts / t1))
+    integrated_phi = 0.06 * ts + 0.10 * tp * (1 - jnp.exp(-ts / tp))
+    np.testing.assert_allclose(
+        jnp.real(result[..., 1, 1]),
+        0.5 * jnp.exp(-integrated_1),
+        rtol=2e-5,
+        atol=2e-5,
+    )
+    np.testing.assert_allclose(
+        jnp.real(result[..., 0, 1]),
+        0.5 * jnp.exp(-(0.5 * integrated_1 + integrated_phi)),
+        rtol=2e-5,
+        atol=2e-5,
+    )
