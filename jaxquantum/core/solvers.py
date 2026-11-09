@@ -297,7 +297,9 @@ def mesolve(
         rho0: Initial ket or density matrix.
         tlist: Integration interval; also the default save times.
         saveat_tlist: Save times. An empty array saves only the final state.
-        c_ops: Static collapse operators or callable returning a fixed-shape stack of collapse operators at time t.
+        c_ops: Static collapse-operator stack or callable ``c_ops(t)`` returning
+            a Qarray stack. For callables, the operator count, matrix dimensions,
+            and batch shapes must remain fixed throughout the solve.
         solver_options: Native Diffrax configuration.
 
     Returns:
@@ -335,6 +337,8 @@ def mesolve_result(
     initial_c_ops = (
         collapse_ops(tlist[0]) if callable(collapse_ops) else collapse_ops
     )
+    if callable(collapse_ops) and not isinstance(initial_c_ops, Qarray):
+        raise TypeError("Callable c_ops(t) must return a Qarray stack.")
 
     if len(initial_c_ops) == 0 and rho0.qtype != Qtypes.oper:
         logging.warning(  # noqa: LOG015
@@ -343,6 +347,15 @@ def mesolve_result(
         )
 
     rho_data = rho0.to_dm().to_dense()
+    if (
+        callable(collapse_ops)
+        and len(initial_c_ops) > 0
+        and initial_c_ops.shape[-2:] != rho_data.data.shape[-2:]
+    ):
+        raise ValueError(
+            "Callable c_ops(t) operators must match the initial state's "
+            "Hilbert-space dimensions."
+        )
 
     if robust_isscalar(H):
         H = H * identity_like(rho_data)
