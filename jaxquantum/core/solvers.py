@@ -287,7 +287,7 @@ def mesolve(
     rho0: Qarray,
     tlist: Array,
     saveat_tlist: Array | None = None,
-    c_ops: Qarray | None = None,
+    c_ops: Qarray | Callable[[float], Qarray] | None = None,
     solver_options: SolverOptions | None = None,
 ) -> Qarray:
     """Solve a Lindblad master equation and return the saved states.
@@ -297,7 +297,7 @@ def mesolve(
         rho0: Initial ket or density matrix.
         tlist: Integration interval; also the default save times.
         saveat_tlist: Save times. An empty array saves only the final state.
-        c_ops: Collapse operators.
+        c_ops: Static collapse operators or callable returning a fixed-shape stack of collapse operators at time t.
         solver_options: Native Diffrax configuration.
 
     Returns:
@@ -323,7 +323,7 @@ def mesolve_result(
     rho0: Qarray,
     tlist: Array,
     saveat_tlist: Array | None = None,
-    c_ops: Qarray | None = None,
+    c_ops: Qarray | Callable[[float], Qarray] | None = None,
     solver_options: SolverOptions | None = None,
 ) -> diffrax.Solution:
     """Solve a Lindblad master equation and return its Diffrax solution.
@@ -332,8 +332,11 @@ def mesolve_result(
     ``SaveAt`` functions, or continuation state.
     """
     collapse_ops = c_ops if c_ops is not None else Qarray.from_list([])
+    initial_c_ops = (
+        collapse_ops(tlist[0]) if callable(collapse_ops) else collapse_ops
+    )
 
-    if len(collapse_ops) == 0 and rho0.qtype != Qtypes.oper:
+    if len(initial_c_ops) == 0 and rho0.qtype != Qtypes.oper:
         logging.warning(  # noqa: LOG015
             "Consider sesolve(): no collapse operators were provided and the "
             "initial state is not a density matrix."
@@ -349,12 +352,17 @@ def mesolve_result(
     else:
         H_data = lambda t: H(t).data
 
+    c_ops_data = (
+        (lambda t: collapse_ops(t).data)
+        if callable(collapse_ops)
+        else collapse_ops.data
+    )
     return _mesolve_result_data(
         H_data,
         rho_data.data,
         tlist,
         saveat_tlist,
-        collapse_ops.data,
+        c_ops_data,
         solver_options=solver_options,
     )
 
@@ -364,12 +372,17 @@ def _mesolve_result_data(
     rho0: Array,
     tlist: Array,
     saveat_tlist: Array | None,
-    c_ops: Array | None = None,
+    c_ops: Array | Callable[[float], Array] | None = None,
     solver_options: SolverOptions | None = None,
 ) -> diffrax.Solution:
     """Array-level master-equation implementation."""
 
-    c_ops = c_ops if c_ops is not None else jnp.array([])
+    dynamic_c_ops = callable(c_ops)
+    initial_c_ops = (
+        c_ops(tlist[0]) if dynamic_c_ops
+        else (c_ops if c_ops is not None else jnp.array([]))
+    )
+    # Callables must return the same operator count and array shape for all times.
 
     # Shape inference: when c_ops contains batched operators (e.g. shape
     # (1, B, N, N)), the initial state ρ0 must be broadcast to (B, N, N) so
@@ -381,20 +394,24 @@ def _mesolve_result_data(
     #   ρ0 batch dims        →  ρ0.shape[:-2]
     # This is a pure shape calculation — no array values are materialised.
     H0_shape = H(tlist[0]).shape
-    if len(c_ops) == 0:
+    if len(initial_c_ops) == 0:
         batch_shape = jnp.broadcast_shapes(H0_shape[:-2], rho0.shape[:-2])
     else:
         # c_ops.shape[1:-2]: strip the outermost (c_op index) dim and the two
         # matrix dims to get the batch dims that will be broadcast into ρ.
         batch_shape = jnp.broadcast_shapes(
-            c_ops.shape[1:-2], H0_shape[:-2], rho0.shape[:-2]
+            initial_c_ops.shape[1:-2], H0_shape[:-2], rho0.shape[:-2]
         )
     rho = jnp.broadcast_to(rho0, batch_shape + rho0.shape[-2:])
 
     # Precompute the adjoint once, outside the ODE hot-loop.
     # dag_data dispatches to the correct impl (dense or sparse) automatically,
     # so c_ops_dag is BCOO when c_ops is sparse and a dense array otherwise.
-    c_ops_dag = dag_data(c_ops) if len(c_ops) != 0 else c_ops
+    c_ops_dag = (
+        dag_data(initial_c_ops)
+        if len(initial_c_ops) != 0 and not dynamic_c_ops
+        else initial_c_ops
+    )
 
     def f(
         t: float,
@@ -402,6 +419,9 @@ def _mesolve_result_data(
         args,
     ):
         c_ops_val, c_ops_dag_val = args
+        if dynamic_c_ops:
+            c_ops_val = c_ops(t)
+            c_ops_dag_val = dag_data(c_ops_val)
         H_val = H(t)  # type: ignore
 
         rho_dot = -1j * (H_val @ rho - rho @ H_val)
@@ -434,7 +454,7 @@ def _mesolve_result_data(
         rho,
         tlist,
         saveat_tlist,
-        (c_ops, c_ops_dag),
+        (initial_c_ops, c_ops_dag),
         solver_options=solver_options,
     )
 
