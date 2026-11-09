@@ -1,4 +1,4 @@
-"""Compare static and callable Lindblad collapse operators on identical dynamics.
+"""Benchmark static, constant-callable, and time-varying collapse operators.
 
 Run from the repository root:
     python benchmarks/time_dependent_c_ops.py --iterations 20
