@@ -5,6 +5,7 @@ These exercise the JAXQuantum + Diffrax solver, not an independent RK4 driver.
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 import jaxquantum as jqt
 
 
@@ -161,3 +162,81 @@ def test_callable_multiple_relaxation_and_dephasing():
         rtol=2e-5,
         atol=2e-5,
     )
+
+
+def test_callable_batched_operator_stack():
+    """A single solve supports distinct rates along the operator batch axis."""
+    times = jnp.linspace(0.0, 3.0, 31)
+    base = jnp.array([0.12, 0.24, 0.35])
+    amplitude = jnp.array([0.07, 0.11, 0.21])
+    tau = 1.4
+    lowering = jqt.destroy(2)
+
+    def collapse(t):
+        rates = base + amplitude * jnp.exp(-t / tau)
+        return jqt.Qarray.from_list([jnp.sqrt(rates) * lowering])
+
+    result = jqt.mesolve(
+        0.0,
+        _initial_density(),
+        times,
+        c_ops=collapse,
+        solver_options=jqt.SolverOptions(progress_meter=None),
+    ).to_dense().data
+
+    assert result.shape == (len(times), 3, 2, 2)
+    integral = (
+        times[:, None] * base[None, :]
+        + tau * amplitude[None, :]
+        * (1 - jnp.exp(-times[:, None] / tau))
+    )
+    np.testing.assert_allclose(
+        jnp.real(result[..., 1, 1]),
+        jnp.exp(-integral),
+        rtol=2e-5,
+        atol=2e-5,
+    )
+
+
+def test_callable_sparse_operator_matches_dense():
+    """A fixed BCOO sparsity pattern supports a time-dependent rate."""
+    times = jnp.linspace(0.0, 2.0, 21)
+    dense_lowering = jqt.destroy(2)
+    sparse_lowering = dense_lowering.to_sparse_bcoo()
+    options = jqt.SolverOptions(progress_meter=None)
+
+    def dense_c_ops(t):
+        rate = 0.15 + 0.22 * jnp.exp(-t / 1.1)
+        return jqt.Qarray.from_list([jnp.sqrt(rate) * dense_lowering])
+
+    def sparse_c_ops(t):
+        rate = 0.15 + 0.22 * jnp.exp(-t / 1.1)
+        return jqt.Qarray.from_list([jnp.sqrt(rate) * sparse_lowering])
+
+    dense = jqt.mesolve(
+        0.0, _initial_density(), times,
+        c_ops=dense_c_ops, solver_options=options,
+    ).to_dense().data
+    sparse = jqt.mesolve(
+        0.0, _initial_density(), times,
+        c_ops=sparse_c_ops, solver_options=options,
+    ).to_dense().data
+    np.testing.assert_allclose(sparse, dense, atol=2e-5, rtol=2e-5)
+
+
+def test_callable_rejects_non_qarray_result():
+    """Invalid dynamic return types should fail with an actionable error."""
+    with pytest.raises(TypeError, match=r"c_ops\(t\).*Qarray"):
+        jqt.mesolve(
+            0.0, _initial_density(), jnp.array([0.0, 1.0]),
+            c_ops=lambda t: jnp.ones((1, 2, 2)),
+        )
+
+
+def test_callable_rejects_incompatible_hilbert_space():
+    """The collapse operator and density matrix must have compatible sizes."""
+    with pytest.raises(ValueError, match="Hilbert-space dimensions"):
+        jqt.mesolve(
+            0.0, _initial_density(), jnp.array([0.0, 1.0]),
+            c_ops=lambda t: jqt.Qarray.from_list([jqt.destroy(3)]),
+        )
