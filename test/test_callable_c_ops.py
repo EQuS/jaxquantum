@@ -14,7 +14,9 @@ def _initial_density():
 
 def _collapses(t, gamma0, amp, tau):
     rate = gamma0 + amp * jnp.exp(-t / tau)
-    return jqt.Qarray.from_list([jnp.sqrt(rate) * jqt.sigmam()])
+    # destroy(2) = |0><1|, so an initial |1> must decay toward |0>.
+    # JAXQuantum's sigmam() instead has matrix |1><0| in this basis.
+    return jqt.Qarray.from_list([jnp.sqrt(rate) * jqt.destroy(2)])
 
 
 def _analytic(t, gamma0, amp, tau):
@@ -53,6 +55,13 @@ def test_callable_static_equivalence():
     )
     np.testing.assert_allclose(
         dynamic.to_dense().data, reference.to_dense().data, atol=2e-5
+    )
+    # Constant callable/static equivalence must be nontrivial, not 1 == 1.
+    np.testing.assert_allclose(
+        jnp.real(reference.to_dense().data[..., 1, 1]),
+        jnp.exp(-0.2 * ts),
+        atol=2e-5,
+        rtol=2e-5,
     )
 
 
